@@ -11,6 +11,7 @@ const authRoutes = require('./src/routes/authRoutes');
 const testRoutes = require('./src/routes/testRoutes');
 const activoRoutes = require('./src/routes/activoRoutes');
 const usuarioRoutes = require('./src/routes/usuarioRoutes');
+const solicitudRoutes = require('./src/routes/solicitudRoutes');
 
 app.use(cors());
 app.use(express.json());
@@ -18,6 +19,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/test', testRoutes);
 app.use('/api/activos', activoRoutes);
 app.use('/api/usuarios', usuarioRoutes);
+app.use('/api/solicitudes', solicitudRoutes);
+
 
 app.get('/', (req, res) => {
   res.json({ mensaje: 'Servidor del sistema de inventario funcionando ✓' });

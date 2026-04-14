@@ -31,6 +31,14 @@ const Solicitud = sequelize.define('Solicitud', {
     ),
     defaultValue: 'PENDIENTE',
   },
+  prioridad: {
+    type: DataTypes.ENUM('BAJA', 'MEDIA', 'ALTA'),
+    defaultValue: 'MEDIA',
+  },
+  respuesta_admin: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
   fecha: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
