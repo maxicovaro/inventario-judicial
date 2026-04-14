@@ -16,6 +16,8 @@ const adjuntoRoutes = require('./src/routes/adjuntoRoutes');
 const insumoRoutes = require('./src/routes/insumoRoutes');
 const movimientoStockRoutes = require('./src/routes/movimientoStockRoutes');
 const dashboardRoutes = require('./src/routes/dashboardRoutes');
+const oficinaRoutes = require('./src/routes/oficinaRoutes');
+const categoriaRoutes = require('./src/routes/categoriaRoutes');
 
 app.use(cors());
 app.use(express.json());
@@ -28,6 +30,8 @@ app.use('/api/adjuntos', adjuntoRoutes);
 app.use('/api/insumos', insumoRoutes);
 app.use('/api/movimientos-stock', movimientoStockRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/oficinas', oficinaRoutes);
+app.use('/api/categorias', categoriaRoutes);
 
 app.use((error, req, res, next) => {
   if (error) {
