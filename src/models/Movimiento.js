@@ -8,15 +8,16 @@ const Movimiento = sequelize.define('Movimiento', {
     primaryKey: true,
   },
   tipo: {
-    type: DataTypes.ENUM(
-      'ALTA',
-      'BAJA',
-      'TRASLADO',
-      'REPARACION',
-      'CAMBIO_ESTADO'
-    ),
-    allowNull: false,
-  },
+  type: DataTypes.ENUM(
+    'ALTA',
+    'BAJA',
+    'TRASLADO',
+    'REPARACION',
+    'CAMBIO_ESTADO',
+    'ACTUALIZACION'
+  ),
+  allowNull: false,
+},
   descripcion: {
     type: DataTypes.TEXT,
     allowNull: true,

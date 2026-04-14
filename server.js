@@ -9,11 +9,13 @@ const seedInitialData = require('./src/seeders/initialData');
 const app = express();
 const authRoutes = require('./src/routes/authRoutes');
 const testRoutes = require('./src/routes/testRoutes');
+const activoRoutes = require('./src/routes/activoRoutes');
 
 app.use(cors());
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/test', testRoutes);
+app.use('/api/activos', activoRoutes);
 
 app.get('/', (req, res) => {
   res.json({ mensaje: 'Servidor del sistema de inventario funcionando ✓' });
