@@ -25,6 +25,7 @@ export default function Activos() {
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [editandoId, setEditandoId] = useState(null);
 
   const cargarDatos = async () => {
     try {
@@ -66,12 +67,22 @@ export default function Activos() {
     setGuardando(true);
 
     try {
-      await api.post("/activos", form);
-      setMensaje("Activo creado correctamente");
+      if (editandoId) {
+        await api.put(`/activos/${editandoId}`, form);
+        setMensaje("Activo actualizado correctamente");
+      } else {
+        await api.post("/activos", form);
+        setMensaje("Activo creado correctamente");
+      }
       setForm(initialForm);
+      setEditandoId(null);
       await cargarDatos();
     } catch (err) {
-      setError(err.response?.data?.mensaje || "Error al crear activo");
+      setError(
+  err.response?.data?.error ||
+  err.response?.data?.mensaje ||
+  "Error al guardar el activo"
+);
     } finally {
       setGuardando(false);
     }
@@ -95,6 +106,33 @@ export default function Activos() {
       setError(err.response?.data?.mensaje || "Error al dar de baja el activo");
     }
   };
+  const editarActivo = (activo) => {
+    setError("");
+    setMensaje("");
+
+    setForm({
+      codigo_interno: activo.codigo_interno || "",
+      nombre: activo.nombre || "",
+      descripcion: activo.descripcion || "",
+      marca: activo.marca || "",
+      modelo: activo.modelo || "",
+      numero_serie: activo.numero_serie || "",
+      cantidad: activo.cantidad || 1,
+      estado: activo.estado || "Buen estado",
+      fecha_alta: activo.fecha_alta || "",
+      observaciones: activo.observaciones || "",
+      categoria_id: activo.categoria_id || "",
+      oficina_id: activo.oficina_id || "",
+    });
+
+    setEditandoId(activo.id);
+  };
+  const cancelarEdicion = () => {
+    setForm(initialForm);
+    setEditandoId(null);
+    setError("");
+    setMensaje("");
+  };
 
   return (
     <Layout>
@@ -102,7 +140,9 @@ export default function Activos() {
 
       <div style={styles.grid}>
         <div style={styles.card}>
-          <h2 style={styles.subtitulo}>Nuevo activo</h2>
+          <h2 style={styles.subtitulo}>
+            {editandoId ? "Editar activo" : "Nuevo activo"}
+          </h2>
 
           <form onSubmit={handleSubmit} style={styles.form}>
             <input
@@ -223,9 +263,25 @@ export default function Activos() {
             {mensaje && <p style={styles.ok}>{mensaje}</p>}
             {error && <p style={styles.error}>{error}</p>}
 
-            <button type="submit" style={styles.button} disabled={guardando}>
-              {guardando ? "Guardando..." : "Crear activo"}
-            </button>
+            <div style={styles.buttonGroup}>
+              <button type="submit" style={styles.button} disabled={guardando}>
+                {guardando
+                  ? "Guardando..."
+                  : editandoId
+                    ? "Actualizar activo"
+                    : "Crear activo"}
+              </button>
+
+              {editandoId && (
+                <button
+                  type="button"
+                  style={styles.cancelButton}
+                  onClick={cancelarEdicion}
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
           </form>
         </div>
 
@@ -257,13 +313,23 @@ export default function Activos() {
                     <td style={styles.td}>{activo.Categoria?.nombre || "-"}</td>
                     <td style={styles.td}>{activo.Oficina?.nombre || "-"}</td>
                     <td style={styles.td}>
-                      <button
-                        type="button"
-                        style={styles.deleteButton}
-                        onClick={() => darDeBaja(activo.id)}
-                      >
-                        Dar de baja
-                      </button>
+                      <div style={styles.actionButtons}>
+                        <button
+                          type="button"
+                          style={styles.editButton}
+                          onClick={() => editarActivo(activo)}
+                        >
+                          Editar
+                        </button>
+
+                        <button
+                          type="button"
+                          style={styles.deleteButton}
+                          onClick={() => darDeBaja(activo.id)}
+                        >
+                          Dar de baja
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -347,6 +413,33 @@ const styles = {
     border: "none",
     borderRadius: "8px",
     background: "#b91c1c",
+    color: "#fff",
+    cursor: "pointer",
+  },
+  buttonGroup: {
+    display: "flex",
+    gap: "0.7rem",
+    marginTop: "0.5rem",
+  },
+  cancelButton: {
+    padding: "0.9rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#6b7280",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
+  actionButtons: {
+    display: "flex",
+    gap: "0.5rem",
+    flexWrap: "wrap",
+  },
+  editButton: {
+    padding: "0.55rem 0.8rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#1f4f82",
     color: "#fff",
     cursor: "pointer",
   },
