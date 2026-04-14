@@ -10,12 +10,14 @@ const app = express();
 const authRoutes = require('./src/routes/authRoutes');
 const testRoutes = require('./src/routes/testRoutes');
 const activoRoutes = require('./src/routes/activoRoutes');
+const usuarioRoutes = require('./src/routes/usuarioRoutes');
 
 app.use(cors());
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/test', testRoutes);
 app.use('/api/activos', activoRoutes);
+app.use('/api/usuarios', usuarioRoutes);
 
 app.get('/', (req, res) => {
   res.json({ mensaje: 'Servidor del sistema de inventario funcionando ✓' });
