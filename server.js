@@ -12,6 +12,10 @@ const testRoutes = require('./src/routes/testRoutes');
 const activoRoutes = require('./src/routes/activoRoutes');
 const usuarioRoutes = require('./src/routes/usuarioRoutes');
 const solicitudRoutes = require('./src/routes/solicitudRoutes');
+const adjuntoRoutes = require('./src/routes/adjuntoRoutes');
+const insumoRoutes = require('./src/routes/insumoRoutes');
+const movimientoStockRoutes = require('./src/routes/movimientoStockRoutes');
+const dashboardRoutes = require('./src/routes/dashboardRoutes');
 
 app.use(cors());
 app.use(express.json());
@@ -20,8 +24,20 @@ app.use('/api/test', testRoutes);
 app.use('/api/activos', activoRoutes);
 app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/solicitudes', solicitudRoutes);
+app.use('/api/adjuntos', adjuntoRoutes);
+app.use('/api/insumos', insumoRoutes);
+app.use('/api/movimientos-stock', movimientoStockRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
+app.use((error, req, res, next) => {
+  if (error) {
+    return res.status(400).json({
+      mensaje: error.message || 'Error en la carga del archivo',
+    });
+  }
 
+  next();
+});
 app.get('/', (req, res) => {
   res.json({ mensaje: 'Servidor del sistema de inventario funcionando ✓' });
 });
@@ -29,7 +45,7 @@ app.get('/', (req, res) => {
 sequelize.authenticate()
   .then(() => {
     console.log('✓ Conectado a MySQL correctamente');
-    return sequelize.sync({ alter: true });
+    return sequelize.sync();
   })
   .then(() => {
     return seedInitialData();

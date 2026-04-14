@@ -7,6 +7,8 @@ const Movimiento = require('./Movimiento');
 const Solicitud = require('./Solicitud');
 const Notificacion = require('./Notificacion');
 const Adjunto = require('./Adjunto');
+const Insumo = require('./Insumo');
+const MovimientoStock = require('./MovimientoStock');
 
 // Relaciones Usuario
 Role.hasMany(Usuario, { foreignKey: 'role_id' });
@@ -50,6 +52,16 @@ Adjunto.belongsTo(Activo, { foreignKey: 'activo_id' });
 Solicitud.hasMany(Adjunto, { foreignKey: 'solicitud_id' });
 Adjunto.belongsTo(Solicitud, { foreignKey: 'solicitud_id' });
 
+// Relaciones Insumo
+Insumo.hasMany(MovimientoStock, { foreignKey: 'insumo_id' });
+MovimientoStock.belongsTo(Insumo, { foreignKey: 'insumo_id' });
+
+Usuario.hasMany(MovimientoStock, { foreignKey: 'usuario_id' });
+MovimientoStock.belongsTo(Usuario, { foreignKey: 'usuario_id' });
+
+Oficina.hasMany(MovimientoStock, { foreignKey: 'oficina_id' });
+MovimientoStock.belongsTo(Oficina, { foreignKey: 'oficina_id' });
+
 module.exports = {
   Role,
   Oficina,
@@ -60,4 +72,6 @@ module.exports = {
   Solicitud,
   Notificacion,
   Adjunto,
+  Insumo,
+  MovimientoStock,
 };
