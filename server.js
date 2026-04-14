@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const sequelize = require('./src/config/database');
 require('./src/models');
+const seedInitialData = require('./src/seeders/initialData');
 
 const app = express();
 
@@ -18,6 +19,9 @@ sequelize.authenticate()
   .then(() => {
     console.log('✓ Conectado a MySQL correctamente');
     return sequelize.sync({ alter: true });
+  })
+  .then(() => {
+    return seedInitialData();
   })
   .then(() => {
     app.listen(process.env.PORT, () => {
