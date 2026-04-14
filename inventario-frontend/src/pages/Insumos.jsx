@@ -21,6 +21,7 @@ export default function Insumos() {
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [guardando, setGuardando] = useState(false);
+  const [editandoId, setEditandoId] = useState(null);
 
   const cargarInsumos = async () => {
     try {
@@ -54,14 +55,78 @@ export default function Insumos() {
     setGuardando(true);
 
     try {
-      await api.post('/insumos', form);
-      setMensaje('Insumo creado correctamente');
+      const payload = {
+        ...form,
+        fecha_vencimiento: form.fecha_vencimiento || null,
+      };
+
+      if (editandoId) {
+        await api.put(`/insumos/${editandoId}`, payload);
+        setMensaje('Insumo actualizado correctamente');
+      } else {
+        await api.post('/insumos', payload);
+        setMensaje('Insumo creado correctamente');
+      }
+
       setForm(initialForm);
+      setEditandoId(null);
       await cargarInsumos();
     } catch (err) {
-      setError(err.response?.data?.mensaje || 'Error al crear insumo');
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.mensaje ||
+          'Error al guardar insumo'
+      );
     } finally {
       setGuardando(false);
+    }
+  };
+
+  const editarInsumo = (insumo) => {
+    setError('');
+    setMensaje('');
+
+    setForm({
+      nombre: insumo.nombre || '',
+      descripcion: insumo.descripcion || '',
+      categoria: insumo.categoria || '',
+      unidad_medida: insumo.unidad_medida || 'unidad',
+      stock_actual: insumo.stock_actual ?? 0,
+      stock_minimo: insumo.stock_minimo ?? 0,
+      lote: insumo.lote || '',
+      fecha_vencimiento: insumo.fecha_vencimiento || '',
+      proveedor: insumo.proveedor || '',
+      observaciones: insumo.observaciones || '',
+    });
+
+    setEditandoId(insumo.id);
+  };
+
+  const cancelarEdicion = () => {
+    setForm(initialForm);
+    setEditandoId(null);
+    setError('');
+    setMensaje('');
+  };
+
+  const desactivarInsumo = async (id) => {
+    const confirmar = window.confirm(
+      '¿Seguro que querés desactivar este insumo?'
+    );
+
+    if (!confirmar) return;
+
+    setError('');
+    setMensaje('');
+
+    try {
+      await api.delete(`/insumos/${id}`);
+      setMensaje('Insumo desactivado correctamente');
+      await cargarInsumos();
+    } catch (err) {
+      setError(
+        err.response?.data?.mensaje || 'Error al desactivar el insumo'
+      );
     }
   };
 
@@ -71,7 +136,9 @@ export default function Insumos() {
 
       <div style={styles.grid}>
         <div style={styles.card}>
-          <h2 style={styles.subtitulo}>Nuevo insumo</h2>
+          <h2 style={styles.subtitulo}>
+            {editandoId ? 'Editar insumo' : 'Nuevo insumo'}
+          </h2>
 
           <form onSubmit={handleSubmit} style={styles.form}>
             <input
@@ -165,9 +232,25 @@ export default function Insumos() {
             {mensaje && <p style={styles.ok}>{mensaje}</p>}
             {error && <p style={styles.error}>{error}</p>}
 
-            <button type="submit" style={styles.button} disabled={guardando}>
-              {guardando ? 'Guardando...' : 'Crear insumo'}
-            </button>
+            <div style={styles.buttonGroup}>
+              <button type="submit" style={styles.button} disabled={guardando}>
+                {guardando
+                  ? 'Guardando...'
+                  : editandoId
+                    ? 'Actualizar insumo'
+                    : 'Crear insumo'}
+              </button>
+
+              {editandoId && (
+                <button
+                  type="button"
+                  style={styles.cancelButton}
+                  onClick={cancelarEdicion}
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
           </form>
         </div>
 
@@ -180,23 +263,45 @@ export default function Insumos() {
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Nombre</th>
-                  <th>Categoría</th>
-                  <th>Unidad</th>
-                  <th>Stock</th>
-                  <th>Mínimo</th>
+                  <th style={styles.th}>ID</th>
+                  <th style={styles.th}>Nombre</th>
+                  <th style={styles.th}>Categoría</th>
+                  <th style={styles.th}>Unidad</th>
+                  <th style={styles.th}>Stock</th>
+                  <th style={styles.th}>Mínimo</th>
+                  <th style={styles.th}>Proveedor</th>
+                  <th style={styles.th}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {insumos.map((insumo) => (
                   <tr key={insumo.id}>
-                    <td>{insumo.id}</td>
-                    <td>{insumo.nombre}</td>
-                    <td>{insumo.categoria || '-'}</td>
-                    <td>{insumo.unidad_medida}</td>
-                    <td>{insumo.stock_actual}</td>
-                    <td>{insumo.stock_minimo}</td>
+                    <td style={styles.td}>{insumo.id}</td>
+                    <td style={styles.td}>{insumo.nombre}</td>
+                    <td style={styles.td}>{insumo.categoria || '-'}</td>
+                    <td style={styles.td}>{insumo.unidad_medida}</td>
+                    <td style={styles.td}>{insumo.stock_actual}</td>
+                    <td style={styles.td}>{insumo.stock_minimo}</td>
+                    <td style={styles.td}>{insumo.proveedor || '-'}</td>
+                    <td style={styles.td}>
+                      <div style={styles.actionButtons}>
+                        <button
+                          type="button"
+                          style={styles.editButton}
+                          onClick={() => editarInsumo(insumo)}
+                        >
+                          Editar
+                        </button>
+
+                        <button
+                          type="button"
+                          style={styles.deleteButton}
+                          onClick={() => desactivarInsumo(insumo.id)}
+                        >
+                          Desactivar
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -227,6 +332,8 @@ const styles = {
     padding: '1rem',
     boxShadow: '0 6px 18px rgba(0,0,0,0.08)',
     overflowX: 'auto',
+    maxHeight: '80vh',
+    overflowY: 'auto',
   },
   form: {
     display: 'grid',
@@ -253,10 +360,55 @@ const styles = {
     cursor: 'pointer',
     fontWeight: 'bold',
   },
+  buttonGroup: {
+    display: 'flex',
+    gap: '0.7rem',
+    marginTop: '0.5rem',
+  },
+  cancelButton: {
+    padding: '0.9rem',
+    border: 'none',
+    borderRadius: '8px',
+    background: '#6b7280',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: '0.95rem',
+    border: '1px solid #e5e7eb',
+  },
+  th: {
+    textAlign: 'left',
+    padding: '0.6rem',
+    borderBottom: '1px solid #e5e7eb',
+  },
+  td: {
+    padding: '0.6rem',
+    borderBottom: '1px solid #f0f0f0',
+  },
+  actionButtons: {
+    display: 'flex',
+    gap: '0.5rem',
+    flexWrap: 'wrap',
+  },
+  editButton: {
+    padding: '0.55rem 0.8rem',
+    border: 'none',
+    borderRadius: '8px',
+    background: '#1f4f82',
+    color: '#fff',
+    cursor: 'pointer',
+  },
+  deleteButton: {
+    padding: '0.55rem 0.8rem',
+    border: 'none',
+    borderRadius: '8px',
+    background: '#b91c1c',
+    color: '#fff',
+    cursor: 'pointer',
   },
   ok: {
     color: 'green',
