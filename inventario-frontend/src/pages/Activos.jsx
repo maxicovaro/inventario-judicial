@@ -77,6 +77,25 @@ export default function Activos() {
     }
   };
 
+  const darDeBaja = async (id) => {
+    const confirmar = window.confirm(
+      "¿Seguro que querés dar de baja este activo?",
+    );
+
+    if (!confirmar) return;
+
+    setError("");
+    setMensaje("");
+
+    try {
+      await api.delete(`/activos/${id}`);
+      setMensaje("Activo dado de baja correctamente");
+      await cargarDatos();
+    } catch (err) {
+      setError(err.response?.data?.mensaje || "Error al dar de baja el activo");
+    }
+  };
+
   return (
     <Layout>
       <h1 style={styles.titulo}>Activos</h1>
@@ -225,6 +244,7 @@ export default function Activos() {
                   <th style={styles.th}>Estado</th>
                   <th style={styles.th}>Categoría</th>
                   <th style={styles.th}>Oficina</th>
+                  <th style={styles.th}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -236,6 +256,15 @@ export default function Activos() {
                     <td style={styles.td}>{activo.estado}</td>
                     <td style={styles.td}>{activo.Categoria?.nombre || "-"}</td>
                     <td style={styles.td}>{activo.Oficina?.nombre || "-"}</td>
+                    <td style={styles.td}>
+                      <button
+                        type="button"
+                        style={styles.deleteButton}
+                        onClick={() => darDeBaja(activo.id)}
+                      >
+                        Dar de baja
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -312,5 +341,13 @@ const styles = {
   td: {
     padding: "0.6rem",
     borderBottom: "1px solid #f0f0f0",
+  },
+  deleteButton: {
+    padding: "0.55rem 0.8rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#b91c1c",
+    color: "#fff",
+    cursor: "pointer",
   },
 };
