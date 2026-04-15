@@ -40,6 +40,8 @@ export default function Layout({ children }) {
           <Link to="/insumos">Insumos</Link>
           <Link to="/solicitudes">Solicitudes</Link>
           <Link to="/movimientos-stock">Movimientos stock</Link>
+          <Link to="/adjuntos">Adjuntos</Link>
+          <Link to="/pedido-mensual">Pedido mensual</Link>
 
           {/* ✅ contador correcto */}
           <Link to="/notificaciones">

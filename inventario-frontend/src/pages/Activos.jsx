@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import AdjuntosPanel from "../components/AdjuntosPanel";
 
 const initialForm = {
   codigo_interno: "",
@@ -30,6 +31,8 @@ export default function Activos() {
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroOficina, setFiltroOficina] = useState("");
+
+  const [activoAdjuntosAbierto, setActivoAdjuntosAbierto] = useState(null);
 
   const cargarDatos = async () => {
     try {
@@ -134,7 +137,7 @@ export default function Activos() {
         setError(
           err.response?.data?.error ||
             err.response?.data?.mensaje ||
-            "Error al guardar el activo"
+            "Error al guardar el activo",
         );
       }
     } finally {
@@ -144,7 +147,7 @@ export default function Activos() {
 
   const darDeBaja = async (id) => {
     const confirmar = window.confirm(
-      "¿Seguro que querés dar de baja este activo?"
+      "¿Seguro que querés dar de baja este activo?",
     );
 
     if (!confirmar) return;
@@ -401,16 +404,33 @@ export default function Activos() {
                     </span>
                   </div>
 
-                  <p><strong>Código:</strong> {activo.codigo_interno || "-"}</p>
-                  <p><strong>Marca:</strong> {activo.marca || "-"}</p>
-                  <p><strong>Modelo:</strong> {activo.modelo || "-"}</p>
-                  <p><strong>N° Serie:</strong> {activo.numero_serie || "-"}</p>
-                  <p><strong>Categoría:</strong> {activo.Categoria?.nombre || "-"}</p>
-                  <p><strong>Oficina:</strong> {activo.Oficina?.nombre || "-"}</p>
-                  <p><strong>Cantidad:</strong> {activo.cantidad}</p>
+                  <p>
+                    <strong>Código:</strong> {activo.codigo_interno || "-"}
+                  </p>
+                  <p>
+                    <strong>Marca:</strong> {activo.marca || "-"}
+                  </p>
+                  <p>
+                    <strong>Modelo:</strong> {activo.modelo || "-"}
+                  </p>
+                  <p>
+                    <strong>N° Serie:</strong> {activo.numero_serie || "-"}
+                  </p>
+                  <p>
+                    <strong>Categoría:</strong>{" "}
+                    {activo.Categoria?.nombre || "-"}
+                  </p>
+                  <p>
+                    <strong>Oficina:</strong> {activo.Oficina?.nombre || "-"}
+                  </p>
+                  <p>
+                    <strong>Cantidad:</strong> {activo.cantidad}
+                  </p>
 
                   {activo.descripcion && (
-                    <p><strong>Descripción:</strong> {activo.descripcion}</p>
+                    <p>
+                      <strong>Descripción:</strong> {activo.descripcion}
+                    </p>
                   )}
 
                   {activo.observaciones && (
@@ -430,12 +450,31 @@ export default function Activos() {
 
                     <button
                       type="button"
+                      style={styles.secondaryButton}
+                      onClick={() =>
+                        setActivoAdjuntosAbierto(
+                          activoAdjuntosAbierto === activo.id
+                            ? null
+                            : activo.id,
+                        )
+                      }
+                    >
+                      {activoAdjuntosAbierto === activo.id
+                        ? "Ocultar adjuntos"
+                        : "Adjuntos"}
+                    </button>
+
+                    <button
+                      type="button"
                       style={styles.deleteButton}
                       onClick={() => darDeBaja(activo.id)}
                     >
                       Dar de baja
                     </button>
                   </div>
+                  {activoAdjuntosAbierto === activo.id && (
+                    <AdjuntosPanel activoId={activo.id} />
+                  )}
                 </div>
               ))}
             </div>
@@ -570,5 +609,13 @@ const styles = {
   error: {
     color: "crimson",
     margin: 0,
+  },
+  secondaryButton: {
+    padding: "0.55rem 0.8rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#374151",
+    color: "#fff",
+    cursor: "pointer",
   },
 };

@@ -20,6 +20,7 @@ const oficinaRoutes = require('./src/routes/oficinaRoutes');
 const categoriaRoutes = require('./src/routes/categoriaRoutes');
 const notificacionRoutes = require('./src/routes/notificacionRoutes');
 
+
 app.use(cors());
 app.use(express.json());
 app.use('/api/auth', authRoutes);
@@ -34,6 +35,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/oficinas', oficinaRoutes);
 app.use('/api/categorias', categoriaRoutes);
 app.use('/api/notificaciones', notificacionRoutes);
+app.use("/api/pedidos-insumos", require("./src/routes/pedidoInsumoRoutes"));
 
 app.use((error, req, res, next) => {
   if (error) {

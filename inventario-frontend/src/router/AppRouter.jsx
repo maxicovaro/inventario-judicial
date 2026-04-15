@@ -7,12 +7,15 @@ import Solicitudes from "../pages/Solicitudes";
 import PrivateRoute from "../components/PrivateRoute";
 import MovimientosStock from "../pages/MovimientosStock";
 import Notificaciones from "../pages/Notificaciones";
+import Adjuntos from "../pages/Adjuntos";
+import PedidoMensual from "../pages/PedidoMensual";
 
 export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
+
         <Route
           path="/dashboard"
           element={
@@ -21,6 +24,7 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="/activos"
           element={
@@ -29,6 +33,7 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="/insumos"
           element={
@@ -37,6 +42,7 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="/solicitudes"
           element={
@@ -45,6 +51,7 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="/movimientos-stock"
           element={
@@ -53,11 +60,30 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="/notificaciones"
           element={
             <PrivateRoute>
               <Notificaciones />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/adjuntos"
+          element={
+            <PrivateRoute>
+              <Adjuntos />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/pedido-mensual"
+          element={
+            <PrivateRoute>
+              <PedidoMensual />
             </PrivateRoute>
           }
         />

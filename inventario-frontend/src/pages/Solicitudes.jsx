@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import AdjuntosSolicitudPanel from "../components/AdjuntosSolicitudPanel";
 
 const initialForm = {
   tipo: "REPOSICION",
@@ -23,6 +24,9 @@ export default function Solicitudes() {
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroPrioridad, setFiltroPrioridad] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
+
+  const [solicitudAdjuntosAbierta, setSolicitudAdjuntosAbierta] =
+    useState(null);
 
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
   const esAdmin = usuario.role === "ADMIN";
@@ -93,8 +97,7 @@ export default function Solicitudes() {
         solicitud.Oficina?.nombre?.toLowerCase().includes(texto) ||
         solicitud.Activo?.nombre?.toLowerCase().includes(texto);
 
-      const coincideEstado =
-        !filtroEstado || solicitud.estado === filtroEstado;
+      const coincideEstado = !filtroEstado || solicitud.estado === filtroEstado;
 
       const coincidePrioridad =
         !filtroPrioridad || solicitud.prioridad === filtroPrioridad;
@@ -102,10 +105,7 @@ export default function Solicitudes() {
       const coincideTipo = !filtroTipo || solicitud.tipo === filtroTipo;
 
       return (
-        coincideBusqueda &&
-        coincideEstado &&
-        coincidePrioridad &&
-        coincideTipo
+        coincideBusqueda && coincideEstado && coincidePrioridad && coincideTipo
       );
     });
   }, [solicitudes, busqueda, filtroEstado, filtroPrioridad, filtroTipo]);
@@ -346,62 +346,84 @@ export default function Solicitudes() {
                   )}
 
                   {esAdmin && (
-                    <div style={styles.adminBox}>
-                      <textarea
-                        placeholder="Respuesta administrativa"
-                        value={respuestas[solicitud.id] || ""}
-                        onChange={(e) =>
-                          handleRespuestaChange(solicitud.id, e.target.value)
-                        }
-                        style={styles.textareaSmall}
-                      />
-
-                      <div style={styles.acciones}>
-                        <button
-                          type="button"
-                          style={styles.smallButton}
-                          onClick={() =>
-                            actualizarEstado(solicitud.id, "APROBADA")
+                    <>
+                      <div style={styles.adminBox}>
+                        <textarea
+                          placeholder="Respuesta administrativa"
+                          value={respuestas[solicitud.id] || ""}
+                          onChange={(e) =>
+                            handleRespuestaChange(solicitud.id, e.target.value)
                           }
-                          disabled={actualizandoId === solicitud.id}
-                        >
-                          Aprobar
-                        </button>
+                          style={styles.textareaSmall}
+                        />
 
-                        <button
-                          type="button"
-                          style={styles.smallButtonDanger}
-                          onClick={() =>
-                            actualizarEstado(solicitud.id, "RECHAZADA")
-                          }
-                          disabled={actualizandoId === solicitud.id}
-                        >
-                          Rechazar
-                        </button>
+                        <div style={styles.acciones}>
+                          <button
+                            type="button"
+                            style={styles.smallButton}
+                            onClick={() =>
+                              actualizarEstado(solicitud.id, "APROBADA")
+                            }
+                            disabled={actualizandoId === solicitud.id}
+                          >
+                            Aprobar
+                          </button>
 
-                        <button
-                          type="button"
-                          style={styles.smallButtonSecondary}
-                          onClick={() =>
-                            actualizarEstado(solicitud.id, "EN_PROCESO")
-                          }
-                          disabled={actualizandoId === solicitud.id}
-                        >
-                          En proceso
-                        </button>
+                          <button
+                            type="button"
+                            style={styles.smallButtonDanger}
+                            onClick={() =>
+                              actualizarEstado(solicitud.id, "RECHAZADA")
+                            }
+                            disabled={actualizandoId === solicitud.id}
+                          >
+                            Rechazar
+                          </button>
 
-                        <button
-                          type="button"
-                          style={styles.smallButtonSuccess}
-                          onClick={() =>
-                            actualizarEstado(solicitud.id, "FINALIZADA")
-                          }
-                          disabled={actualizandoId === solicitud.id}
-                        >
-                          Finalizar
-                        </button>
+                          <button
+                            type="button"
+                            style={styles.smallButtonSecondary}
+                            onClick={() =>
+                              actualizarEstado(solicitud.id, "EN_PROCESO")
+                            }
+                            disabled={actualizandoId === solicitud.id}
+                          >
+                            En proceso
+                          </button>
+
+                          <button
+                            type="button"
+                            style={styles.smallButtonSuccess}
+                            onClick={() =>
+                              actualizarEstado(solicitud.id, "FINALIZADA")
+                            }
+                            disabled={actualizandoId === solicitud.id}
+                          >
+                            Finalizar
+                          </button>
+
+                          <button
+                            type="button"
+                            style={styles.smallButtonDark}
+                            onClick={() =>
+                              setSolicitudAdjuntosAbierta(
+                                solicitudAdjuntosAbierta === solicitud.id
+                                  ? null
+                                  : solicitud.id,
+                              )
+                            }
+                          >
+                            {solicitudAdjuntosAbierta === solicitud.id
+                              ? "Ocultar adjuntos"
+                              : "Adjuntos"}
+                          </button>
+                        </div>
                       </div>
-                    </div>
+
+                      {solicitudAdjuntosAbierta === solicitud.id && (
+                        <AdjuntosSolicitudPanel solicitudId={solicitud.id} />
+                      )}
+                    </>
                   )}
                 </div>
               ))}
@@ -553,5 +575,13 @@ const styles = {
   error: {
     color: "crimson",
     margin: 0,
+  },
+  smallButtonDark: {
+    padding: "0.65rem 0.9rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#374151",
+    color: "#fff",
+    cursor: "pointer",
   },
 };
