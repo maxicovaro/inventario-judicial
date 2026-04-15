@@ -51,6 +51,36 @@ export default function Solicitudes() {
     cargarDatos();
   }, []);
 
+  const getEstadoBadgeStyle = (estado) => {
+    switch (estado) {
+      case "PENDIENTE":
+        return { background: "#fef3c7", color: "#92400e" };
+      case "APROBADA":
+        return { background: "#d1fae5", color: "#065f46" };
+      case "RECHAZADA":
+        return { background: "#fee2e2", color: "#991b1b" };
+      case "EN_PROCESO":
+        return { background: "#dbeafe", color: "#1e40af" };
+      case "FINALIZADA":
+        return { background: "#e5e7eb", color: "#374151" };
+      default:
+        return { background: "#f3f4f6", color: "#111827" };
+    }
+  };
+
+  const getPrioridadBadgeStyle = (prioridad) => {
+    switch (prioridad) {
+      case "ALTA":
+        return { background: "#fee2e2", color: "#991b1b" };
+      case "MEDIA":
+        return { background: "#fef3c7", color: "#92400e" };
+      case "BAJA":
+        return { background: "#dbeafe", color: "#1e40af" };
+      default:
+        return { background: "#f3f4f6", color: "#111827" };
+    }
+  };
+
   const solicitudesFiltradas = useMemo(() => {
     return solicitudes.filter((solicitud) => {
       const texto = busqueda.toLowerCase();
@@ -85,7 +115,8 @@ export default function Solicitudes() {
 
     setForm((prev) => ({
       ...prev,
-      [name]: name === "activo_id" ? (value === "" ? "" : Number(value)) : value,
+      [name]:
+        name === "activo_id" ? (value === "" ? "" : Number(value)) : value,
     }));
   };
 
@@ -126,7 +157,9 @@ export default function Solicitudes() {
       setMensaje(`Solicitud #${id} actualizada a ${estado}`);
       await cargarDatos();
     } catch (err) {
-      setError(err.response?.data?.mensaje || "Error al actualizar la solicitud");
+      setError(
+        err.response?.data?.mensaje || "Error al actualizar la solicitud",
+      );
     } finally {
       setActualizandoId(null);
     }
@@ -181,7 +214,8 @@ export default function Solicitudes() {
               <option value="">Sin activo asociado</option>
               {activos.map((activo) => (
                 <option key={activo.id} value={activo.id}>
-                  {activo.nombre} {activo.codigo_interno ? `- ${activo.codigo_interno}` : ""}
+                  {activo.nombre}{" "}
+                  {activo.codigo_interno ? `- ${activo.codigo_interno}` : ""}
                 </option>
               ))}
             </select>
@@ -259,22 +293,55 @@ export default function Solicitudes() {
             <div style={styles.listado}>
               {solicitudesFiltradas.map((solicitud) => (
                 <div key={solicitud.id} style={styles.item}>
-                  <p><strong>#{solicitud.id}</strong> — {solicitud.tipo}</p>
-                  <p>Estado: <strong>{solicitud.estado}</strong></p>
-                  <p>Prioridad: {solicitud.prioridad}</p>
+                  <div style={styles.headerRow}>
+                    <p style={styles.itemTitle}>
+                      <strong>#{solicitud.id}</strong> — {solicitud.tipo}
+                    </p>
+
+                    <div style={styles.badges}>
+                      <span
+                        style={{
+                          ...styles.badge,
+                          ...getEstadoBadgeStyle(solicitud.estado),
+                        }}
+                      >
+                        {solicitud.estado}
+                      </span>
+
+                      <span
+                        style={{
+                          ...styles.badge,
+                          ...getPrioridadBadgeStyle(solicitud.prioridad),
+                        }}
+                      >
+                        {solicitud.prioridad}
+                      </span>
+                    </div>
+                  </div>
+
                   <p>
-                    Usuario:{" "}
+                    <strong>Usuario:</strong>{" "}
                     {solicitud.Usuario
                       ? `${solicitud.Usuario.nombre} ${solicitud.Usuario.apellido}`
                       : "-"}
                   </p>
-                  <p>Oficina: {solicitud.Oficina?.nombre || "-"}</p>
-                  <p>Activo: {solicitud.Activo?.nombre || "-"}</p>
-                  <p>Descripción: {solicitud.descripcion}</p>
+
+                  <p>
+                    <strong>Oficina:</strong> {solicitud.Oficina?.nombre || "-"}
+                  </p>
+
+                  <p>
+                    <strong>Activo:</strong> {solicitud.Activo?.nombre || "-"}
+                  </p>
+
+                  <p>
+                    <strong>Descripción:</strong> {solicitud.descripcion}
+                  </p>
 
                   {solicitud.respuesta_admin && (
-                    <p>
-                      <strong>Respuesta admin:</strong> {solicitud.respuesta_admin}
+                    <p style={styles.respuestaBox}>
+                      <strong>Respuesta admin:</strong>{" "}
+                      {solicitud.respuesta_admin}
                     </p>
                   )}
 
@@ -293,7 +360,9 @@ export default function Solicitudes() {
                         <button
                           type="button"
                           style={styles.smallButton}
-                          onClick={() => actualizarEstado(solicitud.id, "APROBADA")}
+                          onClick={() =>
+                            actualizarEstado(solicitud.id, "APROBADA")
+                          }
                           disabled={actualizandoId === solicitud.id}
                         >
                           Aprobar
@@ -301,8 +370,10 @@ export default function Solicitudes() {
 
                         <button
                           type="button"
-                          style={styles.smallButton}
-                          onClick={() => actualizarEstado(solicitud.id, "RECHAZADA")}
+                          style={styles.smallButtonDanger}
+                          onClick={() =>
+                            actualizarEstado(solicitud.id, "RECHAZADA")
+                          }
                           disabled={actualizandoId === solicitud.id}
                         >
                           Rechazar
@@ -310,8 +381,10 @@ export default function Solicitudes() {
 
                         <button
                           type="button"
-                          style={styles.smallButton}
-                          onClick={() => actualizarEstado(solicitud.id, "EN_PROCESO")}
+                          style={styles.smallButtonSecondary}
+                          onClick={() =>
+                            actualizarEstado(solicitud.id, "EN_PROCESO")
+                          }
                           disabled={actualizandoId === solicitud.id}
                         >
                           En proceso
@@ -319,8 +392,10 @@ export default function Solicitudes() {
 
                         <button
                           type="button"
-                          style={styles.smallButton}
-                          onClick={() => actualizarEstado(solicitud.id, "FINALIZADA")}
+                          style={styles.smallButtonSuccess}
+                          onClick={() =>
+                            actualizarEstado(solicitud.id, "FINALIZADA")
+                          }
                           disabled={actualizandoId === solicitud.id}
                         >
                           Finalizar
@@ -399,6 +474,30 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
   },
+  smallButtonDanger: {
+    padding: "0.65rem 0.9rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#b91c1c",
+    color: "#fff",
+    cursor: "pointer",
+  },
+  smallButtonSecondary: {
+    padding: "0.65rem 0.9rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#2563eb",
+    color: "#fff",
+    cursor: "pointer",
+  },
+  smallButtonSuccess: {
+    padding: "0.65rem 0.9rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#15803d",
+    color: "#fff",
+    cursor: "pointer",
+  },
   listado: {
     display: "grid",
     gap: "1rem",
@@ -407,6 +506,29 @@ const styles = {
     border: "1px solid #e5e7eb",
     borderRadius: "12px",
     padding: "1rem",
+  },
+  headerRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "1rem",
+    marginBottom: "0.8rem",
+    flexWrap: "wrap",
+  },
+  itemTitle: {
+    margin: 0,
+    fontSize: "1rem",
+  },
+  badges: {
+    display: "flex",
+    gap: "0.5rem",
+    flexWrap: "wrap",
+  },
+  badge: {
+    padding: "0.35rem 0.7rem",
+    borderRadius: "999px",
+    fontSize: "0.8rem",
+    fontWeight: "bold",
   },
   adminBox: {
     marginTop: "1rem",
@@ -417,6 +539,12 @@ const styles = {
     display: "flex",
     flexWrap: "wrap",
     gap: "0.6rem",
+  },
+  respuestaBox: {
+    background: "#f9fafb",
+    border: "1px solid #e5e7eb",
+    borderRadius: "10px",
+    padding: "0.8rem",
   },
   ok: {
     color: "green",

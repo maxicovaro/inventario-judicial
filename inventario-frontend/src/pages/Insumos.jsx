@@ -150,6 +150,16 @@ export default function Insumos() {
     }
   };
 
+  const getStockBadgeStyle = (stockActual, stockMinimo) => {
+    if (stockActual <= stockMinimo) {
+      return { background: "#fee2e2", color: "#991b1b" };
+    }
+    if (stockActual <= stockMinimo + 5) {
+      return { background: "#fef3c7", color: "#92400e" };
+    }
+    return { background: "#d1fae5", color: "#065f46" };
+  };
+
   return (
     <Layout>
       <h1 style={styles.titulo}>Insumos</h1>
@@ -299,66 +309,67 @@ export default function Insumos() {
           {insumosFiltrados.length === 0 ? (
             <p>No hay insumos que coincidan con la búsqueda.</p>
           ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>ID</th>
-                  <th style={styles.th}>Nombre</th>
-                  <th style={styles.th}>Categoría</th>
-                  <th style={styles.th}>Unidad</th>
-                  <th style={styles.th}>Stock</th>
-                  <th style={styles.th}>Mínimo</th>
-                  <th style={styles.th}>Proveedor</th>
-                  <th style={styles.th}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {insumosFiltrados.map((insumo) => (
-                  <tr key={insumo.id}>
-                    <td style={styles.td}>{insumo.id}</td>
-                    <td style={styles.td}>{insumo.nombre}</td>
-                    <td style={styles.td}>{insumo.categoria || "-"}</td>
-                    <td style={styles.td}>{insumo.unidad_medida}</td>
-                    <td
+            <div style={styles.listado}>
+              {insumosFiltrados.map((insumo) => (
+                <div key={insumo.id} style={styles.item}>
+                  <div style={styles.headerRow}>
+                    <p style={styles.itemTitle}>
+                      <strong>#{insumo.id}</strong> — {insumo.nombre}
+                    </p>
+
+                    <span
                       style={{
-                        ...styles.td,
-                        color:
-                          insumo.stock_actual <= insumo.stock_minimo
-                            ? "#b91c1c"
-                            : "inherit",
-                        fontWeight:
-                          insumo.stock_actual <= insumo.stock_minimo
-                            ? "bold"
-                            : "normal",
+                        ...styles.badge,
+                        ...getStockBadgeStyle(
+                          insumo.stock_actual,
+                          insumo.stock_minimo,
+                        ),
                       }}
                     >
-                      {insumo.stock_actual}
-                    </td>
-                    <td style={styles.td}>{insumo.stock_minimo}</td>
-                    <td style={styles.td}>{insumo.proveedor || "-"}</td>
-                    <td style={styles.td}>
-                      <div style={styles.actionButtons}>
-                        <button
-                          type="button"
-                          style={styles.editButton}
-                          onClick={() => editarInsumo(insumo)}
-                        >
-                          Editar
-                        </button>
+                      Stock: {insumo.stock_actual}
+                    </span>
+                  </div>
 
-                        <button
-                          type="button"
-                          style={styles.deleteButton}
-                          onClick={() => desactivarInsumo(insumo.id)}
-                        >
-                          Desactivar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  <p><strong>Categoría:</strong> {insumo.categoria || "-"}</p>
+                  <p><strong>Unidad:</strong> {insumo.unidad_medida}</p>
+                  <p><strong>Stock mínimo:</strong> {insumo.stock_minimo}</p>
+                  <p><strong>Proveedor:</strong> {insumo.proveedor || "-"}</p>
+                  <p><strong>Lote:</strong> {insumo.lote || "-"}</p>
+                  <p>
+                    <strong>Vencimiento:</strong>{" "}
+                    {insumo.fecha_vencimiento || "-"}
+                  </p>
+
+                  {insumo.descripcion && (
+                    <p><strong>Descripción:</strong> {insumo.descripcion}</p>
+                  )}
+
+                  {insumo.observaciones && (
+                    <p style={styles.infoBox}>
+                      <strong>Observaciones:</strong> {insumo.observaciones}
+                    </p>
+                  )}
+
+                  <div style={styles.actionButtons}>
+                    <button
+                      type="button"
+                      style={styles.editButton}
+                      onClick={() => editarInsumo(insumo)}
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      type="button"
+                      style={styles.deleteButton}
+                      onClick={() => desactivarInsumo(insumo.id)}
+                    >
+                      Desactivar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -438,25 +449,44 @@ const styles = {
     cursor: "pointer",
     fontWeight: "bold",
   },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: "0.95rem",
+  listado: {
+    display: "grid",
+    gap: "1rem",
+  },
+  item: {
     border: "1px solid #e5e7eb",
+    borderRadius: "12px",
+    padding: "1rem",
   },
-  th: {
-    textAlign: "left",
-    padding: "0.6rem",
-    borderBottom: "1px solid #e5e7eb",
+  headerRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "1rem",
+    marginBottom: "0.8rem",
+    flexWrap: "wrap",
   },
-  td: {
-    padding: "0.6rem",
-    borderBottom: "1px solid #f0f0f0",
+  itemTitle: {
+    margin: 0,
+    fontSize: "1rem",
+  },
+  badge: {
+    padding: "0.35rem 0.7rem",
+    borderRadius: "999px",
+    fontSize: "0.8rem",
+    fontWeight: "bold",
+  },
+  infoBox: {
+    background: "#f9fafb",
+    border: "1px solid #e5e7eb",
+    borderRadius: "10px",
+    padding: "0.8rem",
   },
   actionButtons: {
     display: "flex",
     gap: "0.5rem",
     flexWrap: "wrap",
+    marginTop: "1rem",
   },
   editButton: {
     padding: "0.55rem 0.8rem",

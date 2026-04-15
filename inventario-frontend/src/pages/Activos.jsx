@@ -51,6 +51,25 @@ export default function Activos() {
     cargarDatos();
   }, []);
 
+  const getEstadoBadgeStyle = (estado) => {
+    switch (estado) {
+      case "Excelente estado":
+        return { background: "#dcfce7", color: "#166534" };
+      case "Buen estado":
+        return { background: "#dbeafe", color: "#1d4ed8" };
+      case "Regular estado":
+        return { background: "#fef3c7", color: "#92400e" };
+      case "Mal estado":
+        return { background: "#fee2e2", color: "#991b1b" };
+      case "Sin funcionar":
+        return { background: "#f3f4f6", color: "#374151" };
+      case "Dado de baja":
+        return { background: "#e5e7eb", color: "#111827" };
+      default:
+        return { background: "#f3f4f6", color: "#111827" };
+    }
+  };
+
   const activosFiltrados = useMemo(() => {
     return activos.filter((activo) => {
       const texto = busqueda.toLowerCase();
@@ -63,7 +82,6 @@ export default function Activos() {
         activo.numero_serie?.toLowerCase().includes(texto);
 
       const coincideEstado = !filtroEstado || activo.estado === filtroEstado;
-
       const coincideOficina =
         !filtroOficina || String(activo.oficina_id) === filtroOficina;
 
@@ -108,8 +126,6 @@ export default function Activos() {
       setEditandoId(null);
       await cargarDatos();
     } catch (err) {
-      console.log("ERROR BACKEND:", err.response?.data);
-
       const detalle = err.response?.data?.detalle;
 
       if (detalle && detalle.length > 0) {
@@ -118,7 +134,7 @@ export default function Activos() {
         setError(
           err.response?.data?.error ||
             err.response?.data?.mensaje ||
-            "Error al guardar el activo",
+            "Error al guardar el activo"
         );
       }
     } finally {
@@ -128,7 +144,7 @@ export default function Activos() {
 
   const darDeBaja = async (id) => {
     const confirmar = window.confirm(
-      "¿Seguro que querés dar de baja este activo?",
+      "¿Seguro que querés dar de baja este activo?"
     );
 
     if (!confirmar) return;
@@ -367,50 +383,62 @@ export default function Activos() {
           {activosFiltrados.length === 0 ? (
             <p>No hay activos que coincidan con la búsqueda.</p>
           ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>ID</th>
-                  <th style={styles.th}>Código</th>
-                  <th style={styles.th}>Nombre</th>
-                  <th style={styles.th}>Estado</th>
-                  <th style={styles.th}>Categoría</th>
-                  <th style={styles.th}>Oficina</th>
-                  <th style={styles.th}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activosFiltrados.map((activo) => (
-                  <tr key={activo.id}>
-                    <td style={styles.td}>{activo.id}</td>
-                    <td style={styles.td}>{activo.codigo_interno || "-"}</td>
-                    <td style={styles.td}>{activo.nombre}</td>
-                    <td style={styles.td}>{activo.estado}</td>
-                    <td style={styles.td}>{activo.Categoria?.nombre || "-"}</td>
-                    <td style={styles.td}>{activo.Oficina?.nombre || "-"}</td>
-                    <td style={styles.td}>
-                      <div style={styles.actionButtons}>
-                        <button
-                          type="button"
-                          style={styles.editButton}
-                          onClick={() => editarActivo(activo)}
-                        >
-                          Editar
-                        </button>
+            <div style={styles.listado}>
+              {activosFiltrados.map((activo) => (
+                <div key={activo.id} style={styles.item}>
+                  <div style={styles.headerRow}>
+                    <p style={styles.itemTitle}>
+                      <strong>#{activo.id}</strong> — {activo.nombre}
+                    </p>
 
-                        <button
-                          type="button"
-                          style={styles.deleteButton}
-                          onClick={() => darDeBaja(activo.id)}
-                        >
-                          Dar de baja
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    <span
+                      style={{
+                        ...styles.badge,
+                        ...getEstadoBadgeStyle(activo.estado),
+                      }}
+                    >
+                      {activo.estado}
+                    </span>
+                  </div>
+
+                  <p><strong>Código:</strong> {activo.codigo_interno || "-"}</p>
+                  <p><strong>Marca:</strong> {activo.marca || "-"}</p>
+                  <p><strong>Modelo:</strong> {activo.modelo || "-"}</p>
+                  <p><strong>N° Serie:</strong> {activo.numero_serie || "-"}</p>
+                  <p><strong>Categoría:</strong> {activo.Categoria?.nombre || "-"}</p>
+                  <p><strong>Oficina:</strong> {activo.Oficina?.nombre || "-"}</p>
+                  <p><strong>Cantidad:</strong> {activo.cantidad}</p>
+
+                  {activo.descripcion && (
+                    <p><strong>Descripción:</strong> {activo.descripcion}</p>
+                  )}
+
+                  {activo.observaciones && (
+                    <p style={styles.infoBox}>
+                      <strong>Observaciones:</strong> {activo.observaciones}
+                    </p>
+                  )}
+
+                  <div style={styles.actionButtons}>
+                    <button
+                      type="button"
+                      style={styles.editButton}
+                      onClick={() => editarActivo(activo)}
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      type="button"
+                      style={styles.deleteButton}
+                      onClick={() => darDeBaja(activo.id)}
+                    >
+                      Dar de baja
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -466,37 +494,6 @@ const styles = {
     fontWeight: "bold",
     marginTop: "0.5rem",
   },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: "0.95rem",
-    border: "1px solid #e5e7eb",
-  },
-  ok: {
-    color: "green",
-    margin: 0,
-  },
-  error: {
-    color: "crimson",
-    margin: 0,
-  },
-  th: {
-    textAlign: "left",
-    padding: "0.6rem",
-    borderBottom: "1px solid #e5e7eb",
-  },
-  td: {
-    padding: "0.6rem",
-    borderBottom: "1px solid #f0f0f0",
-  },
-  deleteButton: {
-    padding: "0.55rem 0.8rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#b91c1c",
-    color: "#fff",
-    cursor: "pointer",
-  },
   buttonGroup: {
     display: "flex",
     gap: "0.7rem",
@@ -511,10 +508,44 @@ const styles = {
     cursor: "pointer",
     fontWeight: "bold",
   },
+  listado: {
+    display: "grid",
+    gap: "1rem",
+  },
+  item: {
+    border: "1px solid #e5e7eb",
+    borderRadius: "12px",
+    padding: "1rem",
+  },
+  headerRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "1rem",
+    marginBottom: "0.8rem",
+    flexWrap: "wrap",
+  },
+  itemTitle: {
+    margin: 0,
+    fontSize: "1rem",
+  },
+  badge: {
+    padding: "0.35rem 0.7rem",
+    borderRadius: "999px",
+    fontSize: "0.8rem",
+    fontWeight: "bold",
+  },
+  infoBox: {
+    background: "#f9fafb",
+    border: "1px solid #e5e7eb",
+    borderRadius: "10px",
+    padding: "0.8rem",
+  },
   actionButtons: {
     display: "flex",
     gap: "0.5rem",
     flexWrap: "wrap",
+    marginTop: "1rem",
   },
   editButton: {
     padding: "0.55rem 0.8rem",
@@ -523,5 +554,21 @@ const styles = {
     background: "#1f4f82",
     color: "#fff",
     cursor: "pointer",
+  },
+  deleteButton: {
+    padding: "0.55rem 0.8rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#b91c1c",
+    color: "#fff",
+    cursor: "pointer",
+  },
+  ok: {
+    color: "green",
+    margin: 0,
+  },
+  error: {
+    color: "crimson",
+    margin: 0,
   },
 };
