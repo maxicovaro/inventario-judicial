@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 
@@ -27,6 +27,10 @@ export default function Activos() {
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
 
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
+  const [filtroOficina, setFiltroOficina] = useState("");
+
   const cargarDatos = async () => {
     try {
       const [resActivos, resCategorias, resOficinas] = await Promise.all([
@@ -46,6 +50,26 @@ export default function Activos() {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  const activosFiltrados = useMemo(() => {
+    return activos.filter((activo) => {
+      const texto = busqueda.toLowerCase();
+
+      const coincideBusqueda =
+        activo.nombre?.toLowerCase().includes(texto) ||
+        activo.codigo_interno?.toLowerCase().includes(texto) ||
+        activo.marca?.toLowerCase().includes(texto) ||
+        activo.modelo?.toLowerCase().includes(texto) ||
+        activo.numero_serie?.toLowerCase().includes(texto);
+
+      const coincideEstado = !filtroEstado || activo.estado === filtroEstado;
+
+      const coincideOficina =
+        !filtroOficina || String(activo.oficina_id) === filtroOficina;
+
+      return coincideBusqueda && coincideEstado && coincideOficina;
+    });
+  }, [activos, busqueda, filtroEstado, filtroOficina]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -67,22 +91,36 @@ export default function Activos() {
     setGuardando(true);
 
     try {
+      const payload = {
+        ...form,
+        fecha_alta: form.fecha_alta || null,
+      };
+
       if (editandoId) {
-        await api.put(`/activos/${editandoId}`, form);
+        await api.put(`/activos/${editandoId}`, payload);
         setMensaje("Activo actualizado correctamente");
       } else {
-        await api.post("/activos", form);
+        await api.post("/activos", payload);
         setMensaje("Activo creado correctamente");
       }
+
       setForm(initialForm);
       setEditandoId(null);
       await cargarDatos();
     } catch (err) {
-      setError(
-  err.response?.data?.error ||
-  err.response?.data?.mensaje ||
-  "Error al guardar el activo"
-);
+      console.log("ERROR BACKEND:", err.response?.data);
+
+      const detalle = err.response?.data?.detalle;
+
+      if (detalle && detalle.length > 0) {
+        setError(detalle.map((d) => `${d.campo}: ${d.mensaje}`).join(" | "));
+      } else {
+        setError(
+          err.response?.data?.error ||
+            err.response?.data?.mensaje ||
+            "Error al guardar el activo",
+        );
+      }
     } finally {
       setGuardando(false);
     }
@@ -106,6 +144,7 @@ export default function Activos() {
       setError(err.response?.data?.mensaje || "Error al dar de baja el activo");
     }
   };
+
   const editarActivo = (activo) => {
     setError("");
     setMensaje("");
@@ -127,6 +166,7 @@ export default function Activos() {
 
     setEditandoId(activo.id);
   };
+
   const cancelarEdicion = () => {
     setForm(initialForm);
     setEditandoId(null);
@@ -288,8 +328,44 @@ export default function Activos() {
         <div style={styles.card}>
           <h2 style={styles.subtitulo}>Listado</h2>
 
-          {activos.length === 0 ? (
-            <p>No hay activos cargados.</p>
+          <div style={styles.filters}>
+            <input
+              type="text"
+              placeholder="Buscar por nombre, código, marca, modelo..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              style={styles.input}
+            />
+
+            <select
+              value={filtroEstado}
+              onChange={(e) => setFiltroEstado(e.target.value)}
+              style={styles.input}
+            >
+              <option value="">Todos los estados</option>
+              <option value="Excelente estado">Excelente estado</option>
+              <option value="Buen estado">Buen estado</option>
+              <option value="Regular estado">Regular estado</option>
+              <option value="Mal estado">Mal estado</option>
+              <option value="Sin funcionar">Sin funcionar</option>
+            </select>
+
+            <select
+              value={filtroOficina}
+              onChange={(e) => setFiltroOficina(e.target.value)}
+              style={styles.input}
+            >
+              <option value="">Todas las oficinas</option>
+              {oficinas.map((oficina) => (
+                <option key={oficina.id} value={String(oficina.id)}>
+                  {oficina.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {activosFiltrados.length === 0 ? (
+            <p>No hay activos que coincidan con la búsqueda.</p>
           ) : (
             <table style={styles.table}>
               <thead>
@@ -304,7 +380,7 @@ export default function Activos() {
                 </tr>
               </thead>
               <tbody>
-                {activos.map((activo) => (
+                {activosFiltrados.map((activo) => (
                   <tr key={activo.id}>
                     <td style={styles.td}>{activo.id}</td>
                     <td style={styles.td}>{activo.codigo_interno || "-"}</td>
@@ -362,6 +438,11 @@ const styles = {
   form: {
     display: "grid",
     gap: "0.8rem",
+  },
+  filters: {
+    display: "grid",
+    gap: "0.8rem",
+    marginBottom: "1rem",
   },
   input: {
     padding: "0.8rem",

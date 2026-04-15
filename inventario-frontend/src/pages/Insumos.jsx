@@ -1,34 +1,37 @@
-import { useEffect, useState } from 'react';
-import api from '../api/axios';
-import Layout from '../components/Layout';
+import { useEffect, useMemo, useState } from "react";
+import api from "../api/axios";
+import Layout from "../components/Layout";
 
 const initialForm = {
-  nombre: '',
-  descripcion: '',
-  categoria: '',
-  unidad_medida: 'unidad',
+  nombre: "",
+  descripcion: "",
+  categoria: "",
+  unidad_medida: "unidad",
   stock_actual: 0,
   stock_minimo: 0,
-  lote: '',
-  fecha_vencimiento: '',
-  proveedor: '',
-  observaciones: '',
+  lote: "",
+  fecha_vencimiento: "",
+  proveedor: "",
+  observaciones: "",
 };
 
 export default function Insumos() {
   const [insumos, setInsumos] = useState([]);
   const [form, setForm] = useState(initialForm);
-  const [error, setError] = useState('');
-  const [mensaje, setMensaje] = useState('');
+  const [error, setError] = useState("");
+  const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
 
+  const [busqueda, setBusqueda] = useState("");
+  const [soloStockBajo, setSoloStockBajo] = useState(false);
+
   const cargarInsumos = async () => {
     try {
-      const response = await api.get('/insumos');
+      const response = await api.get("/insumos");
       setInsumos(response.data);
     } catch (err) {
-      setError(err.response?.data?.mensaje || 'Error al cargar insumos');
+      setError(err.response?.data?.mensaje || "Error al cargar insumos");
     }
   };
 
@@ -36,13 +39,30 @@ export default function Insumos() {
     cargarInsumos();
   }, []);
 
+  const insumosFiltrados = useMemo(() => {
+    return insumos.filter((insumo) => {
+      const texto = busqueda.toLowerCase();
+
+      const coincideBusqueda =
+        insumo.nombre?.toLowerCase().includes(texto) ||
+        insumo.categoria?.toLowerCase().includes(texto) ||
+        insumo.proveedor?.toLowerCase().includes(texto) ||
+        insumo.lote?.toLowerCase().includes(texto);
+
+      const coincideStock =
+        !soloStockBajo || insumo.stock_actual <= insumo.stock_minimo;
+
+      return coincideBusqueda && coincideStock;
+    });
+  }, [insumos, busqueda, soloStockBajo]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
     setForm((prev) => ({
       ...prev,
       [name]:
-        name === 'stock_actual' || name === 'stock_minimo'
+        name === "stock_actual" || name === "stock_minimo"
           ? Number(value)
           : value,
     }));
@@ -50,8 +70,8 @@ export default function Insumos() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setMensaje('');
+    setError("");
+    setMensaje("");
     setGuardando(true);
 
     try {
@@ -62,10 +82,10 @@ export default function Insumos() {
 
       if (editandoId) {
         await api.put(`/insumos/${editandoId}`, payload);
-        setMensaje('Insumo actualizado correctamente');
+        setMensaje("Insumo actualizado correctamente");
       } else {
-        await api.post('/insumos', payload);
-        setMensaje('Insumo creado correctamente');
+        await api.post("/insumos", payload);
+        setMensaje("Insumo creado correctamente");
       }
 
       setForm(initialForm);
@@ -75,7 +95,7 @@ export default function Insumos() {
       setError(
         err.response?.data?.error ||
           err.response?.data?.mensaje ||
-          'Error al guardar insumo'
+          "Error al guardar insumo",
       );
     } finally {
       setGuardando(false);
@@ -83,20 +103,20 @@ export default function Insumos() {
   };
 
   const editarInsumo = (insumo) => {
-    setError('');
-    setMensaje('');
+    setError("");
+    setMensaje("");
 
     setForm({
-      nombre: insumo.nombre || '',
-      descripcion: insumo.descripcion || '',
-      categoria: insumo.categoria || '',
-      unidad_medida: insumo.unidad_medida || 'unidad',
+      nombre: insumo.nombre || "",
+      descripcion: insumo.descripcion || "",
+      categoria: insumo.categoria || "",
+      unidad_medida: insumo.unidad_medida || "unidad",
       stock_actual: insumo.stock_actual ?? 0,
       stock_minimo: insumo.stock_minimo ?? 0,
-      lote: insumo.lote || '',
-      fecha_vencimiento: insumo.fecha_vencimiento || '',
-      proveedor: insumo.proveedor || '',
-      observaciones: insumo.observaciones || '',
+      lote: insumo.lote || "",
+      fecha_vencimiento: insumo.fecha_vencimiento || "",
+      proveedor: insumo.proveedor || "",
+      observaciones: insumo.observaciones || "",
     });
 
     setEditandoId(insumo.id);
@@ -105,27 +125,27 @@ export default function Insumos() {
   const cancelarEdicion = () => {
     setForm(initialForm);
     setEditandoId(null);
-    setError('');
-    setMensaje('');
+    setError("");
+    setMensaje("");
   };
 
   const desactivarInsumo = async (id) => {
     const confirmar = window.confirm(
-      '¿Seguro que querés desactivar este insumo?'
+      "¿Seguro que querés desactivar este insumo?",
     );
 
     if (!confirmar) return;
 
-    setError('');
-    setMensaje('');
+    setError("");
+    setMensaje("");
 
     try {
       await api.delete(`/insumos/${id}`);
-      setMensaje('Insumo desactivado correctamente');
+      setMensaje("Insumo desactivado correctamente");
       await cargarInsumos();
     } catch (err) {
       setError(
-        err.response?.data?.mensaje || 'Error al desactivar el insumo'
+        err.response?.data?.mensaje || "Error al desactivar el insumo",
       );
     }
   };
@@ -137,7 +157,7 @@ export default function Insumos() {
       <div style={styles.grid}>
         <div style={styles.card}>
           <h2 style={styles.subtitulo}>
-            {editandoId ? 'Editar insumo' : 'Nuevo insumo'}
+            {editandoId ? "Editar insumo" : "Nuevo insumo"}
           </h2>
 
           <form onSubmit={handleSubmit} style={styles.form}>
@@ -235,10 +255,10 @@ export default function Insumos() {
             <div style={styles.buttonGroup}>
               <button type="submit" style={styles.button} disabled={guardando}>
                 {guardando
-                  ? 'Guardando...'
+                  ? "Guardando..."
                   : editandoId
-                    ? 'Actualizar insumo'
-                    : 'Crear insumo'}
+                    ? "Actualizar insumo"
+                    : "Crear insumo"}
               </button>
 
               {editandoId && (
@@ -257,8 +277,27 @@ export default function Insumos() {
         <div style={styles.card}>
           <h2 style={styles.subtitulo}>Listado</h2>
 
-          {insumos.length === 0 ? (
-            <p>No hay insumos cargados.</p>
+          <div style={styles.filters}>
+            <input
+              type="text"
+              placeholder="Buscar por nombre, categoría, proveedor o lote..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              style={styles.input}
+            />
+
+            <label style={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={soloStockBajo}
+                onChange={(e) => setSoloStockBajo(e.target.checked)}
+              />
+              Mostrar solo stock bajo
+            </label>
+          </div>
+
+          {insumosFiltrados.length === 0 ? (
+            <p>No hay insumos que coincidan con la búsqueda.</p>
           ) : (
             <table style={styles.table}>
               <thead>
@@ -274,15 +313,29 @@ export default function Insumos() {
                 </tr>
               </thead>
               <tbody>
-                {insumos.map((insumo) => (
+                {insumosFiltrados.map((insumo) => (
                   <tr key={insumo.id}>
                     <td style={styles.td}>{insumo.id}</td>
                     <td style={styles.td}>{insumo.nombre}</td>
-                    <td style={styles.td}>{insumo.categoria || '-'}</td>
+                    <td style={styles.td}>{insumo.categoria || "-"}</td>
                     <td style={styles.td}>{insumo.unidad_medida}</td>
-                    <td style={styles.td}>{insumo.stock_actual}</td>
+                    <td
+                      style={{
+                        ...styles.td,
+                        color:
+                          insumo.stock_actual <= insumo.stock_minimo
+                            ? "#b91c1c"
+                            : "inherit",
+                        fontWeight:
+                          insumo.stock_actual <= insumo.stock_minimo
+                            ? "bold"
+                            : "normal",
+                      }}
+                    >
+                      {insumo.stock_actual}
+                    </td>
                     <td style={styles.td}>{insumo.stock_minimo}</td>
-                    <td style={styles.td}>{insumo.proveedor || '-'}</td>
+                    <td style={styles.td}>{insumo.proveedor || "-"}</td>
                     <td style={styles.td}>
                       <div style={styles.actionButtons}>
                         <button
@@ -316,106 +369,117 @@ export default function Insumos() {
 const styles = {
   titulo: {
     marginTop: 0,
-    marginBottom: '1rem',
+    marginBottom: "1rem",
   },
   subtitulo: {
     marginTop: 0,
   },
   grid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1.4fr',
-    gap: '1rem',
+    display: "grid",
+    gridTemplateColumns: "1fr 1.4fr",
+    gap: "1rem",
   },
   card: {
-    background: '#fff',
-    borderRadius: '14px',
-    padding: '1rem',
-    boxShadow: '0 6px 18px rgba(0,0,0,0.08)',
-    overflowX: 'auto',
-    maxHeight: '80vh',
-    overflowY: 'auto',
+    background: "#fff",
+    borderRadius: "14px",
+    padding: "1rem",
+    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+    overflowX: "auto",
+    maxHeight: "80vh",
+    overflowY: "auto",
   },
   form: {
-    display: 'grid',
-    gap: '0.8rem',
+    display: "grid",
+    gap: "0.8rem",
+  },
+  filters: {
+    display: "grid",
+    gap: "0.8rem",
+    marginBottom: "1rem",
+  },
+  checkboxLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    fontSize: "0.95rem",
   },
   input: {
-    padding: '0.8rem',
-    border: '1px solid #ccc',
-    borderRadius: '8px',
+    padding: "0.8rem",
+    border: "1px solid #ccc",
+    borderRadius: "8px",
   },
   textarea: {
-    padding: '0.8rem',
-    border: '1px solid #ccc',
-    borderRadius: '8px',
-    minHeight: '90px',
-    resize: 'vertical',
+    padding: "0.8rem",
+    border: "1px solid #ccc",
+    borderRadius: "8px",
+    minHeight: "90px",
+    resize: "vertical",
   },
   button: {
-    padding: '0.9rem',
-    border: 'none',
-    borderRadius: '8px',
-    background: '#1f4f82',
-    color: '#fff',
-    cursor: 'pointer',
-    fontWeight: 'bold',
+    padding: "0.9rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#1f4f82",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: "bold",
   },
   buttonGroup: {
-    display: 'flex',
-    gap: '0.7rem',
-    marginTop: '0.5rem',
+    display: "flex",
+    gap: "0.7rem",
+    marginTop: "0.5rem",
   },
   cancelButton: {
-    padding: '0.9rem',
-    border: 'none',
-    borderRadius: '8px',
-    background: '#6b7280',
-    color: '#fff',
-    cursor: 'pointer',
-    fontWeight: 'bold',
+    padding: "0.9rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#6b7280",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: "bold",
   },
   table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    fontSize: '0.95rem',
-    border: '1px solid #e5e7eb',
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "0.95rem",
+    border: "1px solid #e5e7eb",
   },
   th: {
-    textAlign: 'left',
-    padding: '0.6rem',
-    borderBottom: '1px solid #e5e7eb',
+    textAlign: "left",
+    padding: "0.6rem",
+    borderBottom: "1px solid #e5e7eb",
   },
   td: {
-    padding: '0.6rem',
-    borderBottom: '1px solid #f0f0f0',
+    padding: "0.6rem",
+    borderBottom: "1px solid #f0f0f0",
   },
   actionButtons: {
-    display: 'flex',
-    gap: '0.5rem',
-    flexWrap: 'wrap',
+    display: "flex",
+    gap: "0.5rem",
+    flexWrap: "wrap",
   },
   editButton: {
-    padding: '0.55rem 0.8rem',
-    border: 'none',
-    borderRadius: '8px',
-    background: '#1f4f82',
-    color: '#fff',
-    cursor: 'pointer',
+    padding: "0.55rem 0.8rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#1f4f82",
+    color: "#fff",
+    cursor: "pointer",
   },
   deleteButton: {
-    padding: '0.55rem 0.8rem',
-    border: 'none',
-    borderRadius: '8px',
-    background: '#b91c1c',
-    color: '#fff',
-    cursor: 'pointer',
+    padding: "0.55rem 0.8rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#b91c1c",
+    color: "#fff",
+    cursor: "pointer",
   },
   ok: {
-    color: 'green',
+    color: "green",
     margin: 0,
   },
   error: {
-    color: 'crimson',
+    color: "crimson",
     margin: 0,
   },
 };
