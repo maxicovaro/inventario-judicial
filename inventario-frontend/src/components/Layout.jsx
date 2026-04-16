@@ -42,6 +42,7 @@ export default function Layout({ children }) {
           <Link to="/movimientos-stock">Movimientos stock</Link>
           <Link to="/adjuntos">Adjuntos</Link>
           <Link to="/pedido-mensual">Pedido mensual</Link>
+          <Link to="/historial-pedidos">Historial pedidos</Link>
 
           {/* ✅ contador correcto */}
           <Link to="/notificaciones">

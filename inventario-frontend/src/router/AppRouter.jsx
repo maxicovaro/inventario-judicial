@@ -9,6 +9,7 @@ import MovimientosStock from "../pages/MovimientosStock";
 import Notificaciones from "../pages/Notificaciones";
 import Adjuntos from "../pages/Adjuntos";
 import PedidoMensual from "../pages/PedidoMensual";
+import HistorialPedidos from "../pages/HistorialPedidos";
 
 export default function AppRouter() {
   return (
@@ -87,6 +88,14 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         />
+        <Route
+  path="/historial-pedidos"
+  element={
+    <PrivateRoute>
+      <HistorialPedidos />
+    </PrivateRoute>
+  }
+/>
       </Routes>
     </BrowserRouter>
   );
