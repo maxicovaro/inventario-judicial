@@ -10,6 +10,7 @@ import Notificaciones from "../pages/Notificaciones";
 import Adjuntos from "../pages/Adjuntos";
 import PedidoMensual from "../pages/PedidoMensual";
 import HistorialPedidos from "../pages/HistorialPedidos";
+import ReportePedidos from "../pages/ReportePedidos";
 
 export default function AppRouter() {
   return (
@@ -89,13 +90,21 @@ export default function AppRouter() {
           }
         />
         <Route
-  path="/historial-pedidos"
-  element={
-    <PrivateRoute>
-      <HistorialPedidos />
-    </PrivateRoute>
-  }
-/>
+          path="/historial-pedidos"
+          element={
+            <PrivateRoute>
+              <HistorialPedidos />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/reportes-pedidos"
+          element={
+            <PrivateRoute>
+              <ReportePedidos />
+            </PrivateRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
