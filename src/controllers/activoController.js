@@ -179,19 +179,19 @@ const actualizarActivo = async (req, res) => {
         });
       }
     }
-if (codigo_interno) {
-  const activoExistente = await Activo.findOne({
-    where: { codigo_interno },
-  });
+    if (codigo_interno) {
+      const activoExistente = await Activo.findOne({
+        where: { codigo_interno },
+      });
 
-  if (activoExistente && activoExistente.id !== activo.id) {
-    return res.status(400).json({
-      mensaje: activoExistente.activo
-        ? "Ese código interno ya existe en un activo activo."
-        : "Ese código interno ya existe y pertenece a un activo dado de baja.",
-    });
-  }
-}
+      if (activoExistente && activoExistente.id !== activo.id) {
+        return res.status(400).json({
+          mensaje: activoExistente.activo
+            ? "Ese código interno ya existe en un activo activo."
+            : "Ese código interno ya existe y pertenece a un activo dado de baja.",
+        });
+      }
+    }
 
     const estadoAnterior = activo.estado;
     const oficinaAnterior = activo.oficina_id;

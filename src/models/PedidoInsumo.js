@@ -17,6 +17,10 @@ const PedidoInsumo = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    fecha_envio: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
     estado: {
       type: DataTypes.ENUM(
         "BORRADOR",
@@ -43,7 +47,7 @@ const PedidoInsumo = sequelize.define(
   },
   {
     tableName: "pedidos_insumos",
-    timestamps: true,
+    timestamps: false,
   }
 );
 

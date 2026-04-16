@@ -94,6 +94,24 @@ export default function HistorialPedidos() {
     }
   };
 
+  const descargarPDF = async (pedidoId) => {
+    try {
+      const response = await api.get(`/pedidos-insumos/${pedidoId}/pdf`, {
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `pedido_${pedidoId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      alert("Error al descargar PDF");
+    }
+  };
+
   return (
     <Layout>
       <h1 style={styles.titulo}>Historial de pedidos mensuales</h1>
@@ -179,19 +197,29 @@ export default function HistorialPedidos() {
                 </div>
               )}
 
-              <button
-                type="button"
-                style={styles.button}
-                onClick={() =>
-                  setPedidoAbierto(
-                    pedidoAbierto === pedido.id ? null : pedido.id
-                  )
-                }
-              >
-                {pedidoAbierto === pedido.id
-                  ? "Ocultar detalle"
-                  : "Ver detalle"}
-              </button>
+              <div style={styles.accionesTop}>
+                <button
+                  type="button"
+                  style={styles.button}
+                  onClick={() =>
+                    setPedidoAbierto(
+                      pedidoAbierto === pedido.id ? null : pedido.id
+                    )
+                  }
+                >
+                  {pedidoAbierto === pedido.id
+                    ? "Ocultar detalle"
+                    : "Ver detalle"}
+                </button>
+
+                <button
+                  type="button"
+                  style={styles.pdfButton}
+                  onClick={() => descargarPDF(pedido.id)}
+                >
+                  Descargar PDF
+                </button>
+              </div>
 
               {pedidoAbierto === pedido.id && (
                 <div style={styles.detalleBox}>
@@ -206,7 +234,9 @@ export default function HistorialPedidos() {
                           <div key={item.id} style={styles.detalleItem}>
                             <p>
                               <strong>Artículo:</strong>{" "}
-                              {item.Insumo?.nombre || item.articulo_manual || "-"}
+                              {item.Insumo?.nombre ||
+                                item.articulo_manual ||
+                                "-"}
                             </p>
 
                             <p>
@@ -222,7 +252,10 @@ export default function HistorialPedidos() {
                                   min="0"
                                   defaultValue={item.cantidad_provista || 0}
                                   onChange={(e) =>
-                                    handleProvisionChange(item.id, e.target.value)
+                                    handleProvisionChange(
+                                      item.id,
+                                      e.target.value
+                                    )
                                   }
                                   style={styles.provisionInput}
                                 />
@@ -337,12 +370,25 @@ const styles = {
     flexWrap: "wrap",
     marginTop: "1rem",
   },
-  button: {
+  accionesTop: {
+    display: "flex",
+    gap: "0.6rem",
+    flexWrap: "wrap",
     marginTop: "1rem",
+  },
+  button: {
     padding: "0.75rem 1rem",
     border: "none",
     borderRadius: "8px",
     background: "#1f4f82",
+    color: "#fff",
+    cursor: "pointer",
+  },
+  pdfButton: {
+    padding: "0.75rem 1rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#374151",
     color: "#fff",
     cursor: "pointer",
   },

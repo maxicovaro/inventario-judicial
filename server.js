@@ -36,6 +36,7 @@ app.use('/api/oficinas', oficinaRoutes);
 app.use('/api/categorias', categoriaRoutes);
 app.use('/api/notificaciones', notificacionRoutes);
 app.use("/api/pedidos-insumos", require("./src/routes/pedidoInsumoRoutes"));
+app.use("/api/reportes-pedidos", require("./src/routes/reportePedidoRoutes"));
 
 app.use((error, req, res, next) => {
   if (error) {

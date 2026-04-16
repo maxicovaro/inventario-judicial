@@ -44,7 +44,11 @@ const subirAdjunto = async (req, res) => {
     let tipoArchivo = req.file.mimetype;
     let tamanioArchivo = req.file.size;
 
-    const filePath = path.join(__dirname, "../../storage/uploads", req.file.filename);
+    const filePath = path.join(
+      __dirname,
+      "../../storage/uploads",
+      req.file.filename,
+    );
 
     // ✅ Comprimir solo imágenes
     if (IMAGE_MIME_TYPES.includes(req.file.mimetype)) {
@@ -53,7 +57,7 @@ const subirAdjunto = async (req, res) => {
         __dirname,
         "..",
         "uploads",
-        compressedFilename
+        compressedFilename,
       );
 
       await sharp(filePath)
@@ -105,13 +109,13 @@ const listarAdjuntos = async (req, res) => {
     if (solicitud_id) where.solicitud_id = solicitud_id;
 
     const adjuntos = await Adjunto.findAll({
-  where,
-  include: [
-    { model: Activo, attributes: ["id", "nombre"] },
-    { model: Solicitud, attributes: ["id", "tipo"] },
-  ],
-  order: [["id", "DESC"]],
-});
+      where,
+      include: [
+        { model: Activo, attributes: ["id", "nombre"] },
+        { model: Solicitud, attributes: ["id", "tipo"] },
+      ],
+      order: [["id", "DESC"]],
+    });
 
     return res.status(200).json(adjuntos);
   } catch (error) {
@@ -134,7 +138,12 @@ const descargarAdjunto = async (req, res) => {
       });
     }
 
-    const filePath = path.join(__dirname, "..", "uploads", adjunto.ruta_archivo);
+    const filePath = path.join(
+      __dirname,
+      "..",
+      "uploads",
+      adjunto.ruta_archivo,
+    );
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
@@ -163,7 +172,12 @@ const eliminarAdjunto = async (req, res) => {
       });
     }
 
-    const filePath = path.join(__dirname, "..", "uploads", adjunto.ruta_archivo);
+    const filePath = path.join(
+      __dirname,
+      "..",
+      "uploads",
+      adjunto.ruta_archivo,
+    );
 
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);

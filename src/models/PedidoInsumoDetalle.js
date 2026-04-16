@@ -32,7 +32,7 @@ const PedidoInsumoDetalle = sequelize.define(
   },
   {
     tableName: "pedido_insumos_detalle",
-    timestamps: true,
+    timestamps: false,
   }
 );
 

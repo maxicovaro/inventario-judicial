@@ -10,7 +10,6 @@ const Activo = sequelize.define('Activo', {
   codigo_interno: {
     type: DataTypes.STRING(50),
     allowNull: true,
-    unique: true,
   },
   nombre: {
     type: DataTypes.STRING(150),
