@@ -23,9 +23,33 @@ export default function ReportePedidos() {
     cargarReporte();
   }, []);
 
+  const descargarPDF = async () => {
+    try {
+      const response = await api.get("/reportes-pedidos/resumen/pdf", {
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "reporte_general_pedidos.pdf");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      alert("Error al descargar PDF");
+    }
+  };
+
   return (
     <Layout>
-      <h1 style={styles.titulo}>Reporte de pedidos</h1>
+      <div style={styles.headerRow}>
+        <h1 style={styles.titulo}>Reporte de pedidos</h1>
+
+        <button type="button" style={styles.pdfButton} onClick={descargarPDF}>
+          Descargar PDF
+        </button>
+      </div>
 
       {error && <p style={styles.error}>{error}</p>}
 
@@ -114,6 +138,14 @@ const styles = {
     marginTop: 0,
     marginBottom: "1rem",
   },
+  headerRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "1rem",
+    flexWrap: "wrap",
+    marginBottom: "1rem",
+  },
   subtitulo: {
     marginTop: 0,
     marginBottom: "0.8rem",
@@ -161,6 +193,14 @@ const styles = {
     border: "1px solid #e5e7eb",
     borderRadius: "10px",
     background: "#fafafa",
+  },
+  pdfButton: {
+    padding: "0.75rem 1rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#374151",
+    color: "#fff",
+    cursor: "pointer",
   },
   error: {
     color: "crimson",

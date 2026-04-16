@@ -1,7 +1,11 @@
 const express = require("express");
 const router = express.Router();
 
-const { resumenPedidos } = require("../controllers/reportePedidoController");
+const {
+  resumenPedidos,
+  exportarResumenPedidosPDF,
+} = require("../controllers/reportePedidoController");
+
 const { verificarToken, verificarRol } = require("../middlewares/authMiddleware");
 
 router.get(
@@ -9,6 +13,13 @@ router.get(
   verificarToken,
   verificarRol("ADMIN"),
   resumenPedidos
+);
+
+router.get(
+  "/resumen/pdf",
+  verificarToken,
+  verificarRol("ADMIN"),
+  exportarResumenPedidosPDF
 );
 
 module.exports = router;
