@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import { insumoSchema } from "../schemas/insumoSchema";
 
-const initialForm = {
+const defaultValues = {
   nombre: "",
   descripcion: "",
   categoria: "",
-  unidad_medida: "unidad",
+  unidad_medida: "",
   stock_actual: 0,
   stock_minimo: 0,
   lote: "",
@@ -17,14 +20,24 @@ const initialForm = {
 
 export default function Insumos() {
   const [insumos, setInsumos] = useState([]);
-  const [form, setForm] = useState(initialForm);
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
+  const [insumoAbierto, setInsumoAbierto] = useState(null);
 
   const [busqueda, setBusqueda] = useState("");
-  const [soloStockBajo, setSoloStockBajo] = useState(false);
+  const [filtroCategoria, setFiltroCategoria] = useState("");
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(insumoSchema),
+    defaultValues,
+  });
 
   const cargarInsumos = async () => {
     try {
@@ -40,44 +53,41 @@ export default function Insumos() {
   }, []);
 
   const insumosFiltrados = useMemo(() => {
-    return insumos.filter((insumo) => {
-      const texto = busqueda.toLowerCase();
+    return insumos
+      .filter((insumo) => {
+        const texto = busqueda.toLowerCase();
 
-      const coincideBusqueda =
-        insumo.nombre?.toLowerCase().includes(texto) ||
-        insumo.categoria?.toLowerCase().includes(texto) ||
-        insumo.proveedor?.toLowerCase().includes(texto) ||
-        insumo.lote?.toLowerCase().includes(texto);
+        const coincideBusqueda =
+          insumo.nombre?.toLowerCase().includes(texto) ||
+          insumo.categoria?.toLowerCase().includes(texto) ||
+          insumo.unidad_medida?.toLowerCase().includes(texto) ||
+          insumo.proveedor?.toLowerCase().includes(texto);
 
-      const coincideStock =
-        !soloStockBajo || insumo.stock_actual <= insumo.stock_minimo;
+        const coincideCategoria =
+          !filtroCategoria || insumo.categoria === filtroCategoria;
 
-      return coincideBusqueda && coincideStock;
-    });
-  }, [insumos, busqueda, soloStockBajo]);
+        return coincideBusqueda && coincideCategoria;
+      })
+      .sort((a, b) => {
+        const nombreA = a.nombre?.toLowerCase() || "";
+        const nombreB = b.nombre?.toLowerCase() || "";
+        return nombreA.localeCompare(nombreB, "es");
+      });
+  }, [insumos, busqueda, filtroCategoria]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const categoriasUnicas = useMemo(() => {
+    return [...new Set(insumos.map((i) => i.categoria).filter(Boolean))].sort();
+  }, [insumos]);
 
-    setForm((prev) => ({
-      ...prev,
-      [name]:
-        name === "stock_actual" || name === "stock_minimo"
-          ? Number(value)
-          : value,
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const onSubmit = async (data) => {
     setError("");
     setMensaje("");
     setGuardando(true);
 
     try {
       const payload = {
-        ...form,
-        fecha_vencimiento: form.fecha_vencimiento || null,
+        ...data,
+        fecha_vencimiento: data.fecha_vencimiento || null,
       };
 
       if (editandoId) {
@@ -88,7 +98,7 @@ export default function Insumos() {
         setMensaje("Insumo creado correctamente");
       }
 
-      setForm(initialForm);
+      reset(defaultValues);
       setEditandoId(null);
       await cargarInsumos();
     } catch (err) {
@@ -106,11 +116,11 @@ export default function Insumos() {
     setError("");
     setMensaje("");
 
-    setForm({
+    reset({
       nombre: insumo.nombre || "",
       descripcion: insumo.descripcion || "",
       categoria: insumo.categoria || "",
-      unidad_medida: insumo.unidad_medida || "unidad",
+      unidad_medida: insumo.unidad_medida || "",
       stock_actual: insumo.stock_actual ?? 0,
       stock_minimo: insumo.stock_minimo ?? 0,
       lote: insumo.lote || "",
@@ -123,41 +133,41 @@ export default function Insumos() {
   };
 
   const cancelarEdicion = () => {
-    setForm(initialForm);
+    reset(defaultValues);
     setEditandoId(null);
     setError("");
     setMensaje("");
   };
 
-  const desactivarInsumo = async (id) => {
-    const confirmar = window.confirm(
-      "¿Seguro que querés desactivar este insumo?",
-    );
-
-    if (!confirmar) return;
-
-    setError("");
-    setMensaje("");
-
-    try {
-      await api.delete(`/insumos/${id}`);
-      setMensaje("Insumo desactivado correctamente");
-      await cargarInsumos();
-    } catch (err) {
-      setError(
-        err.response?.data?.mensaje || "Error al desactivar el insumo",
-      );
-    }
+  const toggleDetalle = (id) => {
+    setInsumoAbierto((prev) => (prev === id ? null : id));
   };
 
-  const getStockBadgeStyle = (stockActual, stockMinimo) => {
-    if (stockActual <= stockMinimo) {
-      return { background: "#fee2e2", color: "#991b1b" };
+  const getStockStyle = (actual, minimo) => {
+    const stock = Number(actual);
+    const minimoNum = Number(minimo);
+
+    if (stock <= 0) {
+      return {
+        background: "#111827",
+        color: "#fff",
+        texto: "Sin stock",
+      };
     }
-    if (stockActual <= stockMinimo + 5) {
-      return { background: "#fef3c7", color: "#92400e" };
+
+    if (stock <= minimoNum) {
+      return {
+        background: "#fee2e2",
+        color: "#991b1b",
+        texto: `Bajo stock: ${stock}`,
+      };
     }
-    return { background: "#d1fae5", color: "#065f46" };
+
+    return {
+      background: "#dcfce7",
+      color: "#166534",
+      texto: `Stock: ${stock}`,
+    };
   };
 
   return (
@@ -170,94 +180,122 @@ export default function Insumos() {
             {editandoId ? "Editar insumo" : "Nuevo insumo"}
           </h2>
 
-          <form onSubmit={handleSubmit} style={styles.form}>
-            <input
-              name="nombre"
-              placeholder="Nombre"
-              value={form.nombre}
-              onChange={handleChange}
-              style={styles.input}
-            />
+          <form onSubmit={handleSubmit(onSubmit)} style={styles.form}>
+            <div>
+              <input
+                {...register("nombre")}
+                placeholder="Nombre"
+                style={styles.input}
+              />
+              {errors.nombre && (
+                <p style={styles.errorText}>{errors.nombre.message}</p>
+              )}
+            </div>
 
-            <input
-              name="categoria"
-              placeholder="Categoría"
-              value={form.categoria}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div>
+              <input
+                {...register("categoria")}
+                placeholder="Categoría"
+                style={styles.input}
+              />
+              {errors.categoria && (
+                <p style={styles.errorText}>{errors.categoria.message}</p>
+              )}
+            </div>
 
-            <select
-              name="unidad_medida"
-              value={form.unidad_medida}
-              onChange={handleChange}
-              style={styles.input}
-            >
-              <option value="unidad">Unidad</option>
-              <option value="caja">Caja</option>
-              <option value="paquete">Paquete</option>
-              <option value="litro">Litro</option>
-              <option value="kg">Kg</option>
-              <option value="resma">Resma</option>
-            </select>
+            <div>
+              <input
+                {...register("unidad_medida")}
+                placeholder="Unidad de medida"
+                style={styles.input}
+              />
+              {errors.unidad_medida && (
+                <p style={styles.errorText}>{errors.unidad_medida.message}</p>
+              )}
+            </div>
 
-            <input
-              name="stock_actual"
-              type="number"
-              placeholder="Stock actual"
-              value={form.stock_actual}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div>
+              <input
+                type="number"
+                min="0"
+                {...register("stock_actual")}
+                placeholder="Stock actual"
+                style={styles.input}
+              />
+              {errors.stock_actual && (
+                <p style={styles.errorText}>{errors.stock_actual.message}</p>
+              )}
+            </div>
 
-            <input
-              name="stock_minimo"
-              type="number"
-              placeholder="Stock mínimo"
-              value={form.stock_minimo}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div>
+              <input
+                type="number"
+                min="0"
+                {...register("stock_minimo")}
+                placeholder="Stock mínimo"
+                style={styles.input}
+              />
+              {errors.stock_minimo && (
+                <p style={styles.errorText}>{errors.stock_minimo.message}</p>
+              )}
+            </div>
 
-            <input
-              name="lote"
-              placeholder="Lote"
-              value={form.lote}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div>
+              <input
+                {...register("lote")}
+                placeholder="Lote"
+                style={styles.input}
+              />
+              {errors.lote && (
+                <p style={styles.errorText}>{errors.lote.message}</p>
+              )}
+            </div>
 
-            <input
-              name="fecha_vencimiento"
-              type="date"
-              value={form.fecha_vencimiento}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div>
+              <input
+                type="date"
+                {...register("fecha_vencimiento")}
+                style={styles.input}
+              />
+              {errors.fecha_vencimiento && (
+                <p style={styles.errorText}>
+                  {errors.fecha_vencimiento.message}
+                </p>
+              )}
+            </div>
 
-            <input
-              name="proveedor"
-              placeholder="Proveedor"
-              value={form.proveedor}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div>
+              <input
+                {...register("proveedor")}
+                placeholder="Proveedor"
+                style={styles.input}
+              />
+              {errors.proveedor && (
+                <p style={styles.errorText}>{errors.proveedor.message}</p>
+              )}
+            </div>
 
-            <textarea
-              name="descripcion"
-              placeholder="Descripción"
-              value={form.descripcion}
-              onChange={handleChange}
-              style={styles.textarea}
-            />
+            <div>
+              <textarea
+                {...register("descripcion")}
+                placeholder="Descripción"
+                style={styles.textarea}
+              />
+              {errors.descripcion && (
+                <p style={styles.errorText}>{errors.descripcion.message}</p>
+              )}
+            </div>
 
-            <textarea
-              name="observaciones"
-              placeholder="Observaciones"
-              value={form.observaciones}
-              onChange={handleChange}
-              style={styles.textarea}
-            />
+            <div>
+              <textarea
+                {...register("observaciones")}
+                placeholder="Observaciones"
+                style={styles.textarea}
+              />
+              {errors.observaciones && (
+                <p style={styles.errorText}>{errors.observaciones.message}</p>
+              )}
+            </div>
 
             {mensaje && <p style={styles.ok}>{mensaje}</p>}
             {error && <p style={styles.error}>{error}</p>}
@@ -290,20 +328,24 @@ export default function Insumos() {
           <div style={styles.filters}>
             <input
               type="text"
-              placeholder="Buscar por nombre, categoría, proveedor o lote..."
+              placeholder="Buscar por nombre, categoría, unidad o proveedor..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               style={styles.input}
             />
 
-            <label style={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={soloStockBajo}
-                onChange={(e) => setSoloStockBajo(e.target.checked)}
-              />
-              Mostrar solo stock bajo
-            </label>
+            <select
+              value={filtroCategoria}
+              onChange={(e) => setFiltroCategoria(e.target.value)}
+              style={styles.input}
+            >
+              <option value="">Todas las categorías</option>
+              {categoriasUnicas.map((categoria) => (
+                <option key={categoria} value={categoria}>
+                  {categoria}
+                </option>
+              ))}
+            </select>
           </div>
 
           {insumosFiltrados.length === 0 ? (
@@ -312,45 +354,45 @@ export default function Insumos() {
             <div style={styles.listado}>
               {insumosFiltrados.map((insumo) => (
                 <div key={insumo.id} style={styles.item}>
-                  <div style={styles.headerRow}>
-                    <p style={styles.itemTitle}>
-                      <strong>#{insumo.id}</strong> — {insumo.nombre}
-                    </p>
+                  <div style={styles.itemTopRow}>
+                    <div style={styles.itemMainInfo}>
+                      <p style={styles.itemTitle}>
+                        <strong>#{insumo.id}</strong> — {insumo.nombre}{" "}
+                        {insumo.categoria ? `(${insumo.categoria})` : ""}
+                      </p>
+                    </div>
 
-                    <span
-                      style={{
-                        ...styles.badge,
-                        ...getStockBadgeStyle(
-                          insumo.stock_actual,
-                          insumo.stock_minimo,
-                        ),
-                      }}
-                    >
-                      Stock: {insumo.stock_actual}
-                    </span>
+                    {(() => {
+                      const stockInfo = getStockStyle(
+                        insumo.stock_actual,
+                        insumo.stock_minimo,
+                      );
+
+                      return (
+                        <span
+                          style={{
+                            ...styles.badge,
+                            background: stockInfo.background,
+                            color: stockInfo.color,
+                          }}
+                        >
+                          {stockInfo.texto}
+                        </span>
+                      );
+                    })()}
                   </div>
 
-                  <p><strong>Categoría:</strong> {insumo.categoria || "-"}</p>
-                  <p><strong>Unidad:</strong> {insumo.unidad_medida}</p>
-                  <p><strong>Stock mínimo:</strong> {insumo.stock_minimo}</p>
-                  <p><strong>Proveedor:</strong> {insumo.proveedor || "-"}</p>
-                  <p><strong>Lote:</strong> {insumo.lote || "-"}</p>
-                  <p>
-                    <strong>Vencimiento:</strong>{" "}
-                    {insumo.fecha_vencimiento || "-"}
-                  </p>
+                  <div style={styles.compactActions}>
+                    <button
+                      type="button"
+                      style={styles.detailButton}
+                      onClick={() => toggleDetalle(insumo.id)}
+                    >
+                      {insumoAbierto === insumo.id
+                        ? "Ocultar detalle"
+                        : "Ver detalle"}
+                    </button>
 
-                  {insumo.descripcion && (
-                    <p><strong>Descripción:</strong> {insumo.descripcion}</p>
-                  )}
-
-                  {insumo.observaciones && (
-                    <p style={styles.infoBox}>
-                      <strong>Observaciones:</strong> {insumo.observaciones}
-                    </p>
-                  )}
-
-                  <div style={styles.actionButtons}>
                     <button
                       type="button"
                       style={styles.editButton}
@@ -358,15 +400,43 @@ export default function Insumos() {
                     >
                       Editar
                     </button>
-
-                    <button
-                      type="button"
-                      style={styles.deleteButton}
-                      onClick={() => desactivarInsumo(insumo.id)}
-                    >
-                      Desactivar
-                    </button>
                   </div>
+
+                  {insumoAbierto === insumo.id && (
+                    <div style={styles.detailBox}>
+                      <div style={styles.detailGrid}>
+                        <p>
+                          <strong>Unidad de medida:</strong>{" "}
+                          {insumo.unidad_medida || "-"}
+                        </p>
+                        <p>
+                          <strong>Stock mínimo:</strong> {insumo.stock_minimo}
+                        </p>
+                        <p>
+                          <strong>Lote:</strong> {insumo.lote || "-"}
+                        </p>
+                        <p>
+                          <strong>Vencimiento:</strong>{" "}
+                          {insumo.fecha_vencimiento || "-"}
+                        </p>
+                        <p>
+                          <strong>Proveedor:</strong> {insumo.proveedor || "-"}
+                        </p>
+                      </div>
+
+                      {insumo.descripcion && (
+                        <p style={styles.infoBox}>
+                          <strong>Descripción:</strong> {insumo.descripcion}
+                        </p>
+                      )}
+
+                      {insumo.observaciones && (
+                        <p style={styles.infoBox}>
+                          <strong>Observaciones:</strong> {insumo.observaciones}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -378,13 +448,8 @@ export default function Insumos() {
 }
 
 const styles = {
-  titulo: {
-    marginTop: 0,
-    marginBottom: "1rem",
-  },
-  subtitulo: {
-    marginTop: 0,
-  },
+  titulo: { marginTop: 0, marginBottom: "1rem" },
+  subtitulo: { marginTop: 0 },
   grid: {
     display: "grid",
     gridTemplateColumns: "1fr 1.4fr",
@@ -408,16 +473,12 @@ const styles = {
     gap: "0.8rem",
     marginBottom: "1rem",
   },
-  checkboxLabel: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    fontSize: "0.95rem",
-  },
   input: {
     padding: "0.8rem",
     border: "1px solid #ccc",
     borderRadius: "8px",
+    width: "100%",
+    boxSizing: "border-box",
   },
   textarea: {
     padding: "0.8rem",
@@ -425,6 +486,8 @@ const styles = {
     borderRadius: "8px",
     minHeight: "90px",
     resize: "vertical",
+    width: "100%",
+    boxSizing: "border-box",
   },
   button: {
     padding: "0.9rem",
@@ -434,6 +497,7 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
     fontWeight: "bold",
+    marginTop: "0.5rem",
   },
   buttonGroup: {
     display: "flex",
@@ -451,42 +515,50 @@ const styles = {
   },
   listado: {
     display: "grid",
-    gap: "1rem",
+    gap: "0.8rem",
   },
   item: {
     border: "1px solid #e5e7eb",
     borderRadius: "12px",
-    padding: "1rem",
+    padding: "0.9rem 1rem",
+    background: "#fff",
   },
-  headerRow: {
+  itemTopRow: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     gap: "1rem",
-    marginBottom: "0.8rem",
     flexWrap: "wrap",
+  },
+  itemMainInfo: {
+    flex: 1,
+    minWidth: "220px",
   },
   itemTitle: {
     margin: 0,
     fontSize: "1rem",
+    lineHeight: 1.4,
   },
   badge: {
     padding: "0.35rem 0.7rem",
     borderRadius: "999px",
     fontSize: "0.8rem",
     fontWeight: "bold",
+    whiteSpace: "nowrap",
   },
-  infoBox: {
-    background: "#f9fafb",
-    border: "1px solid #e5e7eb",
-    borderRadius: "10px",
-    padding: "0.8rem",
-  },
-  actionButtons: {
+  compactActions: {
     display: "flex",
     gap: "0.5rem",
     flexWrap: "wrap",
-    marginTop: "1rem",
+    marginTop: "0.75rem",
+  },
+  detailButton: {
+    padding: "0.55rem 0.8rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#374151",
+    color: "#fff",
+    cursor: "pointer",
   },
   editButton: {
     padding: "0.55rem 0.8rem",
@@ -496,13 +568,24 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
   },
-  deleteButton: {
-    padding: "0.55rem 0.8rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#b91c1c",
-    color: "#fff",
-    cursor: "pointer",
+  detailBox: {
+    marginTop: "0.9rem",
+    paddingTop: "0.9rem",
+    borderTop: "1px solid #e5e7eb",
+    display: "grid",
+    gap: "0.8rem",
+  },
+  detailGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "0.6rem 1rem",
+  },
+  infoBox: {
+    background: "#f9fafb",
+    border: "1px solid #e5e7eb",
+    borderRadius: "10px",
+    padding: "0.8rem",
+    margin: 0,
   },
   ok: {
     color: "green",
@@ -511,5 +594,11 @@ const styles = {
   error: {
     color: "crimson",
     margin: 0,
+  },
+  errorText: {
+    color: "crimson",
+    marginTop: "0.35rem",
+    marginBottom: 0,
+    fontSize: "0.9rem",
   },
 };
