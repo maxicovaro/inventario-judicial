@@ -19,6 +19,11 @@ export default function Dashboard() {
     cargarDashboard();
   }, []);
 
+  const formatearFecha = (fecha) => {
+    if (!fecha) return "-";
+    return new Date(fecha).toLocaleString("es-AR");
+  };
+
   return (
     <Layout>
       <h1 style={styles.titulo}>Dashboard</h1>
@@ -60,6 +65,88 @@ export default function Dashboard() {
               color="#fee2e2"
               texto="#991b1b"
             />
+            <Card
+              titulo="Pedidos enviados"
+              valor={data.resumen.pedidos_enviados}
+              color="#eff6ff"
+              texto="#1d4ed8"
+            />
+            <Card
+              titulo="Pedidos en revisión"
+              valor={data.resumen.pedidos_en_revision}
+              color="#fefce8"
+              texto="#92400e"
+            />
+            <Card
+              titulo="Pedidos entregados"
+              valor={data.resumen.pedidos_entregados}
+              color="#ecfdf5"
+              texto="#166534"
+            />
+          </div>
+
+          <div style={styles.sectionsGrid}>
+            <section style={styles.section}>
+              <h2 style={styles.subtitulo}>Insumos con stock bajo</h2>
+
+              {data.detalle_insumos_stock_bajo.length === 0 ? (
+                <p>No hay insumos con stock bajo.</p>
+              ) : (
+                <div style={styles.listado}>
+                  {data.detalle_insumos_stock_bajo.map((insumo) => (
+                    <div key={insumo.id} style={styles.alertItem}>
+                      <strong>
+                        {insumo.nombre}
+                        {insumo.categoria ? ` (${insumo.categoria})` : ""}
+                      </strong>
+                      <p style={styles.itemText}>
+                        Stock actual: {insumo.stock_actual} | Mínimo:{" "}
+                        {insumo.stock_minimo}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section style={styles.section}>
+              <h2 style={styles.subtitulo}>Últimos pedidos</h2>
+
+              {data.ultimos_pedidos.length === 0 ? (
+                <p>No hay pedidos registrados.</p>
+              ) : (
+                <div style={styles.listado}>
+                  {data.ultimos_pedidos.map((pedido) => (
+                    <div key={pedido.id} style={styles.item}>
+                      <div style={styles.itemHeader}>
+                        <span
+                          style={{
+                            ...styles.badge,
+                            ...getPedidoStyle(pedido.estado),
+                          }}
+                        >
+                          {pedido.estado}
+                        </span>
+                      </div>
+
+                      <p>
+                        <strong>Pedido:</strong> #{pedido.id} — {pedido.mes}/
+                        {pedido.anio}
+                      </p>
+                      <p>
+                        <strong>Oficina:</strong> {pedido.Oficina?.nombre || "-"}
+                      </p>
+                      <p>
+                        <strong>Usuario:</strong>{" "}
+                        {pedido.Usuario
+                          ? `${pedido.Usuario.nombre} ${pedido.Usuario.apellido}`
+                          : "-"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
 
           <div style={styles.sectionsGrid}>
@@ -94,6 +181,9 @@ export default function Dashboard() {
                       </p>
                       <p>
                         <strong>Motivo:</strong> {mov.motivo || "-"}
+                      </p>
+                      <p>
+                        <strong>Fecha:</strong> {formatearFecha(mov.fecha)}
                       </p>
                     </div>
                   ))}
@@ -166,7 +256,7 @@ const getMovimientoStockStyle = (tipo) => {
       return { background: "#dbeafe", color: "#1e40af" };
     default:
       return { background: "#f3f4f6", color: "#111827" };
-    }
+  }
 };
 
 const getMovimientoActivoStyle = (tipo) => {
@@ -181,6 +271,23 @@ const getMovimientoActivoStyle = (tipo) => {
       return { background: "#fef3c7", color: "#92400e" };
     case "ACTUALIZACION":
       return { background: "#e5e7eb", color: "#374151" };
+    default:
+      return { background: "#f3f4f6", color: "#111827" };
+  }
+};
+
+const getPedidoStyle = (estado) => {
+  switch (estado) {
+    case "ENVIADO":
+      return { background: "#dbeafe", color: "#1e40af" };
+    case "EN_REVISION":
+      return { background: "#fef3c7", color: "#92400e" };
+    case "APROBADO":
+      return { background: "#d1fae5", color: "#065f46" };
+    case "ENTREGADO":
+      return { background: "#dcfce7", color: "#166534" };
+    case "RECHAZADO":
+      return { background: "#fee2e2", color: "#991b1b" };
     default:
       return { background: "#f3f4f6", color: "#111827" };
   }
@@ -220,6 +327,7 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: "1rem",
+    marginBottom: "1rem",
   },
   section: {
     background: "#fff",
@@ -237,6 +345,12 @@ const styles = {
     padding: "0.9rem",
     background: "#fafafa",
   },
+  alertItem: {
+    border: "1px solid #fecaca",
+    borderRadius: "12px",
+    padding: "0.9rem",
+    background: "#fef2f2",
+  },
   itemHeader: {
     marginBottom: "0.6rem",
   },
@@ -245,6 +359,10 @@ const styles = {
     borderRadius: "999px",
     fontSize: "0.8rem",
     fontWeight: "bold",
+  },
+  itemText: {
+    margin: "0.3rem 0 0 0",
+    color: "#4b5563",
   },
   error: {
     color: "crimson",
