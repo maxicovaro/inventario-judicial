@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import AdjuntosPanel from "../components/AdjuntosPanel";
+import { activoSchema } from "../schemas/activoSchema";
 
-const initialForm = {
+const defaultValues = {
   codigo_interno: "",
   nombre: "",
   descripcion: "",
@@ -22,7 +25,6 @@ export default function Activos() {
   const [activos, setActivos] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [oficinas, setOficinas] = useState([]);
-  const [form, setForm] = useState(initialForm);
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -31,8 +33,17 @@ export default function Activos() {
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroOficina, setFiltroOficina] = useState("");
-
   const [activoAdjuntosAbierto, setActivoAdjuntosAbierto] = useState(null);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(activoSchema),
+    defaultValues,
+  });
 
   const cargarDatos = async () => {
     try {
@@ -92,29 +103,15 @@ export default function Activos() {
     });
   }, [activos, busqueda, filtroEstado, filtroOficina]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-
-    setForm((prev) => ({
-      ...prev,
-      [name]: ["cantidad", "categoria_id", "oficina_id"].includes(name)
-        ? value === ""
-          ? ""
-          : Number(value)
-        : value,
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const onSubmit = async (data) => {
     setError("");
     setMensaje("");
     setGuardando(true);
 
     try {
       const payload = {
-        ...form,
-        fecha_alta: form.fecha_alta || null,
+        ...data,
+        fecha_alta: data.fecha_alta || null,
       };
 
       if (editandoId) {
@@ -125,7 +122,7 @@ export default function Activos() {
         setMensaje("Activo creado correctamente");
       }
 
-      setForm(initialForm);
+      reset(defaultValues);
       setEditandoId(null);
       await cargarDatos();
     } catch (err) {
@@ -137,7 +134,7 @@ export default function Activos() {
         setError(
           err.response?.data?.error ||
             err.response?.data?.mensaje ||
-            "Error al guardar el activo",
+            "Error al guardar el activo"
         );
       }
     } finally {
@@ -147,7 +144,7 @@ export default function Activos() {
 
   const darDeBaja = async (id) => {
     const confirmar = window.confirm(
-      "¿Seguro que querés dar de baja este activo?",
+      "¿Seguro que querés dar de baja este activo?"
     );
 
     if (!confirmar) return;
@@ -168,7 +165,7 @@ export default function Activos() {
     setError("");
     setMensaje("");
 
-    setForm({
+    reset({
       codigo_interno: activo.codigo_interno || "",
       nombre: activo.nombre || "",
       descripcion: activo.descripcion || "",
@@ -187,7 +184,7 @@ export default function Activos() {
   };
 
   const cancelarEdicion = () => {
-    setForm(initialForm);
+    reset(defaultValues);
     setEditandoId(null);
     setError("");
     setMensaje("");
@@ -203,121 +200,148 @@ export default function Activos() {
             {editandoId ? "Editar activo" : "Nuevo activo"}
           </h2>
 
-          <form onSubmit={handleSubmit} style={styles.form}>
-            <input
-              name="codigo_interno"
-              placeholder="Código interno"
-              value={form.codigo_interno}
-              onChange={handleChange}
-              style={styles.input}
-            />
+          <form onSubmit={handleSubmit(onSubmit)} style={styles.form}>
+            <div>
+              <input
+                {...register("codigo_interno")}
+                placeholder="Código interno"
+                style={styles.input}
+              />
+              {errors.codigo_interno && (
+                <p style={styles.errorText}>{errors.codigo_interno.message}</p>
+              )}
+            </div>
 
-            <input
-              name="nombre"
-              placeholder="Nombre"
-              value={form.nombre}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div>
+              <input
+                {...register("nombre")}
+                placeholder="Nombre"
+                style={styles.input}
+              />
+              {errors.nombre && (
+                <p style={styles.errorText}>{errors.nombre.message}</p>
+              )}
+            </div>
 
-            <input
-              name="marca"
-              placeholder="Marca"
-              value={form.marca}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div>
+              <input
+                {...register("marca")}
+                placeholder="Marca"
+                style={styles.input}
+              />
+              {errors.marca && (
+                <p style={styles.errorText}>{errors.marca.message}</p>
+              )}
+            </div>
 
-            <input
-              name="modelo"
-              placeholder="Modelo"
-              value={form.modelo}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div>
+              <input
+                {...register("modelo")}
+                placeholder="Modelo"
+                style={styles.input}
+              />
+              {errors.modelo && (
+                <p style={styles.errorText}>{errors.modelo.message}</p>
+              )}
+            </div>
 
-            <input
-              name="numero_serie"
-              placeholder="Número de serie"
-              value={form.numero_serie}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div>
+              <input
+                {...register("numero_serie")}
+                placeholder="Número de serie"
+                style={styles.input}
+              />
+              {errors.numero_serie && (
+                <p style={styles.errorText}>{errors.numero_serie.message}</p>
+              )}
+            </div>
 
-            <input
-              name="cantidad"
-              type="number"
-              min="1"
-              value={form.cantidad}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div>
+              <input
+                {...register("cantidad")}
+                type="number"
+                min="1"
+                style={styles.input}
+              />
+              {errors.cantidad && (
+                <p style={styles.errorText}>{errors.cantidad.message}</p>
+              )}
+            </div>
 
-            <select
-              name="estado"
-              value={form.estado}
-              onChange={handleChange}
-              style={styles.input}
-            >
-              <option value="Excelente estado">Excelente estado</option>
-              <option value="Buen estado">Buen estado</option>
-              <option value="Regular estado">Regular estado</option>
-              <option value="Mal estado">Mal estado</option>
-              <option value="Sin funcionar">Sin funcionar</option>
-              <option value="Dado de baja">Dado de baja</option>
-            </select>
+            <div>
+              <select {...register("estado")} style={styles.input}>
+                <option value="Excelente estado">Excelente estado</option>
+                <option value="Buen estado">Buen estado</option>
+                <option value="Regular estado">Regular estado</option>
+                <option value="Mal estado">Mal estado</option>
+                <option value="Sin funcionar">Sin funcionar</option>
+                <option value="Dado de baja">Dado de baja</option>
+              </select>
+              {errors.estado && (
+                <p style={styles.errorText}>{errors.estado.message}</p>
+              )}
+            </div>
 
-            <input
-              name="fecha_alta"
-              type="date"
-              value={form.fecha_alta}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div>
+              <input
+                {...register("fecha_alta")}
+                type="date"
+                style={styles.input}
+              />
+              {errors.fecha_alta && (
+                <p style={styles.errorText}>{errors.fecha_alta.message}</p>
+              )}
+            </div>
 
-            <select
-              name="categoria_id"
-              value={form.categoria_id}
-              onChange={handleChange}
-              style={styles.input}
-            >
-              <option value="">Seleccionar categoría</option>
-              {categorias.map((categoria) => (
-                <option key={categoria.id} value={categoria.id}>
-                  {categoria.nombre}
-                </option>
-              ))}
-            </select>
+            <div>
+              <select {...register("categoria_id")} style={styles.input}>
+                <option value="">Seleccionar categoría</option>
+                {categorias.map((categoria) => (
+                  <option key={categoria.id} value={categoria.id}>
+                    {categoria.nombre}
+                  </option>
+                ))}
+              </select>
+              {errors.categoria_id && (
+                <p style={styles.errorText}>{errors.categoria_id.message}</p>
+              )}
+            </div>
 
-            <select
-              name="oficina_id"
-              value={form.oficina_id}
-              onChange={handleChange}
-              style={styles.input}
-            >
-              <option value="">Seleccionar oficina</option>
-              {oficinas.map((oficina) => (
-                <option key={oficina.id} value={oficina.id}>
-                  {oficina.nombre}
-                </option>
-              ))}
-            </select>
+            <div>
+              <select {...register("oficina_id")} style={styles.input}>
+                <option value="">Seleccionar oficina</option>
+                {oficinas.map((oficina) => (
+                  <option key={oficina.id} value={oficina.id}>
+                    {oficina.nombre}
+                  </option>
+                ))}
+              </select>
+              {errors.oficina_id && (
+                <p style={styles.errorText}>{errors.oficina_id.message}</p>
+              )}
+            </div>
 
-            <textarea
-              name="descripcion"
-              placeholder="Descripción"
-              value={form.descripcion}
-              onChange={handleChange}
-              style={styles.textarea}
-            />
+            <div>
+              <textarea
+                {...register("descripcion")}
+                placeholder="Descripción"
+                style={styles.textarea}
+              />
+              {errors.descripcion && (
+                <p style={styles.errorText}>{errors.descripcion.message}</p>
+              )}
+            </div>
 
-            <textarea
-              name="observaciones"
-              placeholder="Observaciones"
-              value={form.observaciones}
-              onChange={handleChange}
-              style={styles.textarea}
-            />
+            <div>
+              <textarea
+                {...register("observaciones")}
+                placeholder="Observaciones"
+                style={styles.textarea}
+              />
+              {errors.observaciones && (
+                <p style={styles.errorText}>{errors.observaciones.message}</p>
+              )}
+            </div>
 
             {mensaje && <p style={styles.ok}>{mensaje}</p>}
             {error && <p style={styles.error}>{error}</p>}
@@ -453,9 +477,7 @@ export default function Activos() {
                       style={styles.secondaryButton}
                       onClick={() =>
                         setActivoAdjuntosAbierto(
-                          activoAdjuntosAbierto === activo.id
-                            ? null
-                            : activo.id,
+                          activoAdjuntosAbierto === activo.id ? null : activo.id
                         )
                       }
                     >
@@ -472,6 +494,7 @@ export default function Activos() {
                       Dar de baja
                     </button>
                   </div>
+
                   {activoAdjuntosAbierto === activo.id && (
                     <AdjuntosPanel activoId={activo.id} />
                   )}
@@ -515,6 +538,8 @@ const styles = {
     padding: "0.8rem",
     border: "1px solid #ccc",
     borderRadius: "8px",
+    width: "100%",
+    boxSizing: "border-box",
   },
   textarea: {
     padding: "0.8rem",
@@ -522,6 +547,8 @@ const styles = {
     borderRadius: "8px",
     minHeight: "90px",
     resize: "vertical",
+    width: "100%",
+    boxSizing: "border-box",
   },
   button: {
     padding: "0.9rem",
@@ -602,6 +629,14 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
   },
+  secondaryButton: {
+    padding: "0.55rem 0.8rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#374151",
+    color: "#fff",
+    cursor: "pointer",
+  },
   ok: {
     color: "green",
     margin: 0,
@@ -610,12 +645,10 @@ const styles = {
     color: "crimson",
     margin: 0,
   },
-  secondaryButton: {
-    padding: "0.55rem 0.8rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#374151",
-    color: "#fff",
-    cursor: "pointer",
+  errorText: {
+    color: "crimson",
+    marginTop: "0.35rem",
+    marginBottom: 0,
+    fontSize: "0.9rem",
   },
 };

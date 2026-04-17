@@ -1,102 +1,157 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../api/axios';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import api from "../api/axios";
+import { loginSchema } from "../schemas/loginSchema";
 
 export default function Login() {
-  const [email, setEmail] = useState('admin@inventariojudicial.local');
-  const [password, setPassword] = useState('Admin1234');
-  const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [errorGeneral, setErrorGeneral] = useState("");
+  const [cargando, setCargando] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  const onSubmit = async (data) => {
+    setErrorGeneral("");
+    setCargando(true);
 
     try {
-      const response = await api.post('/auth/login', {
-        email,
-        password,
-      });
+      const response = await api.post("/auth/login", data);
 
-      // Guardar token
-      localStorage.setItem('token', response.data.token);
+      localStorage.setItem("token", response.data.token);
+      localStorage.setItem("usuario", JSON.stringify(response.data.usuario));
 
-      // Guardar usuario
-      localStorage.setItem('usuario', JSON.stringify(response.data.usuario));
-
-      // Redirigir al dashboard
-      navigate('/dashboard');
+      navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.mensaje || 'Error al iniciar sesión');
+      setErrorGeneral(
+        err.response?.data?.mensaje ||
+          err.response?.data?.error ||
+          "Error al iniciar sesión"
+      );
+    } finally {
+      setCargando(false);
     }
   };
 
   return (
     <div style={styles.container}>
-      <form style={styles.form} onSubmit={handleSubmit}>
-        <h1>Inventario Judicial</h1>
+      <div style={styles.card}>
+        <h1 style={styles.title}>Iniciar sesión</h1>
+        <p style={styles.subtitle}>Sistema de Inventario Judicial</p>
 
-        <input
-          type="email"
-          placeholder="Correo"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={styles.input}
-        />
+        <form onSubmit={handleSubmit(onSubmit)} style={styles.form}>
+          <div>
+            <label style={styles.label}>Email</label>
+            <input
+              type="email"
+              placeholder="Ingresá tu email"
+              {...register("email")}
+              style={styles.input}
+            />
+            {errors.email && (
+              <p style={styles.errorText}>{errors.email.message}</p>
+            )}
+          </div>
 
-        <input
-          type="password"
-          placeholder="Contraseña"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={styles.input}
-        />
+          <div>
+            <label style={styles.label}>Contraseña</label>
+            <input
+              type="password"
+              placeholder="Ingresá tu contraseña"
+              {...register("password")}
+              style={styles.input}
+            />
+            {errors.password && (
+              <p style={styles.errorText}>{errors.password.message}</p>
+            )}
+          </div>
 
-        {error && <p style={styles.error}>{error}</p>}
+          {errorGeneral && <p style={styles.errorGeneral}>{errorGeneral}</p>}
 
-        <button type="submit" style={styles.button}>
-          Ingresar
-        </button>
-      </form>
+          <button type="submit" style={styles.button} disabled={cargando}>
+            {cargando ? "Ingresando..." : "Ingresar"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
 
 const styles = {
   container: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: '#f4f6f8',
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "#f3f4f6",
+    padding: "1rem",
+  },
+  card: {
+    width: "100%",
+    maxWidth: "420px",
+    background: "#fff",
+    borderRadius: "16px",
+    padding: "2rem",
+    boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
+  },
+  title: {
+    margin: 0,
+    marginBottom: "0.5rem",
+    fontSize: "2rem",
+    textAlign: "center",
+  },
+  subtitle: {
+    margin: 0,
+    marginBottom: "1.5rem",
+    textAlign: "center",
+    color: "#6b7280",
   },
   form: {
-    background: '#fff',
-    padding: '2rem',
-    borderRadius: '12px',
-    width: '100%',
-    maxWidth: '380px',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1rem',
+    display: "grid",
+    gap: "1rem",
+  },
+  label: {
+    display: "block",
+    marginBottom: "0.4rem",
+    fontWeight: "bold",
   },
   input: {
-    padding: '0.85rem',
-    border: '1px solid #ccc',
-    borderRadius: '8px',
+    width: "100%",
+    padding: "0.85rem",
+    border: "1px solid #d1d5db",
+    borderRadius: "10px",
+    boxSizing: "border-box",
   },
   button: {
-    padding: '0.9rem',
-    border: 'none',
-    borderRadius: '8px',
-    background: '#1f4f82',
-    color: '#fff',
-    cursor: 'pointer',
-    fontWeight: 'bold',
+    padding: "0.9rem",
+    border: "none",
+    borderRadius: "10px",
+    background: "#1f4f82",
+    color: "#fff",
+    fontWeight: "bold",
+    cursor: "pointer",
+    marginTop: "0.5rem",
   },
-  error: {
-    color: 'crimson',
+  errorText: {
+    color: "crimson",
+    marginTop: "0.35rem",
+    marginBottom: 0,
+    fontSize: "0.9rem",
+  },
+  errorGeneral: {
+    color: "crimson",
     margin: 0,
+    textAlign: "center",
   },
 };

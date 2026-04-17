@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import AdjuntosSolicitudPanel from "../components/AdjuntosSolicitudPanel";
+import { solicitudSchema } from "../schemas/solicitudSchema";
 
-const initialForm = {
+const defaultValues = {
   tipo: "REPOSICION",
   descripcion: "",
   prioridad: "MEDIA",
@@ -13,7 +16,6 @@ const initialForm = {
 export default function Solicitudes() {
   const [solicitudes, setSolicitudes] = useState([]);
   const [activos, setActivos] = useState([]);
-  const [form, setForm] = useState(initialForm);
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -24,12 +26,21 @@ export default function Solicitudes() {
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroPrioridad, setFiltroPrioridad] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
-
   const [solicitudAdjuntosAbierta, setSolicitudAdjuntosAbierta] =
     useState(null);
 
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
   const esAdmin = usuario.role === "ADMIN";
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(solicitudSchema),
+    defaultValues,
+  });
 
   const cargarDatos = async () => {
     try {
@@ -98,10 +109,8 @@ export default function Solicitudes() {
         solicitud.Activo?.nombre?.toLowerCase().includes(texto);
 
       const coincideEstado = !filtroEstado || solicitud.estado === filtroEstado;
-
       const coincidePrioridad =
         !filtroPrioridad || solicitud.prioridad === filtroPrioridad;
-
       const coincideTipo = !filtroTipo || solicitud.tipo === filtroTipo;
 
       return (
@@ -110,31 +119,20 @@ export default function Solicitudes() {
     });
   }, [solicitudes, busqueda, filtroEstado, filtroPrioridad, filtroTipo]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-
-    setForm((prev) => ({
-      ...prev,
-      [name]:
-        name === "activo_id" ? (value === "" ? "" : Number(value)) : value,
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const onSubmit = async (data) => {
     setError("");
     setMensaje("");
     setGuardando(true);
 
     try {
       const payload = {
-        ...form,
-        activo_id: form.activo_id || null,
+        ...data,
+        activo_id: data.activo_id === "" ? null : Number(data.activo_id),
       };
 
       await api.post("/solicitudes", payload);
       setMensaje("Solicitud creada correctamente");
-      setForm(initialForm);
+      reset(defaultValues);
       await cargarDatos();
     } catch (err) {
       setError(err.response?.data?.mensaje || "Error al crear solicitud");
@@ -158,7 +156,7 @@ export default function Solicitudes() {
       await cargarDatos();
     } catch (err) {
       setError(
-        err.response?.data?.mensaje || "Error al actualizar la solicitud",
+        err.response?.data?.mensaje || "Error al actualizar la solicitud"
       );
     } finally {
       setActualizandoId(null);
@@ -180,53 +178,56 @@ export default function Solicitudes() {
         <div style={styles.card}>
           <h2 style={styles.subtitulo}>Nueva solicitud</h2>
 
-          <form onSubmit={handleSubmit} style={styles.form}>
-            <select
-              name="tipo"
-              value={form.tipo}
-              onChange={handleChange}
-              style={styles.input}
-            >
-              <option value="REPOSICION">Reposición</option>
-              <option value="REPARACION">Reparación</option>
-              <option value="BAJA">Baja</option>
-              <option value="TRASLADO">Traslado</option>
-              <option value="ADQUISICION">Adquisición</option>
-            </select>
+          <form onSubmit={handleSubmit(onSubmit)} style={styles.form}>
+            <div>
+              <select {...register("tipo")} style={styles.input}>
+                <option value="REPOSICION">Reposición</option>
+                <option value="REPARACION">Reparación</option>
+                <option value="BAJA">Baja</option>
+                <option value="TRASLADO">Traslado</option>
+                <option value="ADQUISICION">Adquisición</option>
+              </select>
+              {errors.tipo && (
+                <p style={styles.errorText}>{errors.tipo.message}</p>
+              )}
+            </div>
 
-            <select
-              name="prioridad"
-              value={form.prioridad}
-              onChange={handleChange}
-              style={styles.input}
-            >
-              <option value="BAJA">Baja</option>
-              <option value="MEDIA">Media</option>
-              <option value="ALTA">Alta</option>
-            </select>
+            <div>
+              <select {...register("prioridad")} style={styles.input}>
+                <option value="BAJA">Baja</option>
+                <option value="MEDIA">Media</option>
+                <option value="ALTA">Alta</option>
+              </select>
+              {errors.prioridad && (
+                <p style={styles.errorText}>{errors.prioridad.message}</p>
+              )}
+            </div>
 
-            <select
-              name="activo_id"
-              value={form.activo_id}
-              onChange={handleChange}
-              style={styles.input}
-            >
-              <option value="">Sin activo asociado</option>
-              {activos.map((activo) => (
-                <option key={activo.id} value={activo.id}>
-                  {activo.nombre}{" "}
-                  {activo.codigo_interno ? `- ${activo.codigo_interno}` : ""}
-                </option>
-              ))}
-            </select>
+            <div>
+              <select {...register("activo_id")} style={styles.input}>
+                <option value="">Sin activo asociado</option>
+                {activos.map((activo) => (
+                  <option key={activo.id} value={activo.id}>
+                    {activo.nombre}{" "}
+                    {activo.codigo_interno ? `- ${activo.codigo_interno}` : ""}
+                  </option>
+                ))}
+              </select>
+              {errors.activo_id && (
+                <p style={styles.errorText}>{errors.activo_id.message}</p>
+              )}
+            </div>
 
-            <textarea
-              name="descripcion"
-              placeholder="Descripción de la solicitud"
-              value={form.descripcion}
-              onChange={handleChange}
-              style={styles.textarea}
-            />
+            <div>
+              <textarea
+                {...register("descripcion")}
+                placeholder="Descripción de la solicitud"
+                style={styles.textarea}
+              />
+              {errors.descripcion && (
+                <p style={styles.errorText}>{errors.descripcion.message}</p>
+              )}
+            </div>
 
             {mensaje && <p style={styles.ok}>{mensaje}</p>}
             {error && <p style={styles.error}>{error}</p>}
@@ -335,7 +336,7 @@ export default function Solicitudes() {
                   </p>
 
                   <p>
-                    <strong>Descripción:</strong> {solicitud.descripcion}
+                    <strong>Descripción:</strong> {solicitud.descripcion || "-"}
                   </p>
 
                   {solicitud.respuesta_admin && (
@@ -409,7 +410,7 @@ export default function Solicitudes() {
                               setSolicitudAdjuntosAbierta(
                                 solicitudAdjuntosAbierta === solicitud.id
                                   ? null
-                                  : solicitud.id,
+                                  : solicitud.id
                               )
                             }
                           >
@@ -463,6 +464,8 @@ const styles = {
     padding: "0.8rem",
     border: "1px solid #ccc",
     borderRadius: "8px",
+    width: "100%",
+    boxSizing: "border-box",
   },
   textarea: {
     padding: "0.8rem",
@@ -470,6 +473,8 @@ const styles = {
     borderRadius: "8px",
     minHeight: "110px",
     resize: "vertical",
+    width: "100%",
+    boxSizing: "border-box",
   },
   textareaSmall: {
     padding: "0.7rem",
@@ -478,6 +483,7 @@ const styles = {
     minHeight: "70px",
     resize: "vertical",
     width: "100%",
+    boxSizing: "border-box",
   },
   button: {
     padding: "0.9rem",
@@ -517,6 +523,14 @@ const styles = {
     border: "none",
     borderRadius: "8px",
     background: "#15803d",
+    color: "#fff",
+    cursor: "pointer",
+  },
+  smallButtonDark: {
+    padding: "0.65rem 0.9rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#374151",
     color: "#fff",
     cursor: "pointer",
   },
@@ -576,12 +590,10 @@ const styles = {
     color: "crimson",
     margin: 0,
   },
-  smallButtonDark: {
-    padding: "0.65rem 0.9rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#374151",
-    color: "#fff",
-    cursor: "pointer",
+  errorText: {
+    color: "crimson",
+    marginTop: "0.35rem",
+    marginBottom: 0,
+    fontSize: "0.9rem",
   },
 };

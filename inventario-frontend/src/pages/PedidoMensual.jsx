@@ -1,22 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import { pedidoMensualSchema } from "../schemas/pedidoMensualSchema";
 
 export default function PedidoMensual() {
   const [insumos, setInsumos] = useState([]);
   const [detalles, setDetalles] = useState([]);
   const [extras, setExtras] = useState([]);
-
-  const [mes, setMes] = useState(new Date().getMonth() + 1);
-  const [anio, setAnio] = useState(new Date().getFullYear());
-
-  const [hechos, setHechos] = useState("");
-  const [autopsias, setAutopsias] = useState("");
-  const [observaciones, setObservaciones] = useState("");
-
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm({
+    resolver: zodResolver(pedidoMensualSchema),
+    defaultValues: {
+      mes: new Date().getMonth() + 1,
+      anio: new Date().getFullYear(),
+      cantidad_hechos_delictivos: 0,
+      cantidad_autopsias: 0,
+      observaciones: "",
+    },
+  });
 
   useEffect(() => {
     cargarInsumos();
@@ -43,14 +54,14 @@ export default function PedidoMensual() {
   const actualizarDetalle = (insumoId, campo, valor) => {
     setDetalles((prev) =>
       prev.map((item) =>
-        item.insumo_id === insumoId ? { ...item, [campo]: valor } : item,
-      ),
+        item.insumo_id === insumoId ? { ...item, [campo]: valor } : item
+      )
     );
   };
 
   const agregarExtra = () => {
-    setExtras([
-      ...extras,
+    setExtras((prev) => [
+      ...prev,
       {
         articulo_manual: "",
         cantidad_solicitada: "",
@@ -59,40 +70,11 @@ export default function PedidoMensual() {
   };
 
   const actualizarExtra = (index, campo, valor) => {
-    const nuevos = [...extras];
-    nuevos[index][campo] = valor;
-    setExtras(nuevos);
-  };
-
-  const enviarPedido = async () => {
-    setError("");
-    setMensaje("");
-    setEnviando(true);
-
-    try {
-      const payload = {
-        mes: Number(mes),
-        anio: Number(anio),
-        cantidad_hechos_delictivos: Number(hechos) || 0,
-        cantidad_autopsias: Number(autopsias) || 0,
-        observaciones,
-        detalles: [
-          ...detalles.filter(
-            (d) => Number(d.cantidad_solicitada) > 0 || d.tuvo_problema,
-          ),
-          ...extras.filter(
-            (e) => e.articulo_manual && Number(e.cantidad_solicitada) > 0,
-          ),
-        ],
-      };
-
-      await api.post("/pedidos-insumos", payload);
-      setMensaje("Pedido enviado correctamente");
-    } catch (err) {
-      setError(err.response?.data?.mensaje || "Error al enviar pedido");
-    } finally {
-      setEnviando(false);
-    }
+    setExtras((prev) => {
+      const nuevos = [...prev];
+      nuevos[index][campo] = valor;
+      return nuevos;
+    });
   };
 
   const insumosAgrupados = useMemo(() => {
@@ -101,13 +83,13 @@ export default function PedidoMensual() {
 
     return {
       "Para uso exclusivo de Unidad Judicial - Limpieza": ordenar(
-        insumos.filter((i) => i.categoria === "Limpieza"),
+        insumos.filter((i) => i.categoria === "Limpieza")
       ),
       "Para uso exclusivo de Unidad Móvil": ordenar(
-        insumos.filter((i) => i.categoria === "Unidad móvil"),
+        insumos.filter((i) => i.categoria === "Unidad móvil")
       ),
       "Para uso exclusivo de Unidad Judicial - Librería": ordenar(
-        insumos.filter((i) => i.categoria === "Librería"),
+        insumos.filter((i) => i.categoria === "Librería")
       ),
     };
   }, [insumos]);
@@ -122,33 +104,88 @@ export default function PedidoMensual() {
     );
   };
 
+  const onSubmit = async (data) => {
+    setError("");
+    setMensaje("");
+    setEnviando(true);
+
+    try {
+      const detallesValidos = detalles.filter(
+        (d) => Number(d.cantidad_solicitada) > 0 || d.tuvo_problema
+      );
+
+      const extrasValidos = extras.filter(
+        (e) => e.articulo_manual && Number(e.cantidad_solicitada) > 0
+      );
+
+      if (detallesValidos.length === 0 && extrasValidos.length === 0) {
+        setError("Debés cargar al menos un insumo o artículo no listado");
+        setEnviando(false);
+        return;
+      }
+
+      const payload = {
+        mes: data.mes,
+        anio: data.anio,
+        cantidad_hechos_delictivos: data.cantidad_hechos_delictivos,
+        cantidad_autopsias: data.cantidad_autopsias,
+        observaciones: data.observaciones,
+        detalles: [...detallesValidos, ...extrasValidos],
+      };
+
+      await api.post("/pedidos-insumos", payload);
+
+      setMensaje("Pedido enviado correctamente");
+
+      reset({
+        mes: new Date().getMonth() + 1,
+        anio: new Date().getFullYear(),
+        cantidad_hechos_delictivos: 0,
+        cantidad_autopsias: 0,
+        observaciones: "",
+      });
+
+      setExtras([]);
+      await cargarInsumos();
+    } catch (err) {
+      setError(
+        err.response?.data?.mensaje ||
+          err.response?.data?.error ||
+          "Error al enviar pedido"
+      );
+    } finally {
+      setEnviando(false);
+    }
+  };
+
   return (
     <Layout>
       <style>{`
-  @media (max-width: 900px) {
-    .pedido-desktop {
-      display: none !important;
-    }
+        @media (max-width: 900px) {
+          .pedido-desktop {
+            display: none !important;
+          }
 
-    .pedido-mobile {
-      display: block !important;
-    }
+          .pedido-mobile {
+            display: block !important;
+          }
 
-    .pedido-extra-row {
-      grid-template-columns: 1fr !important;
-    }
-  }
+          .pedido-extra-row {
+            grid-template-columns: 1fr !important;
+          }
+        }
 
-  @media (min-width: 901px) {
-    .pedido-desktop {
-      display: block !important;
-    }
+        @media (min-width: 901px) {
+          .pedido-desktop {
+            display: block !important;
+          }
 
-    .pedido-mobile {
-      display: none !important;
-    }
-  }
-`}</style>
+          .pedido-mobile {
+            display: none !important;
+          }
+        }
+      `}</style>
+
       <div style={styles.pageHeader}>
         <div>
           <h1 style={styles.titulo}>Pedido mensual de insumos</h1>
@@ -158,295 +195,317 @@ export default function PedidoMensual() {
         </div>
       </div>
 
-      <div style={styles.card}>
-        <h3 style={styles.subtitulo}>Datos del mes</h3>
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <div style={styles.card}>
+          <h3 style={styles.subtitulo}>Datos del mes</h3>
 
-        <div style={styles.topGrid}>
-          <div>
-            <label style={styles.label}>Mes</label>
-            <input
-              type="number"
-              min="1"
-              max="12"
-              value={mes}
-              onChange={(e) => setMes(e.target.value)}
-              style={styles.input}
-            />
-          </div>
-
-          <div>
-            <label style={styles.label}>Año</label>
-            <input
-              type="number"
-              value={anio}
-              onChange={(e) => setAnio(e.target.value)}
-              style={styles.input}
-            />
-          </div>
-
-          <div>
-            <label style={styles.label}>Hechos delictivos</label>
-            <input
-              placeholder="Cantidad"
-              value={hechos}
-              onChange={(e) => setHechos(e.target.value)}
-              style={styles.input}
-            />
-          </div>
-
-          <div>
-            <label style={styles.label}>Autopsias</label>
-            <input
-              placeholder="Cantidad"
-              value={autopsias}
-              onChange={(e) => setAutopsias(e.target.value)}
-              style={styles.input}
-            />
-          </div>
-        </div>
-
-        <div style={styles.observacionesBox}>
-          <label style={styles.label}>Observaciones</label>
-          <textarea
-            placeholder="Observaciones generales"
-            value={observaciones}
-            onChange={(e) => setObservaciones(e.target.value)}
-            style={styles.textarea}
-          />
-        </div>
-      </div>
-
-      {Object.entries(insumosAgrupados).map(([tituloGrupo, lista]) =>
-        lista.length > 0 ? (
-          <div key={tituloGrupo} style={styles.card}>
-            <div style={styles.sectionHeader}>
-              <h3 style={styles.sectionTitle}>{tituloGrupo}</h3>
+          <div style={styles.topGrid}>
+            <div>
+              <label style={styles.label}>Mes</label>
+              <input
+                type="number"
+                min="1"
+                max="12"
+                {...register("mes")}
+                style={styles.input}
+              />
+              {errors.mes && (
+                <p style={styles.errorText}>{errors.mes.message}</p>
+              )}
             </div>
 
-            <div className="pedido-desktop" style={styles.desktopOnly}>
-              <div style={styles.tableWrapper}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.thArticulo}>Artículo</th>
-                      <th style={styles.thCantidad}>Cantidad</th>
-                      <th style={styles.thProblema}>Problema</th>
-                      <th style={styles.thObs}>Observación</th>
-                    </tr>
-                  </thead>
+            <div>
+              <label style={styles.label}>Año</label>
+              <input
+                type="number"
+                {...register("anio")}
+                style={styles.input}
+              />
+              {errors.anio && (
+                <p style={styles.errorText}>{errors.anio.message}</p>
+              )}
+            </div>
 
-                  <tbody>
-                    {lista.map((insumo) => {
-                      const detalle = obtenerDetalle(insumo.id);
+            <div>
+              <label style={styles.label}>Hechos delictivos</label>
+              <input
+                type="number"
+                min="0"
+                {...register("cantidad_hechos_delictivos")}
+                style={styles.input}
+              />
+              {errors.cantidad_hechos_delictivos && (
+                <p style={styles.errorText}>
+                  {errors.cantidad_hechos_delictivos.message}
+                </p>
+              )}
+            </div>
 
-                      return (
-                        <tr key={insumo.id}>
-                          <td style={styles.tdArticulo}>{insumo.nombre}</td>
+            <div>
+              <label style={styles.label}>Autopsias</label>
+              <input
+                type="number"
+                min="0"
+                {...register("cantidad_autopsias")}
+                style={styles.input}
+              />
+              {errors.cantidad_autopsias && (
+                <p style={styles.errorText}>
+                  {errors.cantidad_autopsias.message}
+                </p>
+              )}
+            </div>
+          </div>
 
-                          <td style={styles.tdCantidad}>
-                            <input
-                              type="number"
-                              min="0"
-                              value={detalle.cantidad_solicitada}
-                              onChange={(e) =>
-                                actualizarDetalle(
-                                  insumo.id,
-                                  "cantidad_solicitada",
-                                  e.target.value,
-                                )
-                              }
-                              style={styles.tableInput}
-                            />
-                          </td>
+          <div style={styles.observacionesBox}>
+            <label style={styles.label}>Observaciones</label>
+            <textarea
+              placeholder="Observaciones generales"
+              {...register("observaciones")}
+              style={styles.textarea}
+            />
+            {errors.observaciones && (
+              <p style={styles.errorText}>{errors.observaciones.message}</p>
+            )}
+          </div>
+        </div>
 
-                          <td style={styles.tdProblema}>
-                            <input
-                              type="checkbox"
-                              checked={detalle.tuvo_problema}
-                              onChange={(e) => {
-                                actualizarDetalle(
-                                  insumo.id,
-                                  "tuvo_problema",
-                                  e.target.checked,
-                                );
+        {Object.entries(insumosAgrupados).map(([tituloGrupo, lista]) =>
+          lista.length > 0 ? (
+            <div key={tituloGrupo} style={styles.card}>
+              <div style={styles.sectionHeader}>
+                <h3 style={styles.sectionTitle}>{tituloGrupo}</h3>
+              </div>
 
-                                if (!e.target.checked) {
+              <div className="pedido-desktop" style={styles.desktopOnly}>
+                <div style={styles.tableWrapper}>
+                  <table style={styles.table}>
+                    <thead>
+                      <tr>
+                        <th style={styles.thArticulo}>Artículo</th>
+                        <th style={styles.thCantidad}>Cantidad</th>
+                        <th style={styles.thProblema}>Problema</th>
+                        <th style={styles.thObs}>Observación</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {lista.map((insumo) => {
+                        const detalle = obtenerDetalle(insumo.id);
+
+                        return (
+                          <tr key={insumo.id}>
+                            <td style={styles.tdArticulo}>{insumo.nombre}</td>
+
+                            <td style={styles.tdCantidad}>
+                              <input
+                                type="number"
+                                min="0"
+                                value={detalle.cantidad_solicitada}
+                                onChange={(e) =>
+                                  actualizarDetalle(
+                                    insumo.id,
+                                    "cantidad_solicitada",
+                                    e.target.value
+                                  )
+                                }
+                                style={styles.tableInput}
+                              />
+                            </td>
+
+                            <td style={styles.tdProblema}>
+                              <input
+                                type="checkbox"
+                                checked={detalle.tuvo_problema}
+                                onChange={(e) => {
+                                  actualizarDetalle(
+                                    insumo.id,
+                                    "tuvo_problema",
+                                    e.target.checked
+                                  );
+
+                                  if (!e.target.checked) {
+                                    actualizarDetalle(
+                                      insumo.id,
+                                      "detalle_problema",
+                                      ""
+                                    );
+                                  }
+                                }}
+                              />
+                            </td>
+
+                            <td style={styles.tdObs}>
+                              <input
+                                type="text"
+                                placeholder={
+                                  detalle.tuvo_problema
+                                    ? "Describa el problema"
+                                    : "Sin problema informado"
+                                }
+                                value={detalle.detalle_problema || ""}
+                                disabled={!detalle.tuvo_problema}
+                                onChange={(e) =>
                                   actualizarDetalle(
                                     insumo.id,
                                     "detalle_problema",
-                                    "",
-                                  );
+                                    e.target.value
+                                  )
                                 }
-                              }}
-                            />
-                          </td>
+                                style={{
+                                  ...styles.inputSmall,
+                                  ...(detalle.tuvo_problema
+                                    ? styles.inputSmallActive
+                                    : styles.inputSmallDisabled),
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-                          <td style={styles.tdObs}>
-                            <input
-                              type="text"
-                              placeholder={
-                                detalle.tuvo_problema
-                                  ? "Describa el problema"
-                                  : "Sin problema informado"
-                              }
-                              value={detalle.detalle_problema || ""}
-                              disabled={!detalle.tuvo_problema}
-                              onChange={(e) =>
+              <div className="pedido-mobile" style={styles.mobileOnly}>
+                <div style={styles.mobileList}>
+                  {lista.map((insumo) => {
+                    const detalle = obtenerDetalle(insumo.id);
+
+                    return (
+                      <div key={insumo.id} style={styles.mobileItem}>
+                        <p style={styles.mobileTitle}>{insumo.nombre}</p>
+
+                        <div style={styles.mobileField}>
+                          <label style={styles.mobileLabel}>Cantidad</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={detalle.cantidad_solicitada}
+                            onChange={(e) =>
+                              actualizarDetalle(
+                                insumo.id,
+                                "cantidad_solicitada",
+                                e.target.value
+                              )
+                            }
+                            style={styles.input}
+                          />
+                        </div>
+
+                        <div style={styles.mobileCheckboxRow}>
+                          <label style={styles.mobileLabel}>Problema</label>
+                          <input
+                            type="checkbox"
+                            checked={detalle.tuvo_problema}
+                            onChange={(e) => {
+                              actualizarDetalle(
+                                insumo.id,
+                                "tuvo_problema",
+                                e.target.checked
+                              );
+
+                              if (!e.target.checked) {
                                 actualizarDetalle(
                                   insumo.id,
                                   "detalle_problema",
-                                  e.target.value,
-                                )
+                                  ""
+                                );
                               }
-                              style={{
-                                ...styles.inputSmall,
-                                ...(detalle.tuvo_problema
-                                  ? styles.inputSmallActive
-                                  : styles.inputSmallDisabled),
-                              }}
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                            }}
+                          />
+                        </div>
 
-            <div className="pedido-mobile" style={styles.mobileOnly}>
-              <div style={styles.mobileList}>
-                {lista.map((insumo) => {
-                  const detalle = obtenerDetalle(insumo.id);
-
-                  return (
-                    <div key={insumo.id} style={styles.mobileItem}>
-                      <p style={styles.mobileTitle}>{insumo.nombre}</p>
-
-                      <div style={styles.mobileField}>
-                        <label style={styles.mobileLabel}>Cantidad</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={detalle.cantidad_solicitada}
-                          onChange={(e) =>
-                            actualizarDetalle(
-                              insumo.id,
-                              "cantidad_solicitada",
-                              e.target.value,
-                            )
-                          }
-                          style={styles.input}
-                        />
-                      </div>
-
-                      <div style={styles.mobileCheckboxRow}>
-                        <label style={styles.mobileLabel}>Problema</label>
-                        <input
-                          type="checkbox"
-                          checked={detalle.tuvo_problema}
-                          onChange={(e) => {
-                            actualizarDetalle(
-                              insumo.id,
-                              "tuvo_problema",
-                              e.target.checked,
-                            );
-
-                            if (!e.target.checked) {
+                        <div style={styles.mobileField}>
+                          <label style={styles.mobileLabel}>Observación</label>
+                          <input
+                            type="text"
+                            placeholder={
+                              detalle.tuvo_problema
+                                ? "Describa el problema"
+                                : "Sin problema informado"
+                            }
+                            value={detalle.detalle_problema || ""}
+                            disabled={!detalle.tuvo_problema}
+                            onChange={(e) =>
                               actualizarDetalle(
                                 insumo.id,
                                 "detalle_problema",
-                                "",
-                              );
+                                e.target.value
+                              )
                             }
-                          }}
-                        />
+                            style={{
+                              ...styles.input,
+                              ...(detalle.tuvo_problema
+                                ? styles.inputSmallActive
+                                : styles.inputSmallDisabled),
+                            }}
+                          />
+                        </div>
                       </div>
-
-                      <div style={styles.mobileField}>
-                        <label style={styles.mobileLabel}>Observación</label>
-                        <input
-                          type="text"
-                          placeholder={
-                            detalle.tuvo_problema
-                              ? "Describa el problema"
-                              : "Sin problema informado"
-                          }
-                          value={detalle.detalle_problema || ""}
-                          disabled={!detalle.tuvo_problema}
-                          onChange={(e) =>
-                            actualizarDetalle(
-                              insumo.id,
-                              "detalle_problema",
-                              e.target.value,
-                            )
-                          }
-                          style={{
-                            ...styles.input,
-                            ...(detalle.tuvo_problema
-                              ? styles.inputSmallActive
-                              : styles.inputSmallDisabled),
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
+          ) : null
+        )}
+
+        <div style={styles.card}>
+          <h3 style={styles.sectionTitle}>Artículos no listados</h3>
+
+          <div style={styles.extrasContainer}>
+            {extras.map((extra, i) => (
+              <div
+                key={i}
+                className="pedido-extra-row"
+                style={styles.extraRow}
+              >
+                <input
+                  placeholder="Artículo"
+                  value={extra.articulo_manual}
+                  onChange={(e) =>
+                    actualizarExtra(i, "articulo_manual", e.target.value)
+                  }
+                  style={styles.input}
+                />
+
+                <input
+                  type="number"
+                  placeholder="Cantidad"
+                  value={extra.cantidad_solicitada}
+                  onChange={(e) =>
+                    actualizarExtra(i, "cantidad_solicitada", e.target.value)
+                  }
+                  style={styles.input}
+                />
+              </div>
+            ))}
           </div>
-        ) : null,
-      )}
 
-      <div style={styles.card}>
-        <h3 style={styles.sectionTitle}>Artículos no listados</h3>
-
-        <div style={styles.extrasContainer}>
-          {extras.map((extra, i) => (
-            <div key={i} className="pedido-extra-row" style={styles.extraRow}>
-              <input
-                placeholder="Artículo"
-                value={extra.articulo_manual}
-                onChange={(e) =>
-                  actualizarExtra(i, "articulo_manual", e.target.value)
-                }
-                style={styles.input}
-              />
-
-              <input
-                type="number"
-                placeholder="Cantidad"
-                value={extra.cantidad_solicitada}
-                onChange={(e) =>
-                  actualizarExtra(i, "cantidad_solicitada", e.target.value)
-                }
-                style={styles.input}
-              />
-            </div>
-          ))}
+          <button
+            type="button"
+            onClick={agregarExtra}
+            style={styles.secondaryButton}
+          >
+            + Agregar artículo
+          </button>
         </div>
 
-        <button onClick={agregarExtra} style={styles.secondaryButton}>
-          + Agregar artículo
-        </button>
-      </div>
+        {(mensaje || error) && (
+          <div style={styles.feedbackBox}>
+            {mensaje && <p style={styles.ok}>{mensaje}</p>}
+            {error && <p style={styles.error}>{error}</p>}
+          </div>
+        )}
 
-      {(mensaje || error) && (
-        <div style={styles.feedbackBox}>
-          {mensaje && <p style={styles.ok}>{mensaje}</p>}
-          {error && <p style={styles.error}>{error}</p>}
+        <div style={styles.footerActions}>
+          <button type="submit" style={styles.button} disabled={enviando}>
+            {enviando ? "Enviando..." : "Enviar pedido"}
+          </button>
         </div>
-      )}
-
-      <div style={styles.footerActions}>
-        <button
-          onClick={enviarPedido}
-          style={styles.button}
-          disabled={enviando}
-        >
-          {enviando ? "Enviando..." : "Enviar pedido"}
-        </button>
-      </div>
+      </form>
     </Layout>
   );
 }
@@ -520,6 +579,12 @@ const styles = {
     borderRadius: "10px",
     resize: "vertical",
     boxSizing: "border-box",
+  },
+  errorText: {
+    color: "crimson",
+    marginTop: "0.35rem",
+    marginBottom: 0,
+    fontSize: "0.9rem",
   },
   desktopOnly: {
     display: "block",
@@ -688,4 +753,3 @@ const styles = {
     margin: 0,
   },
 };
-
