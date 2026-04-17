@@ -1,253 +1,214 @@
-import { useEffect, useState } from 'react';
-import api from '../api/axios';
-import Layout from '../components/Layout';
-
-const initialForm = {
-  insumo_id: '',
-  tipo: 'INGRESO',
-  cantidad: 1,
-  motivo: '',
-  oficina_id: '',
-};
+import { useEffect, useMemo, useState } from "react";
+import api from "../api/axios";
+import Layout from "../components/Layout";
 
 export default function MovimientosStock() {
-  const [form, setForm] = useState(initialForm);
-  const [insumos, setInsumos] = useState([]);
-  const [oficinas, setOficinas] = useState([]);
   const [movimientos, setMovimientos] = useState([]);
-  const [error, setError] = useState('');
-  const [mensaje, setMensaje] = useState('');
-  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
 
-  const cargarDatos = async () => {
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState("");
+
+  const cargarMovimientos = async () => {
     try {
-      const [resInsumos, resMovimientos, resOficinas] = await Promise.all([
-        api.get('/insumos'),
-        api.get('/movimientos-stock'),
-        api.get('/usuarios'),
-      ]);
-
-      setInsumos(resInsumos.data);
-      setMovimientos(resMovimientos.data);
-
-      const oficinasUnicas = [];
-      const ids = new Set();
-
-      resOficinas.data.forEach((u) => {
-        if (u.Oficina && !ids.has(u.Oficina.id)) {
-          ids.add(u.Oficina.id);
-          oficinasUnicas.push(u.Oficina);
-        }
-      });
-
-      setOficinas(oficinasUnicas);
+      const response = await api.get("/movimientos-stock");
+      setMovimientos(response.data);
     } catch (err) {
-      setError(err.response?.data?.mensaje || 'Error al cargar datos');
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.mensaje ||
+          "Error al cargar movimientos"
+      );
     }
   };
 
   useEffect(() => {
-    cargarDatos();
+    cargarMovimientos();
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const movimientosFiltrados = useMemo(() => {
+    return movimientos.filter((movimiento) => {
+      const texto = busqueda.toLowerCase();
 
-    setForm((prev) => ({
-      ...prev,
-      [name]:
-        name === 'cantidad' || name === 'insumo_id' || name === 'oficina_id'
-          ? value === '' ? '' : Number(value)
-          : value,
-    }));
+      const coincideBusqueda =
+        movimiento.Insumo?.nombre?.toLowerCase().includes(texto) ||
+        movimiento.motivo?.toLowerCase().includes(texto) ||
+        movimiento.Usuario?.nombre?.toLowerCase().includes(texto) ||
+        movimiento.Usuario?.apellido?.toLowerCase().includes(texto) ||
+        movimiento.Oficina?.nombre?.toLowerCase().includes(texto);
+
+      const coincideTipo = !filtroTipo || movimiento.tipo === filtroTipo;
+
+      return coincideBusqueda && coincideTipo;
+    });
+  }, [movimientos, busqueda, filtroTipo]);
+
+  const getTipoStyle = (tipo) => {
+    switch (tipo) {
+      case "INGRESO":
+        return { background: "#dcfce7", color: "#166534" };
+      case "EGRESO":
+        return { background: "#fee2e2", color: "#991b1b" };
+      case "AJUSTE":
+        return { background: "#fef3c7", color: "#92400e" };
+      case "DEVOLUCION":
+        return { background: "#dbeafe", color: "#1d4ed8" };
+      default:
+        return { background: "#f3f4f6", color: "#111827" };
+    }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setMensaje('');
-    setGuardando(true);
-
-    try {
-      const payload = {
-        ...form,
-        oficina_id: form.oficina_id || null,
-      };
-
-      await api.post('/movimientos-stock', payload);
-      setMensaje('Movimiento registrado correctamente');
-      setForm(initialForm);
-      await cargarDatos();
-    } catch (err) {
-      setError(err.response?.data?.mensaje || 'Error al registrar movimiento');
-    } finally {
-      setGuardando(false);
-    }
+  const formatearFecha = (fecha) => {
+    if (!fecha) return "-";
+    return new Date(fecha).toLocaleString("es-AR");
   };
 
   return (
     <Layout>
-      <h1 style={styles.titulo}>Movimientos de Stock</h1>
+      <h1 style={styles.titulo}>Historial de movimientos de stock</h1>
 
-      <div style={styles.grid}>
-        <div style={styles.card}>
-          <h2 style={styles.subtitulo}>Nuevo movimiento</h2>
+      <div style={styles.card}>
+        <div style={styles.filters}>
+          <input
+            type="text"
+            placeholder="Buscar por insumo, motivo, usuario u oficina..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            style={styles.input}
+          />
 
-          <form onSubmit={handleSubmit} style={styles.form}>
-            <select
-              name="insumo_id"
-              value={form.insumo_id}
-              onChange={handleChange}
-              style={styles.input}
-            >
-              <option value="">Seleccionar insumo</option>
-              {insumos.map((insumo) => (
-                <option key={insumo.id} value={insumo.id}>
-                  {insumo.nombre} - Stock: {insumo.stock_actual}
-                </option>
-              ))}
-            </select>
-
-            <select
-              name="tipo"
-              value={form.tipo}
-              onChange={handleChange}
-              style={styles.input}
-            >
-              <option value="INGRESO">Ingreso</option>
-              <option value="EGRESO">Egreso</option>
-              <option value="AJUSTE">Ajuste</option>
-              <option value="DEVOLUCION">Devolución</option>
-            </select>
-
-            <input
-              name="cantidad"
-              type="number"
-              min="1"
-              value={form.cantidad}
-              onChange={handleChange}
-              style={styles.input}
-            />
-
-            <select
-              name="oficina_id"
-              value={form.oficina_id}
-              onChange={handleChange}
-              style={styles.input}
-            >
-              <option value="">Sin oficina</option>
-              {oficinas.map((oficina) => (
-                <option key={oficina.id} value={oficina.id}>
-                  {oficina.nombre}
-                </option>
-              ))}
-            </select>
-
-            <textarea
-              name="motivo"
-              placeholder="Motivo"
-              value={form.motivo}
-              onChange={handleChange}
-              style={styles.textarea}
-            />
-
-            {mensaje && <p style={styles.ok}>{mensaje}</p>}
-            {error && <p style={styles.error}>{error}</p>}
-
-            <button type="submit" style={styles.button} disabled={guardando}>
-              {guardando ? 'Guardando...' : 'Registrar movimiento'}
-            </button>
-          </form>
+          <select
+            value={filtroTipo}
+            onChange={(e) => setFiltroTipo(e.target.value)}
+            style={styles.input}
+          >
+            <option value="">Todos los tipos</option>
+            <option value="INGRESO">Ingreso</option>
+            <option value="EGRESO">Egreso</option>
+            <option value="AJUSTE">Ajuste</option>
+            <option value="DEVOLUCION">Devolución</option>
+          </select>
         </div>
 
-        <div style={styles.card}>
-          <h2 style={styles.subtitulo}>Historial reciente</h2>
+        {error && <p style={styles.error}>{error}</p>}
 
-          {movimientos.length === 0 ? (
-            <p>No hay movimientos registrados.</p>
-          ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Insumo</th>
-                  <th>Tipo</th>
-                  <th>Cantidad</th>
-                  <th>Oficina</th>
-                  <th>Motivo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movimientos.map((mov) => (
-                  <tr key={mov.id}>
-                    <td>{mov.id}</td>
-                    <td>{mov.Insumo?.nombre || '-'}</td>
-                    <td>{mov.tipo}</td>
-                    <td>{mov.cantidad}</td>
-                    <td>{mov.Oficina?.nombre || '-'}</td>
-                    <td>{mov.motivo || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        {movimientosFiltrados.length === 0 ? (
+          <p>No hay movimientos registrados.</p>
+        ) : (
+          <div style={styles.listado}>
+            {movimientosFiltrados.map((movimiento) => (
+              <div key={movimiento.id} style={styles.item}>
+                <div style={styles.headerRow}>
+                  <p style={styles.itemTitle}>
+                    <strong>#{movimiento.id}</strong> —{" "}
+                    {movimiento.Insumo?.nombre || "-"}
+                  </p>
+
+                  <span
+                    style={{
+                      ...styles.badge,
+                      ...getTipoStyle(movimiento.tipo),
+                    }}
+                  >
+                    {movimiento.tipo}
+                  </span>
+                </div>
+
+                <div style={styles.detailGrid}>
+                  <p>
+                    <strong>Cantidad:</strong> {movimiento.cantidad}
+                  </p>
+                  <p>
+                    <strong>Fecha:</strong> {formatearFecha(movimiento.fecha)}
+                  </p>
+                  <p>
+                    <strong>Usuario:</strong>{" "}
+                    {movimiento.Usuario
+                      ? `${movimiento.Usuario.nombre} ${movimiento.Usuario.apellido}`
+                      : "-"}
+                  </p>
+                  <p>
+                    <strong>Oficina:</strong> {movimiento.Oficina?.nombre || "-"}
+                  </p>
+                </div>
+
+                <p style={styles.infoBox}>
+                  <strong>Motivo:</strong> {movimiento.motivo || "-"}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </Layout>
   );
 }
 
 const styles = {
-  titulo: { marginTop: 0, marginBottom: '1rem' },
-  subtitulo: { marginTop: 0 },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1.4fr',
-    gap: '1rem',
+  titulo: {
+    marginTop: 0,
+    marginBottom: "1rem",
   },
   card: {
-    background: '#fff',
-    borderRadius: '14px',
-    padding: '1rem',
-    boxShadow: '0 6px 18px rgba(0,0,0,0.08)',
-    overflowX: 'auto',
+    background: "#fff",
+    borderRadius: "14px",
+    padding: "1rem",
+    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
   },
-  form: {
-    display: 'grid',
-    gap: '0.8rem',
+  filters: {
+    display: "grid",
+    gap: "0.8rem",
+    marginBottom: "1rem",
   },
   input: {
-    padding: '0.8rem',
-    border: '1px solid #ccc',
-    borderRadius: '8px',
+    padding: "0.8rem",
+    border: "1px solid #ccc",
+    borderRadius: "8px",
+    width: "100%",
+    boxSizing: "border-box",
   },
-  textarea: {
-    padding: '0.8rem',
-    border: '1px solid #ccc',
-    borderRadius: '8px',
-    minHeight: '90px',
-    resize: 'vertical',
+  listado: {
+    display: "grid",
+    gap: "1rem",
   },
-  button: {
-    padding: '0.9rem',
-    border: 'none',
-    borderRadius: '8px',
-    background: '#1f4f82',
-    color: '#fff',
-    cursor: 'pointer',
-    fontWeight: 'bold',
+  item: {
+    border: "1px solid #e5e7eb",
+    borderRadius: "12px",
+    padding: "1rem",
+    background: "#fff",
   },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    fontSize: '0.95rem',
+  headerRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "1rem",
+    marginBottom: "0.8rem",
+    flexWrap: "wrap",
   },
-  ok: {
-    color: 'green',
+  itemTitle: {
+    margin: 0,
+    fontSize: "1rem",
+  },
+  badge: {
+    padding: "0.35rem 0.7rem",
+    borderRadius: "999px",
+    fontSize: "0.8rem",
+    fontWeight: "bold",
+  },
+  detailGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "0.4rem 1rem",
+    marginBottom: "0.8rem",
+  },
+  infoBox: {
+    background: "#f9fafb",
+    border: "1px solid #e5e7eb",
+    borderRadius: "10px",
+    padding: "0.8rem",
     margin: 0,
   },
   error: {
-    color: 'crimson',
-    margin: 0,
+    color: "crimson",
   },
 };
