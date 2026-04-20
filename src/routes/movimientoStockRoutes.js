@@ -1,20 +1,12 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
 const {
-  registrarMovimiento,
-  listarMovimientos,
-} = require('../controllers/movimientoStockController');
+  listarMovimientosStock,
+} = require("../controllers/movimientoStockController");
 
-const { verificarToken, verificarRol } = require('../middlewares/authMiddleware');
+const { verificarToken } = require("../middlewares/authMiddleware");
 
-router.get('/', verificarToken, listarMovimientos);
-
-router.post(
-  '/',
-  verificarToken,
-  verificarRol('ADMIN', 'RESPONSABLE'),
-  registrarMovimiento
-);
+router.get("/", verificarToken, listarMovimientosStock);
 
 module.exports = router;

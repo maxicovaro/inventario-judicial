@@ -9,6 +9,11 @@ const {
 
 const PDFDocument = require("pdfkit");
 
+const {
+  crearNotificacion,
+  notificarAdmins,
+} = require("../utils/notificaciones");
+
 const crearPedido = async (req, res) => {
   try {
     const {
@@ -94,6 +99,11 @@ const crearPedido = async (req, res) => {
       });
     }
 
+    await notificarAdmins({
+      titulo: "Nuevo pedido mensual enviado",
+      mensaje: `La oficina "${oficina.nombre}" envió el pedido mensual N° ${pedido.id} correspondiente a ${mes}/${anio}.`,
+    });
+
     return res.status(201).json({
       mensaje: "Pedido creado correctamente",
       pedido,
@@ -159,22 +169,75 @@ const actualizarProvision = async (req, res) => {
       });
     }
 
+    if (!detalles || !Array.isArray(detalles) || detalles.length === 0) {
+      return res.status(400).json({
+        mensaje: "Debés enviar el detalle de provisión",
+      });
+    }
+
+    for (const item of detalles) {
+      const detallePedido = await PedidoInsumoDetalle.findByPk(item.id);
+
+      if (!detallePedido) {
+        return res.status(404).json({
+          mensaje: `Detalle de pedido no encontrado: ${item.id}`,
+        });
+      }
+
+      const nuevaCantidadProvista = Number(item.cantidad_provista) || 0;
+      const cantidadAnteriorProvista =
+        Number(detallePedido.cantidad_provista) || 0;
+
+      // Diferencia a descontar realmente del stock
+      const diferencia = nuevaCantidadProvista - cantidadAnteriorProvista;
+
+      if (diferencia > 0 && detallePedido.insumo_id) {
+        const insumo = await Insumo.findByPk(detallePedido.insumo_id);
+
+        if (!insumo) {
+          return res.status(404).json({
+            mensaje: `Insumo no encontrado para el detalle ${item.id}`,
+          });
+        }
+
+        if (Number(insumo.stock_actual) < diferencia) {
+          return res.status(400).json({
+            mensaje: `Stock insuficiente para "${insumo.nombre}". Disponible: ${insumo.stock_actual}, requerido adicional: ${diferencia}`,
+          });
+        }
+
+        await insumo.update({
+          stock_actual: Number(insumo.stock_actual) - diferencia,
+        });
+
+        await require("../models").MovimientoStock.create({
+          insumo_id: insumo.id,
+          tipo: "EGRESO",
+          cantidad: diferencia,
+          motivo: `Entrega por pedido mensual N° ${pedido.id}`,
+          usuario_id: req.usuario.id,
+          oficina_id: pedido.oficina_id,
+        });
+      }
+
+      await detallePedido.update({
+        cantidad_provista: nuevaCantidadProvista,
+      });
+    }
+
     if (estado) {
       pedido.estado = estado;
       await pedido.save();
     }
 
-    if (detalles && detalles.length > 0) {
-      for (const item of detalles) {
-        await PedidoInsumoDetalle.update(
-          { cantidad_provista: item.cantidad_provista },
-          { where: { id: item.id } }
-        );
-      }
-    }
+    await crearNotificacion({
+      usuario_id: pedido.usuario_id,
+      titulo: "Pedido mensual entregado",
+      mensaje: `El pedido mensual N° ${pedido.id} fue entregado y se registró la provisión correspondiente.`,
+    });
 
     return res.json({
-      mensaje: "Pedido actualizado correctamente",
+      mensaje: "Pedido actualizado correctamente y stock descontado",
     });
   } catch (error) {
     console.error(error);
@@ -213,6 +276,12 @@ const actualizarEstadoPedido = async (req, res) => {
 
     pedido.estado = estado;
     await pedido.save();
+
+    await crearNotificacion({
+      usuario_id: pedido.usuario_id,
+      titulo: "Actualización de pedido mensual",
+      mensaje: `Tu pedido mensual N° ${pedido.id} ahora se encuentra en estado: ${estado}.`,
+    });
 
     return res.status(200).json({
       mensaje: "Estado actualizado correctamente",
@@ -297,31 +366,29 @@ const exportarPedidoPDF = async (req, res) => {
           ? `${pedido.Usuario.nombre} ${pedido.Usuario.apellido}`
           : "-"
       }`,
-      50
+      50,
     );
 
     doc.moveDown(0.3);
     doc.text(
       `Cantidad de hechos delictivos informados: ${pedido.cantidad_hechos_delictivos || 0}`,
-      50
+      50,
     );
 
     doc.moveDown(0.3);
     doc.text(
       `Cantidad de autopsias informadas: ${pedido.cantidad_autopsias || 0}`,
-      50
+      50,
     );
 
     doc.moveDown(1);
 
     // Observaciones
     doc.font("Helvetica-Bold").text("Observaciones generales:", 50);
-    doc
-      .font("Helvetica")
-      .text(pedido.observaciones || "-", 50, doc.y + 4, {
-        width: 495,
-        align: "left",
-      });
+    doc.font("Helvetica").text(pedido.observaciones || "-", 50, doc.y + 4, {
+      width: 495,
+      align: "left",
+    });
 
     doc.moveDown(1.5);
 
@@ -347,7 +414,11 @@ const exportarPedidoPDF = async (req, res) => {
     doc.text("Detalle", col5, y, { width: 70 });
 
     y += 18;
-    doc.moveTo(startX, y - 4).lineTo(545, y - 4).strokeColor("#999").stroke();
+    doc
+      .moveTo(startX, y - 4)
+      .lineTo(545, y - 4)
+      .strokeColor("#999")
+      .stroke();
     doc.font("Helvetica").fontSize(8.5);
 
     for (const item of pedido.PedidoInsumoDetalles || []) {
@@ -360,7 +431,7 @@ const exportarPedidoPDF = async (req, res) => {
       const rowHeight = Math.max(
         doc.heightOfString(articulo, { width: 195 }),
         doc.heightOfString(detalle, { width: 70 }),
-        18
+        18,
       );
 
       if (y + rowHeight > 730) {
@@ -375,7 +446,11 @@ const exportarPedidoPDF = async (req, res) => {
         doc.text("Detalle", col5, y, { width: 70 });
 
         y += 18;
-        doc.moveTo(startX, y - 4).lineTo(545, y - 4).strokeColor("#999").stroke();
+        doc
+          .moveTo(startX, y - 4)
+          .lineTo(545, y - 4)
+          .strokeColor("#999")
+          .stroke();
         doc.font("Helvetica").fontSize(8.5);
       }
 
@@ -386,7 +461,11 @@ const exportarPedidoPDF = async (req, res) => {
       doc.text(detalle, col5, y, { width: 70 });
 
       y += rowHeight + 8;
-      doc.moveTo(startX, y - 3).lineTo(545, y - 3).strokeColor("#e0e0e0").stroke();
+      doc
+        .moveTo(startX, y - 3)
+        .lineTo(545, y - 3)
+        .strokeColor("#e0e0e0")
+        .stroke();
     }
 
     // Firmas
@@ -410,7 +489,7 @@ const exportarPedidoPDF = async (req, res) => {
       "Documento generado por el sistema de inventario y pedidos mensuales.",
       50,
       790,
-      { align: "center", width: 495 }
+      { align: "center", width: 495 },
     );
 
     doc.end();
