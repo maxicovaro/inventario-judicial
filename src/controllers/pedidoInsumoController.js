@@ -12,6 +12,7 @@ const PDFDocument = require("pdfkit");
 const {
   crearNotificacion,
   notificarAdmins,
+  alertarStockBajoSiCorresponde,
 } = require("../utils/notificaciones");
 
 const crearPedido = async (req, res) => {
@@ -209,6 +210,10 @@ const actualizarProvision = async (req, res) => {
         await insumo.update({
           stock_actual: Number(insumo.stock_actual) - diferencia,
         });
+
+        await insumo.reload();
+
+        await alertarStockBajoSiCorresponde(insumo);
 
         await require("../models").MovimientoStock.create({
           insumo_id: insumo.id,

@@ -36,7 +36,22 @@ const notificarAdmins = async ({ titulo, mensaje }) => {
   }
 };
 
+const alertarStockBajoSiCorresponde = async (insumo) => {
+  if (!insumo) return;
+
+  const stockActual = Number(insumo.stock_actual || 0);
+  const stockMinimo = Number(insumo.stock_minimo || 0);
+
+  if (stockActual <= stockMinimo) {
+    await notificarAdmins({
+      titulo: "Alerta de stock bajo",
+      mensaje: `El insumo "${insumo.nombre}" quedó con stock bajo. Stock actual: ${stockActual}, stock mínimo: ${stockMinimo}.`,
+    });
+  }
+};
+
 module.exports = {
   crearNotificacion,
   notificarAdmins,
+  alertarStockBajoSiCorresponde,
 };
