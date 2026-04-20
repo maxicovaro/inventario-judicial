@@ -1,6 +1,19 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -83,6 +96,57 @@ export default function Dashboard() {
               color="#ecfdf5"
               texto="#166534"
             />
+          </div>
+
+          <div style={styles.sectionsGrid}>
+            <section style={styles.section}>
+              <h2 style={styles.subtitulo}>Pedidos por estado</h2>
+              <div style={styles.chartBox}>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={data.pedidos_por_estado}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="estado" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Bar dataKey="total" fill="#1f4f82" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+
+            <section style={styles.section}>
+              <h2 style={styles.subtitulo}>Movimientos de stock por tipo</h2>
+              <div style={styles.chartBox}>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={data.movimientos_stock_por_tipo}
+                      dataKey="total"
+                      nameKey="tipo"
+                      outerRadius={100}
+                      label
+                    >
+                      {data.movimientos_stock_por_tipo.map((entry, index) => {
+                        const colors = [
+                          "#16a34a",
+                          "#dc2626",
+                          "#d97706",
+                          "#2563eb",
+                        ];
+                        return (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={colors[index % colors.length]}
+                          />
+                        );
+                      })}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
           </div>
 
           <div style={styles.sectionsGrid}>
@@ -256,7 +320,7 @@ const getMovimientoStockStyle = (tipo) => {
       return { background: "#dbeafe", color: "#1e40af" };
     default:
       return { background: "#f3f4f6", color: "#111827" };
-  }
+    }
 };
 
 const getMovimientoActivoStyle = (tipo) => {
@@ -334,6 +398,10 @@ const styles = {
     borderRadius: "14px",
     padding: "1rem",
     boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+  },
+  chartBox: {
+    width: "100%",
+    height: "300px",
   },
   listado: {
     display: "grid",
