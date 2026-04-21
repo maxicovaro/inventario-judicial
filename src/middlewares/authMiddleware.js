@@ -55,6 +55,22 @@ const verificarRol = (...rolesPermitidos) => {
   };
 };
 
+const permitirRoles = (...rolesPermitidos) => {
+  return (req, res, next) => {
+    const rol = req.usuario?.rol;
+
+    if (!rolesPermitidos.includes(rol)) {
+      return res.status(403).json({
+        mensaje: "No tenés permisos para esta acción",
+      });
+    }
+
+    next();
+  };
+};
+
+module.exports = permitirRoles;
+
 module.exports = {
   verificarToken,
   verificarRol,

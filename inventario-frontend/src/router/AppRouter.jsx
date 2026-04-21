@@ -11,6 +11,7 @@ import Adjuntos from "../pages/Adjuntos";
 import PedidoMensual from "../pages/PedidoMensual";
 import HistorialPedidos from "../pages/HistorialPedidos";
 import ReportePedidos from "../pages/ReportePedidos";
+import Usuarios from "../pages/Usuarios";
 
 export default function AppRouter() {
   return (
@@ -102,6 +103,14 @@ export default function AppRouter() {
           element={
             <PrivateRoute>
               <ReportePedidos />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/usuarios"
+          element={
+            <PrivateRoute rolesPermitidos={["ADMIN"]}>
+              <Usuarios />
             </PrivateRoute>
           }
         />

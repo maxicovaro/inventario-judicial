@@ -1,20 +1,23 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
 const {
-  crearUsuario,
   listarUsuarios,
-  obtenerUsuarioPorId,
+  crearUsuario,
   actualizarUsuario,
-  desactivarUsuario,
-} = require('../controllers/usuarioController');
+  cambiarEstadoUsuario,
+} = require("../controllers/usuarioController");
 
-const { verificarToken, verificarRol } = require('../middlewares/authMiddleware');
+const { verificarToken, verificarRol } = require("../middlewares/authMiddleware");
 
-router.get('/', verificarToken, verificarRol('ADMIN'), listarUsuarios);
-router.get('/:id', verificarToken, verificarRol('ADMIN'), obtenerUsuarioPorId);
-router.post('/', verificarToken, verificarRol('ADMIN'), crearUsuario);
-router.put('/:id', verificarToken, verificarRol('ADMIN'), actualizarUsuario);
-router.delete('/:id', verificarToken, verificarRol('ADMIN'), desactivarUsuario);
+router.get("/", verificarToken, verificarRol("ADMIN"), listarUsuarios);
+router.post("/", verificarToken, verificarRol("ADMIN"), crearUsuario);
+router.put("/:id", verificarToken, verificarRol("ADMIN"), actualizarUsuario);
+router.patch(
+  "/:id/estado",
+  verificarToken,
+  verificarRol("ADMIN"),
+  cambiarEstadoUsuario
+);
 
 module.exports = router;

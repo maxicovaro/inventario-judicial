@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
-const { listarOficinas } = require("../controllers/oficinaController");
+const { listarRoles } = require("../controllers/roleController");
 const { verificarToken } = require("../middlewares/authMiddleware");
 
-router.get("/", verificarToken, listarOficinas);
+router.get("/", verificarToken, listarRoles);
 
 module.exports = router;

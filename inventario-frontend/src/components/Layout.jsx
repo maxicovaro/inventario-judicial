@@ -29,6 +29,8 @@ export default function Layout({ children }) {
     navigate("/");
   };
 
+  const esAdmin = usuario.role === "ADMIN";
+
   return (
     <div style={styles.wrapper}>
       <aside style={styles.sidebar}>
@@ -45,7 +47,9 @@ export default function Layout({ children }) {
           <Link to="/historial-pedidos">Historial pedidos</Link>
           <Link to="/reportes-pedidos">Reportes pedidos</Link>
 
-          {/* ✅ contador correcto */}
+          {/* ✅ SOLO ADMIN */}
+          {esAdmin && <Link to="/usuarios">Usuarios</Link>}
+
           <Link to="/notificaciones">
             Notificaciones {noLeidas > 0 ? `(${noLeidas})` : ""}
           </Link>
