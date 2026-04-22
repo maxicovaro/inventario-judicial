@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "react-toastify";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import { usuarioSchema } from "../schemas/usuarioSchema";
@@ -21,8 +22,6 @@ export default function Usuarios() {
   const [usuarios, setUsuarios] = useState([]);
   const [roles, setRoles] = useState([]);
   const [oficinas, setOficinas] = useState([]);
-  const [error, setError] = useState("");
-  const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
 
@@ -30,6 +29,7 @@ export default function Usuarios() {
   const [filtroRol, setFiltroRol] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroOficina, setFiltroOficina] = useState("");
+  const [orden, setOrden] = useState("AZ");
 
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [mostrarConfirmPassword, setMostrarConfirmPassword] = useState(false);
@@ -48,14 +48,12 @@ export default function Usuarios() {
   });
 
   const cargarDatos = async () => {
-    setError("");
-
     try {
       const resUsuarios = await api.get("/usuarios");
       setUsuarios(resUsuarios.data || []);
     } catch (err) {
       console.error("Error usuarios:", err.response?.data || err.message);
-      setError("Error al cargar usuarios");
+      toast.error("Error al cargar usuarios");
     }
 
     try {
@@ -79,7 +77,14 @@ export default function Usuarios() {
 
   useEffect(() => {
     setPaginaActual(1);
-  }, [busqueda, filtroRol, filtroEstado, filtroOficina, usuariosPorPagina]);
+  }, [
+    busqueda,
+    filtroRol,
+    filtroEstado,
+    filtroOficina,
+    usuariosPorPagina,
+    orden,
+  ]);
 
   const usuariosFiltrados = useMemo(() => {
     const filtrados = usuarios.filter((usuario) => {
@@ -110,22 +115,31 @@ export default function Usuarios() {
       );
     });
 
-    return filtrados.sort((a, b) => {
-      const apellidoA = (a.apellido || "").toLowerCase();
-      const apellidoB = (b.apellido || "").toLowerCase();
+    return [...filtrados].sort((a, b) => {
+      switch (orden) {
+        case "AZ": {
+          const apellido = (a.apellido || "").localeCompare(b.apellido || "");
+          if (apellido !== 0) return apellido;
+          return (a.nombre || "").localeCompare(b.nombre || "");
+        }
 
-      if (apellidoA < apellidoB) return -1;
-      if (apellidoA > apellidoB) return 1;
+        case "ZA": {
+          const apellido = (b.apellido || "").localeCompare(a.apellido || "");
+          if (apellido !== 0) return apellido;
+          return (b.nombre || "").localeCompare(a.nombre || "");
+        }
 
-      const nombreA = (a.nombre || "").toLowerCase();
-      const nombreB = (b.nombre || "").toLowerCase();
+        case "NUEVOS":
+          return b.id - a.id;
 
-      if (nombreA < nombreB) return -1;
-      if (nombreA > nombreB) return 1;
+        case "VIEJOS":
+          return a.id - b.id;
 
-      return 0;
+        default:
+          return 0;
+      }
     });
-  }, [usuarios, busqueda, filtroRol, filtroEstado, filtroOficina]);
+  }, [usuarios, busqueda, filtroRol, filtroEstado, filtroOficina, orden]);
 
   const totalPaginas = Math.ceil(usuariosFiltrados.length / usuariosPorPagina);
 
@@ -138,8 +152,6 @@ export default function Usuarios() {
   );
 
   const onSubmit = async (data) => {
-    setError("");
-    setMensaje("");
     setGuardando(true);
 
     try {
@@ -160,16 +172,16 @@ export default function Usuarios() {
 
       if (editandoId) {
         await api.put(`/usuarios/${editandoId}`, payload);
-        setMensaje("Usuario actualizado correctamente");
+        toast.success("Usuario actualizado correctamente");
       } else {
         if (!data.password || data.password.trim() === "") {
-          setError("La contraseña es obligatoria para crear un usuario");
+          toast.error("La contraseña es obligatoria para crear un usuario");
           setGuardando(false);
           return;
         }
 
         await api.post("/usuarios", payload);
-        setMensaje("Usuario creado correctamente");
+        toast.success("Usuario creado correctamente");
       }
 
       reset(defaultValues);
@@ -178,7 +190,7 @@ export default function Usuarios() {
       setMostrarConfirmPassword(false);
       await cargarDatos();
     } catch (err) {
-      setError(
+      toast.error(
         err.response?.data?.error ||
           err.response?.data?.mensaje ||
           "Error al guardar usuario",
@@ -189,9 +201,6 @@ export default function Usuarios() {
   };
 
   const editarUsuario = (usuario) => {
-    setError("");
-    setMensaje("");
-
     reset({
       nombre: usuario.nombre || "",
       apellido: usuario.apellido || "",
@@ -214,8 +223,6 @@ export default function Usuarios() {
     setEditandoId(null);
     setMostrarPassword(false);
     setMostrarConfirmPassword(false);
-    setError("");
-    setMensaje("");
   };
 
   const toggleEstadoUsuario = async (usuario) => {
@@ -227,17 +234,14 @@ export default function Usuarios() {
 
     if (!confirmar) return;
 
-    setError("");
-    setMensaje("");
-
     try {
       await api.patch(`/usuarios/${usuario.id}/estado`);
-      setMensaje(
+      toast.success(
         `Usuario ${accion === "activar" ? "activado" : "desactivado"} correctamente`,
       );
       await cargarDatos();
     } catch (err) {
-      setError(
+      toast.error(
         err.response?.data?.error ||
           err.response?.data?.mensaje ||
           "Error al cambiar estado del usuario",
@@ -378,9 +382,6 @@ export default function Usuarios() {
               Usuario activo
             </label>
 
-            {mensaje && <p style={styles.ok}>{mensaje}</p>}
-            {error && <p style={styles.error}>{error}</p>}
-
             <div style={styles.buttonGroup}>
               <button type="submit" style={styles.button} disabled={guardando}>
                 {guardando
@@ -449,6 +450,17 @@ export default function Usuarios() {
                   {oficina.nombre}
                 </option>
               ))}
+            </select>
+
+            <select
+              value={orden}
+              onChange={(e) => setOrden(e.target.value)}
+              style={styles.input}
+            >
+              <option value="AZ">Apellido A → Z</option>
+              <option value="ZA">Apellido Z → A</option>
+              <option value="NUEVOS">Más nuevos</option>
+              <option value="VIEJOS">Más viejos</option>
             </select>
 
             <select
@@ -686,14 +698,6 @@ const styles = {
     background: "#374151",
     color: "#fff",
     cursor: "pointer",
-  },
-  ok: {
-    color: "green",
-    margin: 0,
-  },
-  error: {
-    color: "crimson",
-    margin: 0,
   },
   errorText: {
     color: "crimson",
