@@ -14,6 +14,7 @@ const {
   notificarAdmins,
   alertarStockBajoSiCorresponde,
 } = require("../utils/notificaciones");
+const { registrarBitacora } = require("../utils/bitacora");
 
 const crearPedido = async (req, res) => {
   try {
@@ -105,6 +106,13 @@ const crearPedido = async (req, res) => {
       mensaje: `La oficina "${oficina.nombre}" envió el pedido mensual N° ${pedido.id} correspondiente a ${mes}/${anio}.`,
     });
 
+    await registrarBitacora({
+      usuario_id: req.usuario.id,
+      accion: "CREAR",
+      modulo: "PEDIDOS",
+      descripcion: `Creó el pedido mensual N° ${pedido.id} de la oficina ${oficina.nombre} para ${mes}/${anio}`,
+    });
+
     return res.status(201).json({
       mensaje: "Pedido creado correctamente",
       pedido,
@@ -162,7 +170,12 @@ const actualizarProvision = async (req, res) => {
   try {
     const { detalles, estado } = req.body;
 
-    const pedido = await PedidoInsumo.findByPk(req.params.id);
+    const pedido = await PedidoInsumo.findByPk(req.params.id, {
+      include: [
+        { model: Oficina, attributes: ["nombre"] },
+        { model: Usuario, attributes: ["nombre", "apellido", "email"] },
+      ],
+    });
 
     if (!pedido) {
       return res.status(404).json({
@@ -189,7 +202,6 @@ const actualizarProvision = async (req, res) => {
       const cantidadAnteriorProvista =
         Number(detallePedido.cantidad_provista) || 0;
 
-      // Diferencia a descontar realmente del stock
       const diferencia = nuevaCantidadProvista - cantidadAnteriorProvista;
 
       if (diferencia > 0 && detallePedido.insumo_id) {
@@ -211,10 +223,6 @@ const actualizarProvision = async (req, res) => {
           stock_actual: Number(insumo.stock_actual) - diferencia,
         });
 
-        await insumo.reload();
-
-        await alertarStockBajoSiCorresponde(insumo);
-
         await require("../models").MovimientoStock.create({
           insumo_id: insumo.id,
           tipo: "EGRESO",
@@ -223,6 +231,9 @@ const actualizarProvision = async (req, res) => {
           usuario_id: req.usuario.id,
           oficina_id: pedido.oficina_id,
         });
+
+        await insumo.reload();
+        await alertarStockBajoSiCorresponde(insumo);
       }
 
       await detallePedido.update({
@@ -241,6 +252,13 @@ const actualizarProvision = async (req, res) => {
       mensaje: `El pedido mensual N° ${pedido.id} fue entregado y se registró la provisión correspondiente.`,
     });
 
+    await registrarBitacora({
+      usuario_id: req.usuario.id,
+      accion: "PROVEER",
+      modulo: "PEDIDOS",
+      descripcion: `Registró provisión y entrega del pedido mensual N° ${pedido.id} de la oficina ${pedido.Oficina?.nombre || "-"}`,
+    });
+
     return res.json({
       mensaje: "Pedido actualizado correctamente y stock descontado",
     });
@@ -252,6 +270,7 @@ const actualizarProvision = async (req, res) => {
     });
   }
 };
+
 const actualizarEstadoPedido = async (req, res) => {
   try {
     const { estado } = req.body;
@@ -271,13 +290,17 @@ const actualizarEstadoPedido = async (req, res) => {
       });
     }
 
-    const pedido = await PedidoInsumo.findByPk(req.params.id);
+    const pedido = await PedidoInsumo.findByPk(req.params.id, {
+      include: [{ model: Oficina, attributes: ["nombre"] }],
+    });
 
     if (!pedido) {
       return res.status(404).json({
         mensaje: "Pedido no encontrado",
       });
     }
+
+    const estadoAnterior = pedido.estado;
 
     pedido.estado = estado;
     await pedido.save();
@@ -286,6 +309,13 @@ const actualizarEstadoPedido = async (req, res) => {
       usuario_id: pedido.usuario_id,
       titulo: "Actualización de pedido mensual",
       mensaje: `Tu pedido mensual N° ${pedido.id} ahora se encuentra en estado: ${estado}.`,
+    });
+
+    await registrarBitacora({
+      usuario_id: req.usuario.id,
+      accion: "CAMBIAR_ESTADO",
+      modulo: "PEDIDOS",
+      descripcion: `Cambió el estado del pedido mensual N° ${pedido.id} de ${estadoAnterior} a ${estado} (${pedido.Oficina?.nombre || "-"})`,
     });
 
     return res.status(200).json({
@@ -299,6 +329,7 @@ const actualizarEstadoPedido = async (req, res) => {
     });
   }
 };
+
 const exportarPedidoPDF = async (req, res) => {
   try {
     const pedido = await PedidoInsumo.findByPk(req.params.id, {
@@ -318,6 +349,13 @@ const exportarPedidoPDF = async (req, res) => {
       });
     }
 
+    await registrarBitacora({
+      usuario_id: req.usuario.id,
+      accion: "EXPORTAR_PDF",
+      modulo: "PEDIDOS",
+      descripcion: `Exportó a PDF el pedido mensual N° ${pedido.id} (${pedido.Oficina?.nombre || "-"})`,
+    });
+
     const doc = new PDFDocument({
       margin: 50,
       size: "A4",
@@ -332,7 +370,6 @@ const exportarPedidoPDF = async (req, res) => {
 
     const fechaActual = new Date().toLocaleDateString("es-AR");
 
-    // Encabezado institucional
     doc
       .font("Helvetica-Bold")
       .fontSize(14)
@@ -347,7 +384,6 @@ const exportarPedidoPDF = async (req, res) => {
     doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#444").stroke();
     doc.moveDown(1);
 
-    // Datos generales
     doc.font("Helvetica-Bold").fontSize(11);
     doc.text("Datos generales del pedido", 50, doc.y);
 
@@ -388,7 +424,6 @@ const exportarPedidoPDF = async (req, res) => {
 
     doc.moveDown(1);
 
-    // Observaciones
     doc.font("Helvetica-Bold").text("Observaciones generales:", 50);
     doc.font("Helvetica").text(pedido.observaciones || "-", 50, doc.y + 4, {
       width: 495,
@@ -397,11 +432,9 @@ const exportarPedidoPDF = async (req, res) => {
 
     doc.moveDown(1.5);
 
-    // Título detalle
     doc.font("Helvetica-Bold").fontSize(11).text("Detalle del pedido", 50);
     doc.moveDown(0.6);
 
-    // Cabecera tabla
     const startX = 50;
     let y = doc.y;
     const col1 = startX;
@@ -409,7 +442,6 @@ const exportarPedidoPDF = async (req, res) => {
     const col3 = 310;
     const col4 = 365;
     const col5 = 420;
-    const col6 = 470;
 
     doc.font("Helvetica-Bold").fontSize(8.5);
     doc.text("Artículo", col1, y, { width: 195 });
@@ -473,7 +505,6 @@ const exportarPedidoPDF = async (req, res) => {
         .stroke();
     }
 
-    // Firmas
     y += 35;
 
     if (y > 700) {
@@ -488,7 +519,6 @@ const exportarPedidoPDF = async (req, res) => {
     doc.text("Firma oficina solicitante", 90, y + 6);
     doc.text("Firma y recepción Dirección", 360, y + 6);
 
-    // Pie
     doc.fontSize(8).fillColor("gray");
     doc.text(
       "Documento generado por el sistema de inventario y pedidos mensuales.",

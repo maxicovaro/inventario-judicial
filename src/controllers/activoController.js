@@ -1,92 +1,9 @@
-const { Activo, Categoria, Oficina, Movimiento } = require("../models");
-
-const crearActivo = async (req, res) => {
-  try {
-    const {
-      codigo_interno,
-      nombre,
-      descripcion,
-      marca,
-      modelo,
-      numero_serie,
-      cantidad,
-      estado,
-      fecha_alta,
-      observaciones,
-      categoria_id,
-      oficina_id,
-    } = req.body;
-
-    if (!nombre || !categoria_id || !oficina_id) {
-      return res.status(400).json({
-        mensaje: "Nombre, categoría y oficina son obligatorios",
-      });
-    }
-
-    const categoria = await Categoria.findByPk(categoria_id);
-    if (!categoria) {
-      return res.status(404).json({
-        mensaje: "La categoría indicada no existe",
-      });
-    }
-
-    const oficina = await Oficina.findByPk(oficina_id);
-    if (!oficina) {
-      return res.status(404).json({
-        mensaje: "La oficina indicada no existe",
-      });
-    }
-    if (codigo_interno) {
-      const activoExistente = await Activo.findOne({
-        where: { codigo_interno },
-      });
-
-      if (activoExistente) {
-        return res.status(400).json({
-          mensaje: activoExistente.activo
-            ? "Ese código interno ya existe en un activo activo."
-            : "Ese código interno ya existe y pertenece a un activo dado de baja.",
-        });
-      }
-    }
-
-    const nuevoActivo = await Activo.create({
-      codigo_interno,
-      nombre,
-      descripcion,
-      marca,
-      modelo,
-      numero_serie,
-      cantidad,
-      estado,
-      fecha_alta,
-      observaciones,
-      categoria_id,
-      oficina_id,
-    });
-    await Movimiento.create({
-      tipo: "ALTA",
-      descripcion: `Se dio de alta el activo "${nuevoActivo.nombre}"`,
-      activo_id: nuevoActivo.id,
-      usuario_id: req.usuario.id,
-    });
-
-    return res.status(201).json({
-      mensaje: "Activo creado correctamente",
-      activo: nuevoActivo,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al crear el activo",
-      error: error.message,
-    });
-  }
-};
+const { Activo, Categoria, Oficina } = require("../models");
+const { registrarBitacora } = require("../utils/bitacora");
 
 const listarActivos = async (req, res) => {
   try {
     const activos = await Activo.findAll({
-      where: { activo: true },
       include: [
         { model: Categoria, attributes: ["id", "nombre"] },
         { model: Oficina, attributes: ["id", "nombre"] },
@@ -97,39 +14,80 @@ const listarActivos = async (req, res) => {
     return res.status(200).json(activos);
   } catch (error) {
     return res.status(500).json({
-      mensaje: "Error al listar los activos",
+      mensaje: "Error al listar activos",
       error: error.message,
     });
   }
 };
 
-const obtenerActivoPorId = async (req, res) => {
+const crearActivo = async (req, res) => {
   try {
-    const { id } = req.params;
+    const {
+      nombre,
+      descripcion,
+      codigo_interno,
+      categoria_id,
+      oficina_id,
+      estado,
+      activo,
+    } = req.body;
 
-    const activo = await Activo.findByPk(id, {
-      include: [
-        { model: Categoria, attributes: ["id", "nombre"] },
-        { model: Oficina, attributes: ["id", "nombre"] },
-      ],
+    if (!nombre || !categoria_id || !oficina_id) {
+      return res.status(400).json({
+        mensaje: "Nombre, categoría y oficina son obligatorios",
+      });
+    }
+
+    if (codigo_interno) {
+      const existente = await Activo.findOne({
+        where: { codigo_interno },
+      });
+
+      if (existente) {
+        return res.status(400).json({
+          mensaje: "Ya existe un activo con ese código interno",
+        });
+      }
+    }
+
+    const categoria = await Categoria.findByPk(categoria_id);
+    if (!categoria) {
+      return res.status(404).json({
+        mensaje: "Categoría no encontrada",
+      });
+    }
+
+    const oficina = await Oficina.findByPk(oficina_id);
+    if (!oficina) {
+      return res.status(404).json({
+        mensaje: "Oficina no encontrada",
+      });
+    }
+
+    const nuevoActivo = await Activo.create({
+      nombre,
+      descripcion: descripcion || null,
+      codigo_interno: codigo_interno || null,
+      categoria_id,
+      oficina_id,
+      estado: estado || "ACTIVO",
+      activo: activo !== undefined ? activo : true,
     });
 
-    if (!activo) {
-      return res.status(404).json({
-        mensaje: "Activo no encontrado",
-      });
-    }
+    await registrarBitacora({
+      usuario_id: req.usuario.id,
+      accion: "CREAR",
+      modulo: "ACTIVOS",
+      descripcion: `Creó el activo ${nuevoActivo.nombre}${nuevoActivo.codigo_interno ? ` (${nuevoActivo.codigo_interno})` : ""}`,
+    });
 
-    if (!activo.activo) {
-      return res.status(404).json({
-        mensaje: "Activo no encontrado",
-      });
-    }
-
-    return res.status(200).json(activo);
+    return res.status(201).json({
+      mensaje: "Activo creado correctamente",
+      activo: nuevoActivo,
+    });
   } catch (error) {
     return res.status(500).json({
-      mensaje: "Error al obtener el activo",
+      mensaje: "Error al crear activo",
       error: error.message,
     });
   }
@@ -138,35 +96,41 @@ const obtenerActivoPorId = async (req, res) => {
 const actualizarActivo = async (req, res) => {
   try {
     const { id } = req.params;
-    const activo = await Activo.findByPk(id);
+    const {
+      nombre,
+      descripcion,
+      codigo_interno,
+      categoria_id,
+      oficina_id,
+      estado,
+      activo,
+    } = req.body;
 
-    if (!activo) {
+    const activoDb = await Activo.findByPk(id);
+
+    if (!activoDb) {
       return res.status(404).json({
         mensaje: "Activo no encontrado",
       });
     }
 
-    const {
-      codigo_interno,
-      nombre,
-      descripcion,
-      marca,
-      modelo,
-      numero_serie,
-      cantidad,
-      estado,
-      fecha_alta,
-      activo: activoEstado,
-      observaciones,
-      categoria_id,
-      oficina_id,
-    } = req.body;
+    if (codigo_interno && codigo_interno !== activoDb.codigo_interno) {
+      const existente = await Activo.findOne({
+        where: { codigo_interno },
+      });
+
+      if (existente) {
+        return res.status(400).json({
+          mensaje: "Ya existe un activo con ese código interno",
+        });
+      }
+    }
 
     if (categoria_id) {
       const categoria = await Categoria.findByPk(categoria_id);
       if (!categoria) {
         return res.status(404).json({
-          mensaje: "La categoría indicada no existe",
+          mensaje: "Categoría no encontrada",
         });
       }
     }
@@ -175,109 +139,42 @@ const actualizarActivo = async (req, res) => {
       const oficina = await Oficina.findByPk(oficina_id);
       if (!oficina) {
         return res.status(404).json({
-          mensaje: "La oficina indicada no existe",
-        });
-      }
-    }
-    if (codigo_interno) {
-      const activoExistente = await Activo.findOne({
-        where: { codigo_interno },
-      });
-
-      if (activoExistente && activoExistente.id !== activo.id) {
-        return res.status(400).json({
-          mensaje: activoExistente.activo
-            ? "Ese código interno ya existe en un activo activo."
-            : "Ese código interno ya existe y pertenece a un activo dado de baja.",
+          mensaje: "Oficina no encontrada",
         });
       }
     }
 
-    const estadoAnterior = activo.estado;
-    const oficinaAnterior = activo.oficina_id;
-    await activo.update({
-      codigo_interno,
+    await activoDb.update({
       nombre,
       descripcion,
-      marca,
-      modelo,
-      numero_serie,
-      cantidad,
-      estado,
-      fecha_alta,
-      activo: activoEstado,
-      observaciones,
+      codigo_interno,
       categoria_id,
       oficina_id,
-    });
-    let tipoMovimiento = "ACTUALIZACION";
-    let descripcionMovimiento = `Se actualizó el activo "${activo.nombre}"`;
-
-    if (estado && estado !== estadoAnterior) {
-      tipoMovimiento = "CAMBIO_ESTADO";
-      descripcionMovimiento = `El activo "${activo.nombre}" cambió de estado de "${estadoAnterior}" a "${estado}"`;
-    }
-
-    if (oficina_id && oficina_id !== oficinaAnterior) {
-      tipoMovimiento = "TRASLADO";
-      descripcionMovimiento = `El activo "${activo.nombre}" fue trasladado de la oficina ID ${oficinaAnterior} a la oficina ID ${oficina_id}`;
-    }
-
-    await Movimiento.create({
-      tipo: tipoMovimiento,
-      descripcion: descripcionMovimiento,
-      activo_id: activo.id,
-      usuario_id: req.usuario.id,
-    });
-    return res.status(200).json({
-      mensaje: "Activo actualizado correctamente",
+      estado,
       activo,
     });
-  } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al actualizar el activo",
-      error: error.message,
-    });
-  }
-};
 
-const eliminarActivo = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const activo = await Activo.findByPk(id);
-
-    if (!activo) {
-      return res.status(404).json({
-        mensaje: "Activo no encontrado",
-      });
-    }
-    await Movimiento.create({
-      tipo: "BAJA",
-      descripcion: `Se dio de baja el activo "${activo.nombre}"`,
-      activo_id: activo.id,
+    await registrarBitacora({
       usuario_id: req.usuario.id,
-    });
-
-    await activo.update({
-      activo: false,
-      estado: "Dado de baja",
+      accion: "EDITAR",
+      modulo: "ACTIVOS",
+      descripcion: `Editó el activo ${activoDb.nombre}${activoDb.codigo_interno ? ` (${activoDb.codigo_interno})` : ""}`,
     });
 
     return res.status(200).json({
-      mensaje: "Activo dado de baja correctamente",
+      mensaje: "Activo actualizado correctamente",
+      activo: activoDb,
     });
   } catch (error) {
     return res.status(500).json({
-      mensaje: "Error al eliminar el activo",
+      mensaje: "Error al actualizar activo",
       error: error.message,
     });
   }
 };
 
 module.exports = {
-  crearActivo,
   listarActivos,
-  obtenerActivoPorId,
+  crearActivo,
   actualizarActivo,
-  eliminarActivo,
 };
