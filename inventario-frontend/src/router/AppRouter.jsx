@@ -12,6 +12,7 @@ import PedidoMensual from "../pages/PedidoMensual";
 import HistorialPedidos from "../pages/HistorialPedidos";
 import ReportePedidos from "../pages/ReportePedidos";
 import Usuarios from "../pages/Usuarios";
+import Bitacora from "../pages/Bitacora";
 
 export default function AppRouter() {
   return (
@@ -111,6 +112,14 @@ export default function AppRouter() {
           element={
             <PrivateRoute rolesPermitidos={["ADMIN"]}>
               <Usuarios />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/bitacora"
+          element={
+            <PrivateRoute rolesPermitidos={["ADMIN"]}>
+              <Bitacora />
             </PrivateRoute>
           }
         />

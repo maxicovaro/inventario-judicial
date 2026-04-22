@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const { Usuario, Role, Oficina } = require("../models");
+const { registrarBitacora } = require("../utils/bitacora");
 
 const listarUsuarios = async (req, res) => {
   try {
@@ -25,7 +26,14 @@ const crearUsuario = async (req, res) => {
     const { nombre, apellido, email, password, role_id, oficina_id, activo } =
       req.body;
 
-    if (!nombre || !apellido || !email || !password || !role_id || !oficina_id) {
+    if (
+      !nombre ||
+      !apellido ||
+      !email ||
+      !password ||
+      !role_id ||
+      !oficina_id
+    ) {
       return res.status(400).json({
         mensaje:
           "Nombre, apellido, email, contraseña, rol y oficina son obligatorios",
@@ -66,6 +74,13 @@ const crearUsuario = async (req, res) => {
       role_id,
       oficina_id,
       activo: activo !== undefined ? activo : true,
+    });
+
+    await registrarBitacora({
+      usuario_id: req.usuario.id,
+      accion: "CREAR",
+      modulo: "USUARIOS",
+      descripcion: `Creó el usuario ${usuario.nombre} ${usuario.apellido} (${usuario.email})`,
     });
 
     return res.status(201).json({
@@ -139,6 +154,13 @@ const actualizarUsuario = async (req, res) => {
 
     await usuario.update(datosActualizados);
 
+    await registrarBitacora({
+      usuario_id: req.usuario.id,
+      accion: "EDITAR",
+      modulo: "USUARIOS",
+      descripcion: `Editó el usuario ${usuario.nombre} ${usuario.apellido} (${usuario.email})`,
+    });
+
     return res.status(200).json({
       mensaje: "Usuario actualizado correctamente",
       usuario,
@@ -163,12 +185,21 @@ const cambiarEstadoUsuario = async (req, res) => {
       });
     }
 
+    const nuevoEstado = !usuario.activo;
+
     await usuario.update({
-      activo: !usuario.activo,
+      activo: nuevoEstado,
+    });
+
+    await registrarBitacora({
+      usuario_id: req.usuario.id,
+      accion: nuevoEstado ? "ACTIVAR" : "DESACTIVAR",
+      modulo: "USUARIOS",
+      descripcion: `${nuevoEstado ? "Activó" : "Desactivó"} el usuario ${usuario.nombre} ${usuario.apellido} (${usuario.email})`,
     });
 
     return res.status(200).json({
-      mensaje: `Usuario ${usuario.activo ? "activado" : "desactivado"} correctamente`,
+      mensaje: `Usuario ${nuevoEstado ? "activado" : "desactivado"} correctamente`,
       usuario,
     });
   } catch (error) {

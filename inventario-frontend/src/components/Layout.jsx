@@ -46,9 +46,11 @@ export default function Layout({ children }) {
           <Link to="/pedido-mensual">Pedido mensual</Link>
           <Link to="/historial-pedidos">Historial pedidos</Link>
           <Link to="/reportes-pedidos">Reportes pedidos</Link>
+          
 
           {/* ✅ SOLO ADMIN */}
           {esAdmin && <Link to="/usuarios">Usuarios</Link>}
+          {esAdmin && <Link to="/bitacora">Bitácora</Link>}
 
           <Link to="/notificaciones">
             Notificaciones {noLeidas > 0 ? `(${noLeidas})` : ""}
