@@ -1,20 +1,16 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
 const {
-  crearActivo,
   listarActivos,
-  obtenerActivoPorId,
+  crearActivo,
   actualizarActivo,
-  eliminarActivo,
-} = require('../controllers/activoController');
+} = require("../controllers/activoController");
 
-const { verificarToken, verificarRol } = require('../middlewares/authMiddleware');
+const { verificarToken } = require("../middlewares/authMiddleware");
 
-router.get('/', verificarToken, listarActivos);
-router.get('/:id', verificarToken, obtenerActivoPorId);
-router.post('/', verificarToken, verificarRol('ADMIN', 'RESPONSABLE'), crearActivo);
-router.put('/:id', verificarToken, verificarRol('ADMIN', 'RESPONSABLE'), actualizarActivo);
-router.delete('/:id', verificarToken, verificarRol('ADMIN'), eliminarActivo);
+router.get("/", verificarToken, listarActivos);
+router.post("/", verificarToken, crearActivo);
+router.put("/:id", verificarToken, actualizarActivo);
 
 module.exports = router;
