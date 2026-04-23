@@ -5,11 +5,10 @@ import api from "../api/axios";
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
+  const esAdmin = usuario.role === "ADMIN";
 
-  // ✅ ESTADO VA ACÁ (arriba)
   const [noLeidas, setNoLeidas] = useState(0);
 
-  // ✅ EFECTO VA ACÁ (arriba)
   useEffect(() => {
     const cargarNoLeidas = async () => {
       try {
@@ -23,13 +22,17 @@ export default function Layout({ children }) {
     cargarNoLeidas();
   }, []);
 
-  const cerrarSesion = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("usuario");
-    navigate("/");
+  const cerrarSesion = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (error) {
+      console.error("Error al registrar logout:", error);
+    } finally {
+      localStorage.removeItem("token");
+      localStorage.removeItem("usuario");
+      navigate("/");
+    }
   };
-
-  const esAdmin = usuario.role === "ADMIN";
 
   return (
     <div style={styles.wrapper}>
@@ -46,9 +49,7 @@ export default function Layout({ children }) {
           <Link to="/pedido-mensual">Pedido mensual</Link>
           <Link to="/historial-pedidos">Historial pedidos</Link>
           <Link to="/reportes-pedidos">Reportes pedidos</Link>
-          
 
-          {/* ✅ SOLO ADMIN */}
           {esAdmin && <Link to="/usuarios">Usuarios</Link>}
           {esAdmin && <Link to="/bitacora">Bitácora</Link>}
 
@@ -83,5 +84,21 @@ const styles = {
     padding: "1.5rem",
   },
   nav: { display: "flex", flexDirection: "column", gap: "1rem" },
+  userBox: {
+    marginTop: "2rem",
+    paddingTop: "1rem",
+    borderTop: "1px solid rgba(255,255,255,0.15)",
+  },
+  logoutBtn: {
+    marginTop: "0.8rem",
+    padding: "0.7rem 1rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#b91c1c",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: "bold",
+    width: "100%",
+  },
   main: { flex: 1, padding: "2rem" },
 };

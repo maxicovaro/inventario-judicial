@@ -210,9 +210,92 @@ const cambiarEstadoUsuario = async (req, res) => {
   }
 };
 
+const desbloquearUsuario = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const usuario = await Usuario.findByPk(id);
+
+    if (!usuario) {
+      return res.status(404).json({
+        mensaje: "Usuario no encontrado",
+      });
+    }
+
+    await usuario.update({
+      intentos_fallidos: 0,
+      bloqueado_hasta: null,
+    });
+
+    await registrarBitacora({
+      usuario_id: req.usuario.id,
+      accion: "DESBLOQUEAR",
+      modulo: "USUARIOS",
+      descripcion: `Desbloqueó al usuario ${usuario.nombre} ${usuario.apellido} (${usuario.email})`,
+    });
+
+    return res.status(200).json({
+      mensaje: "Usuario desbloqueado correctamente",
+      usuario,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      mensaje: "Error al desbloquear usuario",
+      error: error.message,
+    });
+  }
+};
+
+const resetearPasswordUsuario = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nuevaPassword } = req.body;
+
+    if (!nuevaPassword || nuevaPassword.trim().length < 6) {
+      return res.status(400).json({
+        mensaje: "La nueva contraseña debe tener al menos 6 caracteres",
+      });
+    }
+
+    const usuario = await Usuario.findByPk(id);
+
+    if (!usuario) {
+      return res.status(404).json({
+        mensaje: "Usuario no encontrado",
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(nuevaPassword.trim(), 10);
+
+    await usuario.update({
+      password: passwordHash,
+      intentos_fallidos: 0,
+      bloqueado_hasta: null,
+    });
+
+    await registrarBitacora({
+      usuario_id: req.usuario.id,
+      accion: "RESETEAR_PASSWORD",
+      modulo: "USUARIOS",
+      descripcion: `Reseteó la contraseña del usuario ${usuario.nombre} ${usuario.apellido} (${usuario.email})`,
+    });
+
+    return res.status(200).json({
+      mensaje: "Contraseña reseteada correctamente",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      mensaje: "Error al resetear contraseña",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   listarUsuarios,
   crearUsuario,
   actualizarUsuario,
   cambiarEstadoUsuario,
+  desbloquearUsuario,
+  resetearPasswordUsuario,
 };

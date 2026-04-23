@@ -208,6 +208,15 @@ export default function Bitacora() {
           background: "#e5e7eb",
           color: "#111827",
         };
+      case "LOGIN":
+        return { background: "#d1fae5", color: "#065f46" };
+      case "LOGIN_FALLIDO":
+      case "LOGIN_BLOQUEADO":
+        return { background: "#fee2e2", color: "#991b1b" };
+      case "LOGOUT":
+        return { background: "#e0e7ff", color: "#3730a3" };
+      case "BLOQUEO_USUARIO":
+        return { background: "#fecaca", color: "#7f1d1d" };
     }
   };
 
@@ -490,14 +499,10 @@ export default function Bitacora() {
                     ...styles.paginaBtn,
                     opacity: paginaActual === totalPaginas ? 0.5 : 1,
                     cursor:
-                      paginaActual === totalPaginas
-                        ? "not-allowed"
-                        : "pointer",
+                      paginaActual === totalPaginas ? "not-allowed" : "pointer",
                   }}
                   onClick={() =>
-                    setPaginaActual((prev) =>
-                      Math.min(prev + 1, totalPaginas),
-                    )
+                    setPaginaActual((prev) => Math.min(prev + 1, totalPaginas))
                   }
                   disabled={paginaActual === totalPaginas}
                 >

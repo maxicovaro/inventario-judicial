@@ -6,6 +6,8 @@ const {
   crearUsuario,
   actualizarUsuario,
   cambiarEstadoUsuario,
+  desbloquearUsuario,
+  resetearPasswordUsuario,
 } = require("../controllers/usuarioController");
 
 const { verificarToken, verificarRol } = require("../middlewares/authMiddleware");
@@ -17,7 +19,19 @@ router.patch(
   "/:id/estado",
   verificarToken,
   verificarRol("ADMIN"),
-  cambiarEstadoUsuario
+  cambiarEstadoUsuario,
+);
+router.patch(
+  "/:id/desbloquear",
+  verificarToken,
+  verificarRol("ADMIN"),
+  desbloquearUsuario,
+);
+router.patch(
+  "/:id/reset-password",
+  verificarToken,
+  verificarRol("ADMIN"),
+  resetearPasswordUsuario,
 );
 
 module.exports = router;

@@ -249,6 +249,65 @@ export default function Usuarios() {
     }
   };
 
+  const desbloquearUsuario = async (usuario) => {
+    const confirmar = window.confirm(
+      `¿Seguro que querés desbloquear al usuario ${usuario.nombre} ${usuario.apellido}?`,
+    );
+
+    if (!confirmar) return;
+
+    try {
+      await api.patch(`/usuarios/${usuario.id}/desbloquear`);
+      toast.success("Usuario desbloqueado correctamente");
+      await cargarDatos();
+    } catch (err) {
+      toast.error(
+        err.response?.data?.error ||
+          err.response?.data?.mensaje ||
+          "Error al desbloquear usuario",
+      );
+    }
+  };
+
+  const resetearPasswordUsuario = async (usuario) => {
+    const nuevaPassword = window.prompt(
+      `Ingresá la nueva contraseña para ${usuario.nombre} ${usuario.apellido} (mínimo 6 caracteres):`,
+    );
+
+    if (nuevaPassword === null) return;
+
+    if (!nuevaPassword || nuevaPassword.trim().length < 6) {
+      toast.error("La nueva contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+
+    try {
+      await api.patch(`/usuarios/${usuario.id}/reset-password`, {
+        nuevaPassword: nuevaPassword.trim(),
+      });
+      toast.success("Contraseña reseteada correctamente");
+      await cargarDatos();
+    } catch (err) {
+      toast.error(
+        err.response?.data?.error ||
+          err.response?.data?.mensaje ||
+          "Error al resetear contraseña",
+      );
+    }
+  };
+
+  const estaBloqueado = (usuario) => {
+    return (
+      usuario.bloqueado_hasta &&
+      new Date(usuario.bloqueado_hasta) > new Date()
+    );
+  };
+
+  const formatearBloqueo = (fecha) => {
+    if (!fecha) return "-";
+    return new Date(fecha).toLocaleString("es-AR");
+  };
+
   return (
     <Layout>
       <h1 style={styles.titulo}>Usuarios</h1>
@@ -487,16 +546,24 @@ export default function Usuarios() {
                         {usuario.apellido}
                       </p>
 
-                      <span
-                        style={{
-                          ...styles.badge,
-                          ...(usuario.activo
-                            ? styles.badgeActivo
-                            : styles.badgeInactivo),
-                        }}
-                      >
-                        {usuario.activo ? "Activo" : "Inactivo"}
-                      </span>
+                      <div style={styles.badges}>
+                        <span
+                          style={{
+                            ...styles.badge,
+                            ...(usuario.activo
+                              ? styles.badgeActivo
+                              : styles.badgeInactivo),
+                          }}
+                        >
+                          {usuario.activo ? "Activo" : "Inactivo"}
+                        </span>
+
+                        {estaBloqueado(usuario) && (
+                          <span style={{ ...styles.badge, ...styles.badgeBloqueado }}>
+                            Bloqueado
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <p>
@@ -507,6 +574,18 @@ export default function Usuarios() {
                     </p>
                     <p>
                       <strong>Oficina:</strong> {usuario.Oficina?.nombre || "-"}
+                    </p>
+
+                    <p>
+                      <strong>Intentos fallidos:</strong>{" "}
+                      {usuario.intentos_fallidos || 0}
+                    </p>
+
+                    <p>
+                      <strong>Bloqueado hasta:</strong>{" "}
+                      {estaBloqueado(usuario)
+                        ? formatearBloqueo(usuario.bloqueado_hasta)
+                        : "-"}
                     </p>
 
                     <div style={styles.actionButtons}>
@@ -524,6 +603,24 @@ export default function Usuarios() {
                         onClick={() => toggleEstadoUsuario(usuario)}
                       >
                         {usuario.activo ? "Desactivar" : "Activar"}
+                      </button>
+
+                      {estaBloqueado(usuario) && (
+                        <button
+                          type="button"
+                          style={styles.unlockButton}
+                          onClick={() => desbloquearUsuario(usuario)}
+                        >
+                          Desbloquear
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        style={styles.resetButton}
+                        onClick={() => resetearPasswordUsuario(usuario)}
+                      >
+                        Resetear clave
                       </button>
                     </div>
                   </div>
@@ -663,6 +760,11 @@ const styles = {
     margin: 0,
     fontSize: "1rem",
   },
+  badges: {
+    display: "flex",
+    gap: "0.5rem",
+    flexWrap: "wrap",
+  },
   badge: {
     padding: "0.35rem 0.7rem",
     borderRadius: "999px",
@@ -676,6 +778,10 @@ const styles = {
   badgeInactivo: {
     background: "#fee2e2",
     color: "#991b1b",
+  },
+  badgeBloqueado: {
+    background: "#fca5a5",
+    color: "#7f1d1d",
   },
   actionButtons: {
     display: "flex",
@@ -696,6 +802,22 @@ const styles = {
     border: "none",
     borderRadius: "8px",
     background: "#374151",
+    color: "#fff",
+    cursor: "pointer",
+  },
+  unlockButton: {
+    padding: "0.55rem 0.8rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#b45309",
+    color: "#fff",
+    cursor: "pointer",
+  },
+  resetButton: {
+    padding: "0.55rem 0.8rem",
+    border: "none",
+    borderRadius: "8px",
+    background: "#7c3aed",
     color: "#fff",
     cursor: "pointer",
   },
