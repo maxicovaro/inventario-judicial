@@ -42,6 +42,7 @@ app.use("/api/oficinas", require("./src/routes/oficinaRoutes"));
 app.use("/api/roles", require("./src/routes/roleRoutes"));
 app.use("/api/bitacora", require("./src/routes/bitacoraRoutes"));
 
+
 app.use((error, req, res, next) => {
   if (error) {
     return res.status(400).json({
