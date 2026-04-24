@@ -12,7 +12,7 @@ const MovimientoStock = require("./MovimientoStock");
 const PedidoInsumo = require("./PedidoInsumo");
 const PedidoInsumoDetalle = require("./PedidoInsumoDetalle");
 const Bitacora = require("./Bitacora");
-
+const StockOficina = require("./StockOficina");
 
 // Relaciones Usuario
 Role.hasMany(Usuario, { foreignKey: "role_id" });
@@ -76,6 +76,12 @@ PedidoInsumoDetalle.belongsTo(Insumo, { foreignKey: "insumo_id" });
 Usuario.hasMany(Bitacora, { foreignKey: "usuario_id" });
 Bitacora.belongsTo(Usuario, { foreignKey: "usuario_id" });
 
+Insumo.hasMany(StockOficina, { foreignKey: "insumo_id" });
+StockOficina.belongsTo(Insumo, { foreignKey: "insumo_id" });
+
+Oficina.hasMany(StockOficina, { foreignKey: "oficina_id" });
+StockOficina.belongsTo(Oficina, { foreignKey: "oficina_id" });
+
 module.exports = {
   Role,
   Oficina,
@@ -91,4 +97,5 @@ module.exports = {
   PedidoInsumo,
   PedidoInsumoDetalle,
   Bitacora,
+  StockOficina,
 };
