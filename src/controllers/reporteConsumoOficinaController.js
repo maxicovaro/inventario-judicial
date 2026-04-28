@@ -7,6 +7,8 @@ const {
   Oficina,
 } = require("../models");
 
+const { esAdminGeneral } = require("../utils/permisos");
+
 const obtenerReporteMensualOficina = async (req, res) => {
   try {
     const { oficina_id, mes, anio } = req.query;
@@ -17,7 +19,19 @@ const obtenerReporteMensualOficina = async (req, res) => {
       });
     }
 
-    const oficina = await Oficina.findByPk(oficina_id);
+    let oficinaPermitida = oficina_id;
+
+    if (!esAdminGeneral(req.usuario)) {
+      oficinaPermitida = req.usuario.oficina_id;
+
+      if (String(oficina_id) !== String(req.usuario.oficina_id)) {
+        return res.status(403).json({
+          mensaje: "No tenés permisos para consultar reportes de otra oficina",
+        });
+      }
+    }
+
+    const oficina = await Oficina.findByPk(oficinaPermitida);
 
     if (!oficina) {
       return res.status(404).json({
@@ -26,7 +40,11 @@ const obtenerReporteMensualOficina = async (req, res) => {
     }
 
     const pedido = await PedidoInsumo.findOne({
-      where: { oficina_id, mes, anio },
+      where: {
+        oficina_id: oficinaPermitida,
+        mes,
+        anio,
+      },
       include: [
         {
           model: PedidoInsumoDetalle,
@@ -36,12 +54,18 @@ const obtenerReporteMensualOficina = async (req, res) => {
     });
 
     const consumos = await ConsumoOficina.findAll({
-      where: { oficina_id, mes, anio },
+      where: {
+        oficina_id: oficinaPermitida,
+        mes,
+        anio,
+      },
       include: [{ model: Insumo }],
     });
 
     const stockActual = await StockOficina.findAll({
-      where: { oficina_id },
+      where: {
+        oficina_id: oficinaPermitida,
+      },
       include: [{ model: Insumo }],
     });
 

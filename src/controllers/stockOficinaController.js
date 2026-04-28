@@ -7,13 +7,30 @@ const {
 
 const { registrarBitacora } = require("../utils/bitacora");
 const { alertarStockBajoSiCorresponde } = require("../utils/notificaciones");
+const {
+  esAdminGeneral,
+  puedeGestionarDeposito,
+} = require("../utils/permisos");
 
 const obtenerStockPorOficina = async (req, res) => {
   try {
     const { oficina_id } = req.params;
 
+    let oficinaPermitida = oficina_id;
+
+    // Si NO es Dirección, solo puede ver su propia oficina
+    if (!esAdminGeneral(req.usuario)) {
+      oficinaPermitida = req.usuario.oficina_id;
+
+      if (String(oficina_id) !== String(req.usuario.oficina_id)) {
+        return res.status(403).json({
+          mensaje: "No tenés permisos para consultar el stock de otra oficina",
+        });
+      }
+    }
+
     const stock = await StockOficina.findAll({
-      where: { oficina_id },
+      where: { oficina_id: oficinaPermitida },
       include: [
         {
           model: Insumo,
@@ -38,6 +55,13 @@ const obtenerStockPorOficina = async (req, res) => {
 
 const asignarStockAOficina = async (req, res) => {
   try {
+    // Solo Dirección o Depósito pueden asignar stock desde depósito
+    if (!puedeGestionarDeposito(req.usuario)) {
+      return res.status(403).json({
+        mensaje: "No tenés permisos para asignar stock desde depósito",
+      });
+    }
+
     const { insumo_id, oficina_id, cantidad, motivo } = req.body;
 
     if (!insumo_id || !oficina_id || !cantidad) {
@@ -100,9 +124,7 @@ const asignarStockAOficina = async (req, res) => {
       insumo_id: insumo.id,
       tipo: "EGRESO",
       cantidad: cantidadNum,
-      motivo:
-        motivo ||
-        `Asignación manual de stock a ${oficina.nombre}`,
+      motivo: motivo || `Asignación manual de stock a ${oficina.nombre}`,
       usuario_id: req.usuario.id,
       oficina_id: oficina.id,
     });

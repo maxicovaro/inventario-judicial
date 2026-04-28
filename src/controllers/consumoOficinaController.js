@@ -7,6 +7,15 @@ const {
 } = require("../models");
 
 const { registrarBitacora } = require("../utils/bitacora");
+const { esAdminGeneral } = require("../utils/permisos");
+
+const resolverOficinaPermitida = (req, oficinaSolicitada) => {
+  if (esAdminGeneral(req.usuario)) {
+    return oficinaSolicitada;
+  }
+
+  return req.usuario.oficina_id;
+};
 
 const registrarConsumoOficina = async (req, res) => {
   try {
@@ -26,6 +35,14 @@ const registrarConsumoOficina = async (req, res) => {
       });
     }
 
+    const oficinaPermitida = resolverOficinaPermitida(req, oficina_id);
+
+    if (String(oficina_id) !== String(oficinaPermitida)) {
+      return res.status(403).json({
+        mensaje: "No tenés permisos para registrar consumo de otra oficina",
+      });
+    }
+
     const cantidadNum = Number(cantidad_consumida);
 
     if (!Number.isInteger(cantidadNum) || cantidadNum <= 0) {
@@ -34,7 +51,7 @@ const registrarConsumoOficina = async (req, res) => {
       });
     }
 
-    const oficina = await Oficina.findByPk(oficina_id);
+    const oficina = await Oficina.findByPk(oficinaPermitida);
 
     if (!oficina) {
       return res.status(404).json({
@@ -52,7 +69,7 @@ const registrarConsumoOficina = async (req, res) => {
 
     const stockOficina = await StockOficina.findOne({
       where: {
-        oficina_id,
+        oficina_id: oficinaPermitida,
         insumo_id,
       },
     });
@@ -74,7 +91,7 @@ const registrarConsumoOficina = async (req, res) => {
     });
 
     const consumo = await ConsumoOficina.create({
-      oficina_id,
+      oficina_id: oficinaPermitida,
       insumo_id,
       usuario_id: req.usuario.id,
       mes,
@@ -110,7 +127,18 @@ const listarConsumosOficina = async (req, res) => {
 
     const where = {};
 
-    if (oficina_id) where.oficina_id = oficina_id;
+    if (esAdminGeneral(req.usuario)) {
+      if (oficina_id) where.oficina_id = oficina_id;
+    } else {
+      where.oficina_id = req.usuario.oficina_id;
+
+      if (oficina_id && String(oficina_id) !== String(req.usuario.oficina_id)) {
+        return res.status(403).json({
+          mensaje: "No tenés permisos para consultar consumos de otra oficina",
+        });
+      }
+    }
+
     if (mes) where.mes = mes;
     if (anio) where.anio = anio;
 
@@ -147,7 +175,19 @@ const obtenerResumenConsumoPorOficina = async (req, res) => {
     const { oficina_id } = req.params;
     const { mes, anio } = req.query;
 
-    const where = { oficina_id };
+    let oficinaPermitida = oficina_id;
+
+    if (!esAdminGeneral(req.usuario)) {
+      oficinaPermitida = req.usuario.oficina_id;
+
+      if (String(oficina_id) !== String(req.usuario.oficina_id)) {
+        return res.status(403).json({
+          mensaje: "No tenés permisos para consultar resumen de otra oficina",
+        });
+      }
+    }
+
+    const where = { oficina_id: oficinaPermitida };
 
     if (mes) where.mes = mes;
     if (anio) where.anio = anio;

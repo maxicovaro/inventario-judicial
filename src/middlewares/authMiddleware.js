@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
 const verificarToken = (req, res, next) => {
   try {
@@ -6,32 +6,38 @@ const verificarToken = (req, res, next) => {
 
     if (!authHeader) {
       return res.status(401).json({
-        mensaje: 'Acceso denegado. Token no proporcionado',
+        mensaje: "Acceso denegado. Token no proporcionado",
       });
     }
 
-    if (!authHeader.startsWith('Bearer ')) {
+    if (!authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
-        mensaje: 'Formato de token inválido',
+        mensaje: "Formato de token inválido",
       });
     }
 
-    const token = authHeader.split(' ')[1];
+    const token = authHeader.split(" ")[1];
 
     if (!token) {
       return res.status(401).json({
-        mensaje: 'Token no válido',
+        mensaje: "Token no válido",
       });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.usuario = decoded;
+    req.usuario = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,
+      oficina_id: decoded.oficina_id,
+      oficina_nombre: decoded.oficina_nombre,
+    };
 
     next();
   } catch (error) {
     return res.status(401).json({
-      mensaje: 'Token inválido o expirado',
+      mensaje: "Token inválido o expirado",
       error: error.message,
     });
   }
@@ -41,13 +47,13 @@ const verificarRol = (...rolesPermitidos) => {
   return (req, res, next) => {
     if (!req.usuario || !req.usuario.role) {
       return res.status(403).json({
-        mensaje: 'Acceso denegado. Rol no identificado',
+        mensaje: "Acceso denegado. Rol no identificado",
       });
     }
 
     if (!rolesPermitidos.includes(req.usuario.role)) {
       return res.status(403).json({
-        mensaje: 'No tenés permisos para acceder a este recurso',
+        mensaje: "No tenés permisos para acceder a este recurso",
       });
     }
 
@@ -57,9 +63,13 @@ const verificarRol = (...rolesPermitidos) => {
 
 const permitirRoles = (...rolesPermitidos) => {
   return (req, res, next) => {
-    const rol = req.usuario?.rol;
+    if (!req.usuario || !req.usuario.role) {
+      return res.status(403).json({
+        mensaje: "Acceso denegado. Rol no identificado",
+      });
+    }
 
-    if (!rolesPermitidos.includes(rol)) {
+    if (!rolesPermitidos.includes(req.usuario.role)) {
       return res.status(403).json({
         mensaje: "No tenés permisos para esta acción",
       });
@@ -69,9 +79,8 @@ const permitirRoles = (...rolesPermitidos) => {
   };
 };
 
-module.exports = permitirRoles;
-
 module.exports = {
   verificarToken,
   verificarRol,
+  permitirRoles,
 };
