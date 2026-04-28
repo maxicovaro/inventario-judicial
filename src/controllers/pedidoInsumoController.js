@@ -5,6 +5,8 @@ const {
   Usuario,
   Oficina,
   Role,
+  MovimientoStock,
+  StockOficina,
 } = require("../models");
 
 const PDFDocument = require("pdfkit");
@@ -172,8 +174,8 @@ const actualizarProvision = async (req, res) => {
 
     const pedido = await PedidoInsumo.findByPk(req.params.id, {
       include: [
-        { model: Oficina, attributes: ["nombre"] },
-        { model: Usuario, attributes: ["nombre", "apellido", "email"] },
+        { model: Oficina, attributes: ["id", "nombre"] },
+        { model: Usuario, attributes: ["id", "nombre", "apellido", "email"] },
       ],
     });
 
@@ -219,19 +221,39 @@ const actualizarProvision = async (req, res) => {
           });
         }
 
+        // 1) Descontar del depósito central
         await insumo.update({
           stock_actual: Number(insumo.stock_actual) - diferencia,
         });
 
-        await require("../models").MovimientoStock.create({
+        // 2) Sumar al stock de la oficina solicitante
+        const [stockOficina] = await StockOficina.findOrCreate({
+          where: {
+            insumo_id: insumo.id,
+            oficina_id: pedido.oficina_id,
+          },
+          defaults: {
+            insumo_id: insumo.id,
+            oficina_id: pedido.oficina_id,
+            cantidad: 0,
+          },
+        });
+
+        await stockOficina.update({
+          cantidad: Number(stockOficina.cantidad) + diferencia,
+        });
+
+        // 3) Registrar movimiento de stock
+        await MovimientoStock.create({
           insumo_id: insumo.id,
           tipo: "EGRESO",
           cantidad: diferencia,
-          motivo: `Entrega por pedido mensual N° ${pedido.id}`,
+          motivo: `Entrega por pedido mensual N° ${pedido.id} a ${pedido.Oficina?.nombre || "oficina"}`,
           usuario_id: req.usuario.id,
           oficina_id: pedido.oficina_id,
         });
 
+        // 4) Alertar stock bajo central
         await insumo.reload();
         await alertarStockBajoSiCorresponde(insumo);
       }
@@ -256,14 +278,16 @@ const actualizarProvision = async (req, res) => {
       usuario_id: req.usuario.id,
       accion: "PROVEER",
       modulo: "PEDIDOS",
-      descripcion: `Registró provisión y entrega del pedido mensual N° ${pedido.id} de la oficina ${pedido.Oficina?.nombre || "-"}`,
+      descripcion: `Registró provisión del pedido mensual N° ${pedido.id} para ${pedido.Oficina?.nombre || "oficina"}`,
     });
 
-    return res.json({
-      mensaje: "Pedido actualizado correctamente y stock descontado",
+    return res.status(200).json({
+      mensaje:
+        "Pedido actualizado correctamente, stock central descontado y stock de oficina actualizado",
     });
   } catch (error) {
-    console.error(error);
+    console.error("ERROR actualizarProvision:", error);
+
     return res.status(500).json({
       mensaje: "Error al actualizar provisión",
       error: error.message,

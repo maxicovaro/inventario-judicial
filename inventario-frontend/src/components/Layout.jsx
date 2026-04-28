@@ -144,9 +144,11 @@ export default function Layout({ children }) {
                 <div style={styles.submenu}>
                   {renderLink("/activos", "Activos", "◫")}
                   {renderLink("/insumos", "Insumos", "◪")}
+                  {renderLink("/stock-oficina", "Stock oficina", "▤")}
                   {renderLink("/solicitudes", "Solicitudes", "◩")}
                   {renderLink("/movimientos-stock", "Movimientos stock", "↹")}
                   {renderLink("/adjuntos", "Adjuntos", "⋮")}
+                  {renderLink("/consumo-oficina", "Consumo oficina", "◍")}
                 </div>
               )}
             </div>
@@ -161,6 +163,7 @@ export default function Layout({ children }) {
                   {renderLink("/pedido-mensual", "Pedido mensual", "◻")}
                   {renderLink("/historial-pedidos", "Historial pedidos", "◷")}
                   {renderLink("/reportes-pedidos", "Reportes pedidos", "▥")}
+                  {renderLink("/reporte-consumo-oficina", "Reporte consumo oficina", "▥")}
                 </div>
               )}
             </div>

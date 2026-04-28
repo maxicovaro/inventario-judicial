@@ -13,6 +13,9 @@ import HistorialPedidos from "../pages/HistorialPedidos";
 import ReportePedidos from "../pages/ReportePedidos";
 import Usuarios from "../pages/Usuarios";
 import Bitacora from "../pages/Bitacora";
+import StockOficina from "../pages/StockOficina";
+import ConsumoOficina from "../pages/ConsumoOficina";
+import ReporteConsumoOficina from "../pages/ReporteConsumoOficina";
 
 export default function AppRouter() {
   return (
@@ -120,6 +123,30 @@ export default function AppRouter() {
           element={
             <PrivateRoute rolesPermitidos={["ADMIN"]}>
               <Bitacora />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/stock-oficina"
+          element={
+            <PrivateRoute>
+              <StockOficina />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/consumo-oficina"
+          element={
+            <PrivateRoute>
+              <ConsumoOficina />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/reporte-consumo-oficina"
+          element={
+            <PrivateRoute>
+              <ReporteConsumoOficina />
             </PrivateRoute>
           }
         />

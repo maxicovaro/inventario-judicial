@@ -19,6 +19,11 @@ const dashboardRoutes = require('./src/routes/dashboardRoutes');
 const oficinaRoutes = require('./src/routes/oficinaRoutes');
 const categoriaRoutes = require('./src/routes/categoriaRoutes');
 const notificacionRoutes = require('./src/routes/notificacionRoutes');
+const stockOficinaRoutes = require("./src/routes/stockOficinaRoutes");
+const consumoOficinaRoutes = require("./src/routes/consumoOficinaRoutes");
+const reporteConsumoOficinaRoutes = require("./src/routes/reporteConsumoOficinaRoutes");
+
+
 
 
 app.use(cors());
@@ -41,6 +46,9 @@ app.use("/api/usuarios", require("./src/routes/usuarioRoutes"));
 app.use("/api/oficinas", require("./src/routes/oficinaRoutes"));
 app.use("/api/roles", require("./src/routes/roleRoutes"));
 app.use("/api/bitacora", require("./src/routes/bitacoraRoutes"));
+app.use("/api/stock-oficina", stockOficinaRoutes);
+app.use("/api/consumo-oficina", consumoOficinaRoutes);
+app.use("/api/reportes", reporteConsumoOficinaRoutes);
 
 
 app.use((error, req, res, next) => {
