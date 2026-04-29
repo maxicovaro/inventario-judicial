@@ -9,6 +9,8 @@ const {
   StockOficina,
 } = require("../models");
 
+const { esAdminGeneral, puedeGestionarDeposito } = require("../utils/permisos");
+
 const PDFDocument = require("pdfkit");
 
 const {
@@ -139,10 +141,15 @@ const listarPedidos = async (req, res) => {
       });
     }
 
-    const nombreRol = usuario.Role?.nombre || "";
-    const esAdmin = ["ADMIN", "RESPONSABLE"].includes(nombreRol);
+    let where = {};
 
-    const where = esAdmin ? {} : { oficina_id: usuario.oficina_id };
+    if (esAdminGeneral(req.usuario)) {
+      // Dirección ve TODO
+      where = {};
+    } else {
+      // Cada oficina solo ve lo suyo
+      where = { oficina_id: usuario.oficina_id };
+    }
 
     const pedidos = await PedidoInsumo.findAll({
       where,
@@ -185,6 +192,11 @@ const actualizarProvision = async (req, res) => {
       });
     }
 
+    if (!puedeGestionarDeposito(req.usuario)) {
+      return res.status(403).json({
+        mensaje: "No tenés permisos para proveer pedidos",
+      });
+    }
     if (!detalles || !Array.isArray(detalles) || detalles.length === 0) {
       return res.status(400).json({
         mensaje: "Debés enviar el detalle de provisión",
@@ -308,6 +320,12 @@ const actualizarEstadoPedido = async (req, res) => {
       "RECHAZADO",
     ];
 
+    if (!esAdminGeneral(req.usuario)) {
+      return res.status(403).json({
+        mensaje: "Solo Dirección puede cambiar el estado de pedidos",
+      });
+    }
+
     if (!estado || !estadosValidos.includes(estado)) {
       return res.status(400).json({
         mensaje: "Estado inválido",
@@ -370,6 +388,15 @@ const exportarPedidoPDF = async (req, res) => {
     if (!pedido) {
       return res.status(404).json({
         mensaje: "Pedido no encontrado",
+      });
+    }
+
+    if (
+      !esAdminGeneral(req.usuario) &&
+      String(pedido.oficina_id) !== String(req.usuario.oficina_id)
+    ) {
+      return res.status(403).json({
+        mensaje: "No tenés permisos para exportar pedidos de otra oficina",
       });
     }
 
