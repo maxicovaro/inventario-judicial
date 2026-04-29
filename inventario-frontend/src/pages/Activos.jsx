@@ -21,7 +21,29 @@ const defaultValues = {
   oficina_id: "",
 };
 
+const normalizar = (texto = "") =>
+  texto
+    .toString()
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 export default function Activos() {
+  const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
+
+  const oficinaNombre = normalizar(usuario.oficina_nombre || "");
+
+  const esDireccion =
+    usuario.role === "ADMIN" &&
+    oficinaNombre.includes("DIRECCION") &&
+    oficinaNombre.includes("POLICIA JUDICIAL");
+
+  const valoresIniciales = {
+    ...defaultValues,
+    oficina_id: esDireccion ? "" : String(usuario.oficina_id || ""),
+  };
+
   const [activos, setActivos] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [oficinas, setOficinas] = useState([]);
@@ -39,23 +61,26 @@ export default function Activos() {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(activoSchema),
-    defaultValues,
+    defaultValues: valoresIniciales,
   });
 
   const cargarDatos = async () => {
     try {
+      setError("");
+
       const [resActivos, resCategorias, resOficinas] = await Promise.all([
         api.get("/activos"),
         api.get("/categorias"),
         api.get("/oficinas"),
       ]);
 
-      setActivos(resActivos.data);
-      setCategorias(resCategorias.data);
-      setOficinas(resOficinas.data);
+      setActivos(resActivos.data || []);
+      setCategorias(resCategorias.data || []);
+      setOficinas(resOficinas.data || []);
     } catch (err) {
       setError(err.response?.data?.mensaje || "Error al cargar activos");
     }
@@ -64,6 +89,15 @@ export default function Activos() {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  useEffect(() => {
+    if (!esDireccion) {
+      setFiltroOficina("");
+      setValue("oficina_id", String(usuario.oficina_id || ""), {
+        shouldValidate: true,
+      });
+    }
+  }, [esDireccion, usuario.oficina_id, setValue]);
 
   const getEstadoBadgeStyle = (estado) => {
     switch (estado) {
@@ -85,7 +119,13 @@ export default function Activos() {
   };
 
   const activosFiltrados = useMemo(() => {
-    return activos.filter((activo) => {
+    const activosBase = esDireccion
+      ? activos
+      : activos.filter(
+          (activo) => String(activo.oficina_id) === String(usuario.oficina_id),
+        );
+
+    return activosBase.filter((activo) => {
       const texto = busqueda.toLowerCase();
 
       const coincideBusqueda =
@@ -96,12 +136,22 @@ export default function Activos() {
         activo.numero_serie?.toLowerCase().includes(texto);
 
       const coincideEstado = !filtroEstado || activo.estado === filtroEstado;
+
       const coincideOficina =
-        !filtroOficina || String(activo.oficina_id) === filtroOficina;
+        !esDireccion ||
+        !filtroOficina ||
+        String(activo.oficina_id) === String(filtroOficina);
 
       return coincideBusqueda && coincideEstado && coincideOficina;
     });
-  }, [activos, busqueda, filtroEstado, filtroOficina]);
+  }, [
+    activos,
+    busqueda,
+    filtroEstado,
+    filtroOficina,
+    esDireccion,
+    usuario.oficina_id,
+  ]);
 
   const onSubmit = async (data) => {
     setError("");
@@ -109,10 +159,22 @@ export default function Activos() {
     setGuardando(true);
 
     try {
+      if (!esDireccion && !usuario.oficina_id) {
+        setError("Tu usuario no tiene una oficina asignada");
+        return;
+      }
+
       const payload = {
         ...data,
+        oficina_id: esDireccion ? data.oficina_id : usuario.oficina_id,
+        cantidad: Number(data.cantidad || 1),
         fecha_alta: data.fecha_alta || null,
       };
+
+      if (!esDireccion && payload.estado === "Dado de baja") {
+        setError("Solo Dirección puede dar de baja activos");
+        return;
+      }
 
       if (editandoId) {
         await api.put(`/activos/${editandoId}`, payload);
@@ -122,7 +184,11 @@ export default function Activos() {
         setMensaje("Activo creado correctamente");
       }
 
-      reset(defaultValues);
+      reset({
+        ...defaultValues,
+        oficina_id: esDireccion ? "" : String(usuario.oficina_id || ""),
+      });
+
       setEditandoId(null);
       await cargarDatos();
     } catch (err) {
@@ -134,7 +200,7 @@ export default function Activos() {
         setError(
           err.response?.data?.error ||
             err.response?.data?.mensaje ||
-            "Error al guardar el activo"
+            "Error al guardar el activo",
         );
       }
     } finally {
@@ -143,8 +209,13 @@ export default function Activos() {
   };
 
   const darDeBaja = async (id) => {
+    if (!esDireccion) {
+      setError("Solo Dirección puede dar de baja activos");
+      return;
+    }
+
     const confirmar = window.confirm(
-      "¿Seguro que querés dar de baja este activo?"
+      "¿Seguro que querés dar de baja este activo?",
     );
 
     if (!confirmar) return;
@@ -165,6 +236,14 @@ export default function Activos() {
     setError("");
     setMensaje("");
 
+    const perteneceAMiOficina =
+      String(activo.oficina_id) === String(usuario.oficina_id);
+
+    if (!esDireccion && !perteneceAMiOficina) {
+      setError("No podés editar activos de otra oficina");
+      return;
+    }
+
     reset({
       codigo_interno: activo.codigo_interno || "",
       nombre: activo.nombre || "",
@@ -177,14 +256,20 @@ export default function Activos() {
       fecha_alta: activo.fecha_alta || "",
       observaciones: activo.observaciones || "",
       categoria_id: activo.categoria_id || "",
-      oficina_id: activo.oficina_id || "",
+      oficina_id: esDireccion
+        ? String(activo.oficina_id || "")
+        : String(usuario.oficina_id || ""),
     });
 
     setEditandoId(activo.id);
   };
 
   const cancelarEdicion = () => {
-    reset(defaultValues);
+    reset({
+      ...defaultValues,
+      oficina_id: esDireccion ? "" : String(usuario.oficina_id || ""),
+    });
+
     setEditandoId(null);
     setError("");
     setMensaje("");
@@ -275,7 +360,9 @@ export default function Activos() {
                 <option value="Regular estado">Regular estado</option>
                 <option value="Mal estado">Mal estado</option>
                 <option value="Sin funcionar">Sin funcionar</option>
-                <option value="Dado de baja">Dado de baja</option>
+                {esDireccion && (
+                  <option value="Dado de baja">Dado de baja</option>
+                )}
               </select>
               {errors.estado && (
                 <p style={styles.errorText}>{errors.estado.message}</p>
@@ -297,7 +384,7 @@ export default function Activos() {
               <select {...register("categoria_id")} style={styles.input}>
                 <option value="">Seleccionar categoría</option>
                 {categorias.map((categoria) => (
-                  <option key={categoria.id} value={categoria.id}>
+                  <option key={categoria.id} value={String(categoria.id)}>
                     {categoria.nombre}
                   </option>
                 ))}
@@ -308,14 +395,27 @@ export default function Activos() {
             </div>
 
             <div>
-              <select {...register("oficina_id")} style={styles.input}>
-                <option value="">Seleccionar oficina</option>
-                {oficinas.map((oficina) => (
-                  <option key={oficina.id} value={oficina.id}>
-                    {oficina.nombre}
-                  </option>
-                ))}
-              </select>
+              {esDireccion ? (
+                <select {...register("oficina_id")} style={styles.input}>
+                  <option value="">Seleccionar oficina</option>
+                  {oficinas.map((oficina) => (
+                    <option key={oficina.id} value={String(oficina.id)}>
+                      {oficina.nombre}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <>
+                  <input
+                    value={usuario.oficina_nombre || "Mi oficina"}
+                    style={styles.input}
+                    disabled
+                    readOnly
+                  />
+                  <input type="hidden" {...register("oficina_id")} />
+                </>
+              )}
+
               {errors.oficina_id && (
                 <p style={styles.errorText}>{errors.oficina_id.message}</p>
               )}
@@ -391,115 +491,137 @@ export default function Activos() {
               <option value="Regular estado">Regular estado</option>
               <option value="Mal estado">Mal estado</option>
               <option value="Sin funcionar">Sin funcionar</option>
+              <option value="Dado de baja">Dado de baja</option>
             </select>
 
-            <select
-              value={filtroOficina}
-              onChange={(e) => setFiltroOficina(e.target.value)}
-              style={styles.input}
-            >
-              <option value="">Todas las oficinas</option>
-              {oficinas.map((oficina) => (
-                <option key={oficina.id} value={String(oficina.id)}>
-                  {oficina.nombre}
-                </option>
-              ))}
-            </select>
+            {esDireccion && (
+              <select
+                value={filtroOficina}
+                onChange={(e) => setFiltroOficina(e.target.value)}
+                style={styles.input}
+              >
+                <option value="">Todas las oficinas</option>
+                {oficinas.map((oficina) => (
+                  <option key={oficina.id} value={String(oficina.id)}>
+                    {oficina.nombre}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {activosFiltrados.length === 0 ? (
             <p>No hay activos que coincidan con la búsqueda.</p>
           ) : (
             <div style={styles.listado}>
-              {activosFiltrados.map((activo) => (
-                <div key={activo.id} style={styles.item}>
-                  <div style={styles.headerRow}>
-                    <p style={styles.itemTitle}>
-                      <strong>#{activo.id}</strong> — {activo.nombre}
-                    </p>
+              {activosFiltrados.map((activo) => {
+                const perteneceAMiOficina =
+                  String(activo.oficina_id) === String(usuario.oficina_id);
 
-                    <span
-                      style={{
-                        ...styles.badge,
-                        ...getEstadoBadgeStyle(activo.estado),
-                      }}
-                    >
-                      {activo.estado}
-                    </span>
-                  </div>
+                const puedeInteractuar = esDireccion || perteneceAMiOficina;
 
-                  <p>
-                    <strong>Código:</strong> {activo.codigo_interno || "-"}
-                  </p>
-                  <p>
-                    <strong>Marca:</strong> {activo.marca || "-"}
-                  </p>
-                  <p>
-                    <strong>Modelo:</strong> {activo.modelo || "-"}
-                  </p>
-                  <p>
-                    <strong>N° Serie:</strong> {activo.numero_serie || "-"}
-                  </p>
-                  <p>
-                    <strong>Categoría:</strong>{" "}
-                    {activo.Categoria?.nombre || "-"}
-                  </p>
-                  <p>
-                    <strong>Oficina:</strong> {activo.Oficina?.nombre || "-"}
-                  </p>
-                  <p>
-                    <strong>Cantidad:</strong> {activo.cantidad}
-                  </p>
+                return (
+                  <div key={activo.id} style={styles.item}>
+                    <div style={styles.headerRow}>
+                      <p style={styles.itemTitle}>
+                        <strong>#{activo.id}</strong> — {activo.nombre}
+                      </p>
 
-                  {activo.descripcion && (
+                      <span
+                        style={{
+                          ...styles.badge,
+                          ...getEstadoBadgeStyle(activo.estado),
+                        }}
+                      >
+                        {activo.estado}
+                      </span>
+                    </div>
+
                     <p>
-                      <strong>Descripción:</strong> {activo.descripcion}
+                      <strong>Código:</strong> {activo.codigo_interno || "-"}
                     </p>
-                  )}
 
-                  {activo.observaciones && (
-                    <p style={styles.infoBox}>
-                      <strong>Observaciones:</strong> {activo.observaciones}
+                    <p>
+                      <strong>Marca:</strong> {activo.marca || "-"}
                     </p>
-                  )}
 
-                  <div style={styles.actionButtons}>
-                    <button
-                      type="button"
-                      style={styles.editButton}
-                      onClick={() => editarActivo(activo)}
-                    >
-                      Editar
-                    </button>
+                    <p>
+                      <strong>Modelo:</strong> {activo.modelo || "-"}
+                    </p>
 
-                    <button
-                      type="button"
-                      style={styles.secondaryButton}
-                      onClick={() =>
-                        setActivoAdjuntosAbierto(
-                          activoAdjuntosAbierto === activo.id ? null : activo.id
-                        )
-                      }
-                    >
-                      {activoAdjuntosAbierto === activo.id
-                        ? "Ocultar adjuntos"
-                        : "Adjuntos"}
-                    </button>
+                    <p>
+                      <strong>N° Serie:</strong> {activo.numero_serie || "-"}
+                    </p>
 
-                    <button
-                      type="button"
-                      style={styles.deleteButton}
-                      onClick={() => darDeBaja(activo.id)}
-                    >
-                      Dar de baja
-                    </button>
+                    <p>
+                      <strong>Categoría:</strong>{" "}
+                      {activo.Categoria?.nombre || "-"}
+                    </p>
+
+                    <p>
+                      <strong>Oficina:</strong> {activo.Oficina?.nombre || "-"}
+                    </p>
+
+                    <p>
+                      <strong>Cantidad:</strong> {activo.cantidad}
+                    </p>
+
+                    {activo.descripcion && (
+                      <p>
+                        <strong>Descripción:</strong> {activo.descripcion}
+                      </p>
+                    )}
+
+                    {activo.observaciones && (
+                      <p style={styles.infoBox}>
+                        <strong>Observaciones:</strong> {activo.observaciones}
+                      </p>
+                    )}
+
+                    {puedeInteractuar && (
+                      <div style={styles.actionButtons}>
+                        <button
+                          type="button"
+                          style={styles.editButton}
+                          onClick={() => editarActivo(activo)}
+                        >
+                          Editar
+                        </button>
+
+                        <button
+                          type="button"
+                          style={styles.secondaryButton}
+                          onClick={() =>
+                            setActivoAdjuntosAbierto(
+                              activoAdjuntosAbierto === activo.id
+                                ? null
+                                : activo.id,
+                            )
+                          }
+                        >
+                          {activoAdjuntosAbierto === activo.id
+                            ? "Ocultar adjuntos"
+                            : "Adjuntos"}
+                        </button>
+
+                        {esDireccion && (
+                          <button
+                            type="button"
+                            style={styles.deleteButton}
+                            onClick={() => darDeBaja(activo.id)}
+                          >
+                            Dar de baja
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {activoAdjuntosAbierto === activo.id && puedeInteractuar && (
+                      <AdjuntosPanel activoId={activo.id} />
+                    )}
                   </div>
-
-                  {activoAdjuntosAbierto === activo.id && (
-                    <AdjuntosPanel activoId={activo.id} />
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -510,12 +632,15 @@ export default function Activos() {
 
 const styles = {
   titulo: { marginTop: 0, marginBottom: "1rem" },
+
   subtitulo: { marginTop: 0 },
+
   grid: {
     display: "grid",
     gridTemplateColumns: "1fr 1.4fr",
     gap: "1rem",
   },
+
   card: {
     background: "#fff",
     borderRadius: "14px",
@@ -525,15 +650,18 @@ const styles = {
     maxHeight: "80vh",
     overflowY: "auto",
   },
+
   form: {
     display: "grid",
     gap: "0.8rem",
   },
+
   filters: {
     display: "grid",
     gap: "0.8rem",
     marginBottom: "1rem",
   },
+
   input: {
     padding: "0.8rem",
     border: "1px solid #ccc",
@@ -541,6 +669,7 @@ const styles = {
     width: "100%",
     boxSizing: "border-box",
   },
+
   textarea: {
     padding: "0.8rem",
     border: "1px solid #ccc",
@@ -550,6 +679,7 @@ const styles = {
     width: "100%",
     boxSizing: "border-box",
   },
+
   button: {
     padding: "0.9rem",
     border: "none",
@@ -560,11 +690,13 @@ const styles = {
     fontWeight: "bold",
     marginTop: "0.5rem",
   },
+
   buttonGroup: {
     display: "flex",
     gap: "0.7rem",
     marginTop: "0.5rem",
   },
+
   cancelButton: {
     padding: "0.9rem",
     border: "none",
@@ -574,15 +706,18 @@ const styles = {
     cursor: "pointer",
     fontWeight: "bold",
   },
+
   listado: {
     display: "grid",
     gap: "1rem",
   },
+
   item: {
     border: "1px solid #e5e7eb",
     borderRadius: "12px",
     padding: "1rem",
   },
+
   headerRow: {
     display: "flex",
     justifyContent: "space-between",
@@ -591,28 +726,33 @@ const styles = {
     marginBottom: "0.8rem",
     flexWrap: "wrap",
   },
+
   itemTitle: {
     margin: 0,
     fontSize: "1rem",
   },
+
   badge: {
     padding: "0.35rem 0.7rem",
     borderRadius: "999px",
     fontSize: "0.8rem",
     fontWeight: "bold",
   },
+
   infoBox: {
     background: "#f9fafb",
     border: "1px solid #e5e7eb",
     borderRadius: "10px",
     padding: "0.8rem",
   },
+
   actionButtons: {
     display: "flex",
     gap: "0.5rem",
     flexWrap: "wrap",
     marginTop: "1rem",
   },
+
   editButton: {
     padding: "0.55rem 0.8rem",
     border: "none",
@@ -621,6 +761,7 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
   },
+
   deleteButton: {
     padding: "0.55rem 0.8rem",
     border: "none",
@@ -629,6 +770,7 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
   },
+
   secondaryButton: {
     padding: "0.55rem 0.8rem",
     border: "none",
@@ -637,14 +779,17 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
   },
+
   ok: {
     color: "green",
     margin: 0,
   },
+
   error: {
     color: "crimson",
     margin: 0,
   },
+
   errorText: {
     color: "crimson",
     marginTop: "0.35rem",

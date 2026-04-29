@@ -4,18 +4,48 @@ const {
   Oficina,
   Insumo,
 } = require("../models");
+
 const { Sequelize, Op } = require("sequelize");
 const PDFDocument = require("pdfkit");
+const { esAdminGeneral } = require("../utils/permisos");
+
+const obtenerWherePedido = (req) => {
+  if (esAdminGeneral(req.usuario)) {
+    return {};
+  }
+
+  return {
+    oficina_id: req.usuario.oficina_id,
+  };
+};
+
+const obtenerIdsPedidosPermitidos = async (wherePedido) => {
+  const pedidos = await PedidoInsumo.findAll({
+    attributes: ["id"],
+    where: wherePedido,
+    raw: true,
+  });
+
+  const ids = pedidos.map((pedido) => pedido.id);
+
+  return ids.length > 0 ? ids : [-1];
+};
 
 const resumenPedidos = async (req, res) => {
   try {
-    const totalPedidos = await PedidoInsumo.count();
+    const wherePedido = obtenerWherePedido(req);
+    const pedidosPermitidosIds = await obtenerIdsPedidosPermitidos(wherePedido);
+
+    const totalPedidos = await PedidoInsumo.count({
+      where: wherePedido,
+    });
 
     const porEstadoRaw = await PedidoInsumo.findAll({
       attributes: [
         "estado",
         [Sequelize.fn("COUNT", Sequelize.col("id")), "total"],
       ],
+      where: wherePedido,
       group: ["estado"],
       raw: true,
     });
@@ -25,6 +55,7 @@ const resumenPedidos = async (req, res) => {
         "oficina_id",
         [Sequelize.fn("COUNT", Sequelize.col("PedidoInsumo.id")), "total"],
       ],
+      where: wherePedido,
       include: [
         {
           model: Oficina,
@@ -41,7 +72,7 @@ const resumenPedidos = async (req, res) => {
         [
           Sequelize.fn(
             "SUM",
-            Sequelize.col("PedidoInsumoDetalle.cantidad_solicitada")
+            Sequelize.col("PedidoInsumoDetalle.cantidad_solicitada"),
           ),
           "total_solicitado",
         ],
@@ -53,7 +84,12 @@ const resumenPedidos = async (req, res) => {
         },
       ],
       where: {
-        insumo_id: { [Op.ne]: null },
+        pedido_id: {
+          [Op.in]: pedidosPermitidosIds,
+        },
+        insumo_id: {
+          [Op.ne]: null,
+        },
       },
       group: ["insumo_id", "Insumo.id", "Insumo.nombre"],
       order: [[Sequelize.literal("total_solicitado"), "DESC"]],
@@ -76,8 +112,13 @@ const resumenPedidos = async (req, res) => {
         },
       ],
       where: {
+        pedido_id: {
+          [Op.in]: pedidosPermitidosIds,
+        },
         tuvo_problema: true,
-        insumo_id: { [Op.ne]: null },
+        insumo_id: {
+          [Op.ne]: null,
+        },
       },
       group: ["insumo_id", "Insumo.id", "Insumo.nombre"],
       order: [[Sequelize.literal("total_problemas"), "DESC"]],
@@ -87,20 +128,24 @@ const resumenPedidos = async (req, res) => {
 
     return res.status(200).json({
       totalPedidos,
+
       porEstado: porEstadoRaw.map((item) => ({
         estado: item.estado,
         total: Number(item.total),
       })),
+
       pedidosPorOficina: pedidosPorOficinaRaw.map((item) => ({
         oficina_id: item.oficina_id,
         oficina: item["Oficina.nombre"],
         total: Number(item.total),
       })),
+
       insumosMasSolicitados: insumosMasSolicitadosRaw.map((item) => ({
         insumo_id: item.insumo_id,
         nombre: item["Insumo.nombre"],
         total_solicitado: Number(item.total_solicitado),
       })),
+
       insumosConProblemas: insumosConProblemasRaw.map((item) => ({
         insumo_id: item.insumo_id,
         nombre: item["Insumo.nombre"],
@@ -108,6 +153,8 @@ const resumenPedidos = async (req, res) => {
       })),
     });
   } catch (error) {
+    console.error("ERROR resumenPedidos:", error);
+
     return res.status(500).json({
       mensaje: "Error al generar reporte de pedidos",
       error: error.message,
@@ -117,13 +164,19 @@ const resumenPedidos = async (req, res) => {
 
 const exportarResumenPedidosPDF = async (req, res) => {
   try {
-    const totalPedidos = await PedidoInsumo.count();
+    const wherePedido = obtenerWherePedido(req);
+    const pedidosPermitidosIds = await obtenerIdsPedidosPermitidos(wherePedido);
+
+    const totalPedidos = await PedidoInsumo.count({
+      where: wherePedido,
+    });
 
     const porEstadoRaw = await PedidoInsumo.findAll({
       attributes: [
         "estado",
         [Sequelize.fn("COUNT", Sequelize.col("id")), "total"],
       ],
+      where: wherePedido,
       group: ["estado"],
       raw: true,
     });
@@ -133,6 +186,7 @@ const exportarResumenPedidosPDF = async (req, res) => {
         "oficina_id",
         [Sequelize.fn("COUNT", Sequelize.col("PedidoInsumo.id")), "total"],
       ],
+      where: wherePedido,
       include: [
         {
           model: Oficina,
@@ -149,7 +203,7 @@ const exportarResumenPedidosPDF = async (req, res) => {
         [
           Sequelize.fn(
             "SUM",
-            Sequelize.col("PedidoInsumoDetalle.cantidad_solicitada")
+            Sequelize.col("PedidoInsumoDetalle.cantidad_solicitada"),
           ),
           "total_solicitado",
         ],
@@ -161,7 +215,12 @@ const exportarResumenPedidosPDF = async (req, res) => {
         },
       ],
       where: {
-        insumo_id: { [Op.ne]: null },
+        pedido_id: {
+          [Op.in]: pedidosPermitidosIds,
+        },
+        insumo_id: {
+          [Op.ne]: null,
+        },
       },
       group: ["insumo_id", "Insumo.id", "Insumo.nombre"],
       order: [[Sequelize.literal("total_solicitado"), "DESC"]],
@@ -184,14 +243,39 @@ const exportarResumenPedidosPDF = async (req, res) => {
         },
       ],
       where: {
+        pedido_id: {
+          [Op.in]: pedidosPermitidosIds,
+        },
         tuvo_problema: true,
-        insumo_id: { [Op.ne]: null },
+        insumo_id: {
+          [Op.ne]: null,
+        },
       },
       group: ["insumo_id", "Insumo.id", "Insumo.nombre"],
       order: [[Sequelize.literal("total_problemas"), "DESC"]],
       limit: 10,
       raw: true,
     });
+
+    const porEstado = porEstadoRaw.map((item) => ({
+      estado: item.estado,
+      total: Number(item.total),
+    }));
+
+    const pedidosPorOficina = pedidosPorOficinaRaw.map((item) => ({
+      oficina: item["Oficina.nombre"],
+      total: Number(item.total),
+    }));
+
+    const insumosMasSolicitados = insumosMasSolicitadosRaw.map((item) => ({
+      nombre: item["Insumo.nombre"],
+      total_solicitado: Number(item.total_solicitado),
+    }));
+
+    const insumosConProblemas = insumosConProblemasRaw.map((item) => ({
+      nombre: item["Insumo.nombre"],
+      total_problemas: Number(item.total_problemas),
+    }));
 
     const doc = new PDFDocument({
       margin: 50,
@@ -203,7 +287,7 @@ const exportarResumenPedidosPDF = async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="reporte_general_pedidos.pdf"`
+      'attachment; filename="reporte_general_pedidos.pdf"',
     );
 
     doc.pipe(res);
@@ -221,6 +305,7 @@ const exportarResumenPedidosPDF = async (req, res) => {
       });
 
     doc.moveDown(0.6);
+
     doc.fontSize(10).text(`Fecha de emisión: ${fechaActual}`, {
       align: "right",
     });
@@ -259,47 +344,31 @@ const exportarResumenPedidosPDF = async (req, res) => {
       doc.moveDown(1);
     };
 
-    renderSection(
-      "Pedidos por estado",
-      porEstadoRaw.map((item) => ({
-        estado: item.estado,
-        total: Number(item.total),
-      })),
-      "estado",
-      "total"
-    );
+    renderSection("Pedidos por estado", porEstado, "estado", "total");
 
     renderSection(
       "Pedidos por oficina",
-      pedidosPorOficinaRaw.map((item) => ({
-        oficina: item["Oficina.nombre"],
-        total: Number(item.total),
-      })),
+      pedidosPorOficina,
       "oficina",
-      "total"
+      "total",
     );
 
     renderSection(
       "Insumos más solicitados",
-      insumosMasSolicitadosRaw.map((item) => ({
-        nombre: item["Insumo.nombre"],
-        total_solicitado: Number(item.total_solicitado),
-      })),
+      insumosMasSolicitados,
       "nombre",
-      "total_solicitado"
+      "total_solicitado",
     );
 
     renderSection(
       "Insumos con más problemas reportados",
-      insumosConProblemasRaw.map((item) => ({
-        nombre: item["Insumo.nombre"],
-        total_problemas: Number(item.total_problemas),
-      })),
+      insumosConProblemas,
       "nombre",
-      "total_problemas"
+      "total_problemas",
     );
 
     doc.moveDown(1.5);
+
     doc.fontSize(8).fillColor("gray").text(
       "Documento generado por el sistema de inventario y pedidos mensuales.",
       50,
@@ -307,11 +376,13 @@ const exportarResumenPedidosPDF = async (req, res) => {
       {
         align: "center",
         width: 495,
-      }
+      },
     );
 
     doc.end();
   } catch (error) {
+    console.error("ERROR exportarResumenPedidosPDF:", error);
+
     return res.status(500).json({
       mensaje: "Error al exportar reporte general a PDF",
       error: error.message,

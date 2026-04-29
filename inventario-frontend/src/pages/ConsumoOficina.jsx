@@ -20,18 +20,23 @@ const meses = [
 
 const fechaActual = new Date();
 
-const formInicial = {
-  oficina_id: "",
-  insumo_id: "",
-  mes: fechaActual.getMonth() + 1,
-  anio: fechaActual.getFullYear(),
-  cantidad_consumida: "",
-  observaciones: "",
-};
+const normalizar = (texto = "") =>
+  texto
+    .toString()
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 
 export default function ConsumoOficina() {
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-  const esAdmin = usuario.role === "ADMIN";
+
+  const oficinaNombre = normalizar(usuario.oficina_nombre || "");
+
+  const esDireccion =
+    usuario.role === "ADMIN" &&
+    oficinaNombre.includes("DIRECCION") &&
+    oficinaNombre.includes("POLICIA JUDICIAL");
 
   const [oficinas, setOficinas] = useState([]);
   const [stock, setStock] = useState([]);
@@ -46,15 +51,20 @@ export default function ConsumoOficina() {
   });
 
   const [form, setForm] = useState({
-    ...formInicial,
     oficina_id: usuario.oficina_id || "",
+    insumo_id: "",
+    mes: fechaActual.getMonth() + 1,
+    anio: fechaActual.getFullYear(),
+    cantidad_consumida: "",
+    observaciones: "",
   });
 
   const cargarOficinas = async () => {
     try {
       const res = await api.get("/oficinas");
       setOficinas(res.data || []);
-    } catch {
+    } catch (error) {
+      console.error(error);
       toast.error("Error al cargar oficinas");
     }
   };
@@ -65,27 +75,29 @@ export default function ConsumoOficina() {
     try {
       const res = await api.get(`/stock-oficina/${oficinaId}`);
       setStock(res.data || []);
-    } catch {
+    } catch (error) {
+      console.error(error);
       toast.error("Error al cargar stock de oficina");
     }
   };
 
-  const cargarConsumos = async () => {
-    if (!filtros.oficina_id) return;
+  const cargarConsumos = async (filtrosActuales = filtros) => {
+    if (!filtrosActuales.oficina_id) return;
 
     setCargando(true);
 
     try {
       const res = await api.get("/consumo-oficina", {
         params: {
-          oficina_id: filtros.oficina_id,
-          mes: filtros.mes,
-          anio: filtros.anio,
+          oficina_id: filtrosActuales.oficina_id,
+          mes: filtrosActuales.mes,
+          anio: filtrosActuales.anio,
         },
       });
 
       setConsumos(res.data || []);
-    } catch {
+    } catch (error) {
+      console.error(error);
       toast.error("Error al cargar consumos");
     } finally {
       setCargando(false);
@@ -97,7 +109,7 @@ export default function ConsumoOficina() {
 
     if (filtros.oficina_id) {
       cargarStock(filtros.oficina_id);
-      cargarConsumos();
+      cargarConsumos(filtros);
     }
   }, []);
 
@@ -114,7 +126,7 @@ export default function ConsumoOficina() {
 
     if (filtros.oficina_id) {
       cargarStock(filtros.oficina_id);
-      cargarConsumos();
+      cargarConsumos(filtros);
     }
   }, [filtros.oficina_id, filtros.mes, filtros.anio]);
 
@@ -203,8 +215,10 @@ export default function ConsumoOficina() {
       }));
 
       await cargarStock(form.oficina_id);
-      await cargarConsumos();
+      await cargarConsumos(filtros);
     } catch (err) {
+      console.error(err);
+
       toast.error(
         err.response?.data?.mensaje ||
           err.response?.data?.error ||
@@ -230,7 +244,7 @@ export default function ConsumoOficina() {
         <h2 style={styles.cardTitle}>Filtros</h2>
 
         <div style={styles.filters}>
-          {esAdmin && (
+          {esDireccion ? (
             <select
               name="oficina_id"
               value={filtros.oficina_id}
@@ -244,6 +258,13 @@ export default function ConsumoOficina() {
                 </option>
               ))}
             </select>
+          ) : (
+            <input
+              value={usuario.oficina_nombre || "Mi oficina"}
+              style={styles.input}
+              disabled
+              readOnly
+            />
           )}
 
           <select
@@ -300,9 +321,11 @@ export default function ConsumoOficina() {
             disabled={!filtros.oficina_id}
           >
             <option value="">Seleccionar insumo disponible</option>
+
             {stockDisponible.map((item) => (
               <option key={item.id} value={item.insumo_id}>
-                {item.Insumo?.nombre} — Disponible: {item.cantidad}
+                {item.Insumo?.nombre || "Insumo sin nombre"} — Disponible:{" "}
+                {item.cantidad}
               </option>
             ))}
           </select>
@@ -370,16 +393,27 @@ export default function ConsumoOficina() {
                     <td style={styles.td}>
                       <strong>{item.Insumo?.nombre || "-"}</strong>
                     </td>
-                    <td style={styles.td}>{item.Insumo?.categoria || "-"}</td>
+
+                    <td style={styles.td}>
+                      {item.Insumo?.categoria ||
+                        item.Insumo?.Categoria?.nombre ||
+                        "-"}
+                    </td>
+
                     <td style={styles.td}>
                       {item.mes}/{item.anio}
                     </td>
-                    <td style={styles.tdRight}>{item.cantidad_consumida}</td>
+
+                    <td style={styles.tdRight}>
+                      {item.cantidad_consumida}
+                    </td>
+
                     <td style={styles.td}>
                       {item.Usuario
                         ? `${item.Usuario.nombre} ${item.Usuario.apellido}`
                         : "-"}
                     </td>
+
                     <td style={styles.td}>{item.observaciones || "-"}</td>
                   </tr>
                 ))}
@@ -393,7 +427,10 @@ export default function ConsumoOficina() {
 }
 
 const styles = {
-  pageHeader: { marginBottom: 24 },
+  pageHeader: {
+    marginBottom: 24,
+  },
+
   titulo: {
     margin: 0,
     fontSize: 34,
@@ -401,12 +438,14 @@ const styles = {
     color: "#1f2937",
     letterSpacing: "-0.03em",
   },
+
   subtitulo: {
     margin: "6px 0 0 0",
     fontSize: 15,
     color: "#6b7280",
     fontWeight: 500,
   },
+
   card: {
     background: "#fff",
     border: "1px solid #dde3ea",
@@ -415,24 +454,28 @@ const styles = {
     boxShadow: "0 2px 8px rgba(31,41,55,0.04)",
     marginBottom: 20,
   },
+
   cardTitle: {
     margin: "0 0 16px 0",
     fontSize: 20,
     fontWeight: 700,
     color: "#1f2937",
   },
+
   filters: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: 14,
     marginBottom: 18,
   },
+
   formGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: 14,
     alignItems: "center",
   },
+
   input: {
     width: "100%",
     padding: "12px 14px",
@@ -442,7 +485,9 @@ const styles = {
     color: "#1f2937",
     fontSize: 14,
     outline: "none",
+    boxSizing: "border-box",
   },
+
   primaryButton: {
     padding: "12px 16px",
     border: "none",
@@ -453,17 +498,20 @@ const styles = {
     fontWeight: 700,
     cursor: "pointer",
   },
+
   summaryGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
     gap: 14,
   },
+
   summaryCard: {
     background: "#f8fafc",
     border: "1px solid #e2e8f0",
     borderRadius: 14,
     padding: 16,
   },
+
   summaryLabel: {
     display: "block",
     fontSize: 13,
@@ -471,21 +519,25 @@ const styles = {
     fontWeight: 600,
     marginBottom: 6,
   },
+
   summaryValue: {
     fontSize: 18,
     color: "#1f2937",
     fontWeight: 700,
   },
+
   tableWrapper: {
     overflowX: "auto",
     border: "1px solid #e2e8f0",
     borderRadius: 14,
   },
+
   table: {
     width: "100%",
     borderCollapse: "collapse",
     fontSize: 14,
   },
+
   th: {
     textAlign: "left",
     padding: "14px 16px",
@@ -494,6 +546,7 @@ const styles = {
     fontWeight: 700,
     borderBottom: "1px solid #e2e8f0",
   },
+
   thRight: {
     textAlign: "right",
     padding: "14px 16px",
@@ -502,14 +555,23 @@ const styles = {
     fontWeight: 700,
     borderBottom: "1px solid #e2e8f0",
   },
-  tr: { borderBottom: "1px solid #edf2f7" },
-  td: { padding: "14px 16px", color: "#334155" },
+
+  tr: {
+    borderBottom: "1px solid #edf2f7",
+  },
+
+  td: {
+    padding: "14px 16px",
+    color: "#334155",
+  },
+
   tdRight: {
     padding: "14px 16px",
     color: "#334155",
     textAlign: "right",
     fontWeight: 700,
   },
+
   emptyBox: {
     border: "1px dashed #cbd5e1",
     borderRadius: 14,

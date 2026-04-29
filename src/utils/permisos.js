@@ -6,51 +6,27 @@ const normalizar = (texto = "") =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-const obtenerNombreOficina = (usuario) => {
-  return normalizar(
-    usuario?.oficina_nombre ||
-      usuario?.Oficina?.nombre ||
-      usuario?.oficina ||
-      "",
-  );
-};
+const esDireccion = (usuario = {}) => {
+  const oficinaNombre = normalizar(usuario.oficina_nombre || "");
 
-const esDireccion = (usuario) => {
-  const oficina = obtenerNombreOficina(usuario);
-  return oficina.includes("DIRECCION") && oficina.includes("POLICIA JUDICIAL");
-};
-
-const esDeposito = (usuario) => {
-  const oficina = obtenerNombreOficina(usuario);
-  return oficina.includes("DEPOSITO");
-};
-
-const esContable = (usuario) => {
-  const oficina = obtenerNombreOficina(usuario);
-  return oficina.includes("CONTABLE");
-};
-
-const esAdminGeneral = (usuario) => {
-  return usuario?.role === "ADMIN" && esDireccion(usuario);
-};
-
-const puedeGestionarDeposito = (usuario) => {
   return (
-    usuario?.role === "ADMIN" && (esDireccion(usuario) || esDeposito(usuario))
+    usuario.role === "ADMIN" &&
+    oficinaNombre.includes("DIRECCION") &&
+    oficinaNombre.includes("POLICIA JUDICIAL")
   );
 };
 
-const puedeVerReportesGlobales = (usuario) => {
-  return (
-    usuario?.role === "ADMIN" && (esDireccion(usuario) || esContable(usuario))
-  );
+const esAdminGeneral = (usuario = {}) => {
+  return esDireccion(usuario);
+};
+
+const puedeGestionarDeposito = (usuario = {}) => {
+  return esDireccion(usuario);
 };
 
 module.exports = {
+  normalizar,
   esDireccion,
-  esDeposito,
-  esContable,
   esAdminGeneral,
   puedeGestionarDeposito,
-  puedeVerReportesGlobales,
 };

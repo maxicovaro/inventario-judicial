@@ -2,6 +2,14 @@ import { useEffect, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 
+const normalizar = (texto = "") =>
+  texto
+    .toString()
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 export default function HistorialPedidos() {
   const [pedidos, setPedidos] = useState([]);
   const [error, setError] = useState("");
@@ -9,17 +17,25 @@ export default function HistorialPedidos() {
   const [provisiones, setProvisiones] = useState({});
 
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-  const esAdmin = usuario.role === "ADMIN";
+
+  const oficinaNombre = normalizar(usuario.oficina_nombre || "");
+
+  const esDireccion =
+    usuario.role === "ADMIN" &&
+    oficinaNombre.includes("DIRECCION") &&
+    oficinaNombre.includes("POLICIA JUDICIAL");
 
   const cargarPedidos = async () => {
     try {
+      setError("");
+
       const response = await api.get("/pedidos-insumos");
-      setPedidos(response.data);
+      setPedidos(response.data || []);
     } catch (err) {
       setError(
         err.response?.data?.error ||
           err.response?.data?.mensaje ||
-          "Error al cargar pedidos"
+          "Error al cargar pedidos",
       );
     }
   };
@@ -55,6 +71,11 @@ export default function HistorialPedidos() {
   };
 
   const cambiarEstado = async (pedidoId, estado) => {
+    if (!esDireccion) {
+      alert("Solo Dirección puede cambiar el estado de los pedidos");
+      return;
+    }
+
     try {
       await api.put(`/pedidos-insumos/${pedidoId}/estado`, { estado });
       await cargarPedidos();
@@ -62,12 +83,17 @@ export default function HistorialPedidos() {
       alert(
         err.response?.data?.mensaje ||
           err.response?.data?.error ||
-          "Error al cambiar estado"
+          "Error al cambiar estado",
       );
     }
   };
 
-  const guardarProvision = async (pedidoId, detalles) => {
+  const guardarProvision = async (pedidoId, detalles = []) => {
+    if (!esDireccion) {
+      alert("Solo Dirección puede cargar provisiones de pedidos");
+      return;
+    }
+
     try {
       const payload = {
         estado: "ENTREGADO",
@@ -89,7 +115,7 @@ export default function HistorialPedidos() {
       alert(
         err.response?.data?.mensaje ||
           err.response?.data?.error ||
-          "Error al guardar provisión"
+          "Error al guardar provisión",
       );
     }
   };
@@ -124,182 +150,190 @@ export default function HistorialPedidos() {
         </div>
       ) : (
         <div style={styles.listado}>
-          {pedidos.map((pedido) => (
-            <div key={pedido.id} style={styles.card}>
-              <div style={styles.headerRow}>
-                <div>
-                  <h3 style={styles.cardTitle}>
-                    Pedido #{pedido.id} — {pedido.mes}/{pedido.anio}
-                  </h3>
-                  <p style={styles.meta}>
-                    Oficina: {pedido.Oficina?.nombre || "-"}
-                  </p>
-                  <p style={styles.meta}>
-                    Usuario:{" "}
-                    {pedido.Usuario
-                      ? `${pedido.Usuario.nombre} ${pedido.Usuario.apellido}`
-                      : "-"}
-                  </p>
+          {pedidos.map((pedido) => {
+            const detalles = pedido.PedidoInsumoDetalles || [];
+
+            return (
+              <div key={pedido.id} style={styles.card}>
+                <div style={styles.headerRow}>
+                  <div>
+                    <h3 style={styles.cardTitle}>
+                      Pedido #{pedido.id} — {pedido.mes}/{pedido.anio}
+                    </h3>
+
+                    <p style={styles.meta}>
+                      Oficina: {pedido.Oficina?.nombre || "-"}
+                    </p>
+
+                    <p style={styles.meta}>
+                      Usuario:{" "}
+                      {pedido.Usuario
+                        ? `${pedido.Usuario.nombre} ${pedido.Usuario.apellido}`
+                        : "-"}
+                    </p>
+                  </div>
+
+                  <span
+                    style={{
+                      ...styles.badge,
+                      ...getEstadoStyle(pedido.estado),
+                    }}
+                  >
+                    {pedido.estado}
+                  </span>
                 </div>
 
-                <span
-                  style={{
-                    ...styles.badge,
-                    ...getEstadoStyle(pedido.estado),
-                  }}
-                >
-                  {pedido.estado}
-                </span>
-              </div>
+                <div style={styles.resumenGrid}>
+                  <div style={styles.infoBox}>
+                    <strong>Hechos delictivos:</strong>{" "}
+                    {pedido.cantidad_hechos_delictivos || 0}
+                  </div>
 
-              <div style={styles.resumenGrid}>
-                <div style={styles.infoBox}>
-                  <strong>Hechos delictivos:</strong>{" "}
-                  {pedido.cantidad_hechos_delictivos || 0}
+                  <div style={styles.infoBox}>
+                    <strong>Autopsias:</strong>{" "}
+                    {pedido.cantidad_autopsias || 0}
+                  </div>
                 </div>
 
-                <div style={styles.infoBox}>
-                  <strong>Autopsias:</strong> {pedido.cantidad_autopsias || 0}
-                </div>
-              </div>
+                {pedido.observaciones && (
+                  <div style={styles.obsBox}>
+                    <strong>Observaciones:</strong> {pedido.observaciones}
+                  </div>
+                )}
 
-              {pedido.observaciones && (
-                <div style={styles.obsBox}>
-                  <strong>Observaciones:</strong> {pedido.observaciones}
-                </div>
-              )}
+                {esDireccion && (
+                  <div style={styles.estadosBox}>
+                    <button
+                      type="button"
+                      style={styles.revisionButton}
+                      onClick={() =>
+                        cambiarEstado(pedido.id, "EN_REVISION")
+                      }
+                    >
+                      En revisión
+                    </button>
 
-              {esAdmin && (
-                <div style={styles.estadosBox}>
+                    <button
+                      type="button"
+                      style={styles.aprobarButton}
+                      onClick={() => cambiarEstado(pedido.id, "APROBADO")}
+                    >
+                      Aprobar
+                    </button>
+
+                    <button
+                      type="button"
+                      style={styles.rechazarButton}
+                      onClick={() => cambiarEstado(pedido.id, "RECHAZADO")}
+                    >
+                      Rechazar
+                    </button>
+                  </div>
+                )}
+
+                <div style={styles.accionesTop}>
                   <button
                     type="button"
-                    style={styles.revisionButton}
-                    onClick={() => cambiarEstado(pedido.id, "EN_REVISION")}
+                    style={styles.button}
+                    onClick={() =>
+                      setPedidoAbierto(
+                        pedidoAbierto === pedido.id ? null : pedido.id,
+                      )
+                    }
                   >
-                    En revisión
+                    {pedidoAbierto === pedido.id
+                      ? "Ocultar detalle"
+                      : "Ver detalle"}
                   </button>
 
                   <button
                     type="button"
-                    style={styles.aprobarButton}
-                    onClick={() => cambiarEstado(pedido.id, "APROBADO")}
+                    style={styles.pdfButton}
+                    onClick={() => descargarPDF(pedido.id)}
                   >
-                    Aprobar
-                  </button>
-
-                  <button
-                    type="button"
-                    style={styles.rechazarButton}
-                    onClick={() => cambiarEstado(pedido.id, "RECHAZADO")}
-                  >
-                    Rechazar
+                    Descargar PDF
                   </button>
                 </div>
-              )}
 
-              <div style={styles.accionesTop}>
-                <button
-                  type="button"
-                  style={styles.button}
-                  onClick={() =>
-                    setPedidoAbierto(
-                      pedidoAbierto === pedido.id ? null : pedido.id
-                    )
-                  }
-                >
-                  {pedidoAbierto === pedido.id
-                    ? "Ocultar detalle"
-                    : "Ver detalle"}
-                </button>
+                {pedidoAbierto === pedido.id && (
+                  <div style={styles.detalleBox}>
+                    <h4 style={styles.subtitulo}>Detalle solicitado</h4>
 
-                <button
-                  type="button"
-                  style={styles.pdfButton}
-                  onClick={() => descargarPDF(pedido.id)}
-                >
-                  Descargar PDF
-                </button>
-              </div>
-
-              {pedidoAbierto === pedido.id && (
-                <div style={styles.detalleBox}>
-                  <h4 style={styles.subtitulo}>Detalle solicitado</h4>
-
-                  {pedido.PedidoInsumoDetalles?.length === 0 ? (
-                    <p>Sin detalle.</p>
-                  ) : (
-                    <>
-                      <div style={styles.detalleListado}>
-                        {pedido.PedidoInsumoDetalles.map((item) => (
-                          <div key={item.id} style={styles.detalleItem}>
-                            <p>
-                              <strong>Artículo:</strong>{" "}
-                              {item.Insumo?.nombre ||
-                                item.articulo_manual ||
-                                "-"}
-                            </p>
-
-                            <p>
-                              <strong>Cantidad solicitada:</strong>{" "}
-                              {item.cantidad_solicitada || 0}
-                            </p>
-
-                            {esAdmin && (
+                    {detalles.length === 0 ? (
+                      <p>Sin detalle.</p>
+                    ) : (
+                      <>
+                        <div style={styles.detalleListado}>
+                          {detalles.map((item) => (
+                            <div key={item.id} style={styles.detalleItem}>
                               <p>
-                                <strong>Cantidad provista:</strong>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  defaultValue={item.cantidad_provista || 0}
-                                  onChange={(e) =>
-                                    handleProvisionChange(
-                                      item.id,
-                                      e.target.value
-                                    )
-                                  }
-                                  style={styles.provisionInput}
-                                />
+                                <strong>Artículo:</strong>{" "}
+                                {item.Insumo?.nombre ||
+                                  item.articulo_manual ||
+                                  "-"}
                               </p>
-                            )}
 
-                            <p>
-                              <strong>Problema:</strong>{" "}
-                              {item.tuvo_problema ? "Sí" : "No"}
-                            </p>
+                              <p>
+                                <strong>Cantidad solicitada:</strong>{" "}
+                                {item.cantidad_solicitada || 0}
+                              </p>
 
-                            <p>
-                              <strong>Detalle problema:</strong>{" "}
-                              {item.detalle_problema || "-"}
-                            </p>
+                              {esDireccion && (
+                                <p>
+                                  <strong>Cantidad provista:</strong>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    defaultValue={
+                                      item.cantidad_provista || 0
+                                    }
+                                    onChange={(e) =>
+                                      handleProvisionChange(
+                                        item.id,
+                                        e.target.value,
+                                      )
+                                    }
+                                    style={styles.provisionInput}
+                                  />
+                                </p>
+                              )}
 
-                            <p>
-                              <strong>Cantidad provista actual:</strong>{" "}
-                              {item.cantidad_provista || 0}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
+                              <p>
+                                <strong>Problema:</strong>{" "}
+                                {item.tuvo_problema ? "Sí" : "No"}
+                              </p>
 
-                      {esAdmin && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            guardarProvision(
-                              pedido.id,
-                              pedido.PedidoInsumoDetalles
-                            )
-                          }
-                          style={styles.saveButton}
-                        >
-                          Guardar provisión y marcar entregado
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+                              <p>
+                                <strong>Detalle problema:</strong>{" "}
+                                {item.detalle_problema || "-"}
+                              </p>
+
+                              <p>
+                                <strong>Cantidad provista actual:</strong>{" "}
+                                {item.cantidad_provista || 0}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {esDireccion && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              guardarProvision(pedido.id, detalles)
+                            }
+                            style={styles.saveButton}
+                          >
+                            Guardar provisión y marcar entregado
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </Layout>
@@ -311,20 +345,24 @@ const styles = {
     marginTop: 0,
     marginBottom: "1rem",
   },
+
   subtitulo: {
     marginTop: 0,
     marginBottom: "0.8rem",
   },
+
   listado: {
     display: "grid",
     gap: "1rem",
   },
+
   card: {
     background: "#fff",
     borderRadius: "14px",
     padding: "1rem",
     boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
   },
+
   headerRow: {
     display: "flex",
     justifyContent: "space-between",
@@ -332,31 +370,37 @@ const styles = {
     gap: "1rem",
     flexWrap: "wrap",
   },
+
   cardTitle: {
     margin: 0,
   },
+
   meta: {
     margin: "0.25rem 0",
     color: "#6b7280",
   },
+
   badge: {
     padding: "0.35rem 0.7rem",
     borderRadius: "999px",
     fontSize: "0.8rem",
     fontWeight: "bold",
   },
+
   resumenGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: "0.8rem",
     marginTop: "1rem",
   },
+
   infoBox: {
     background: "#f9fafb",
     border: "1px solid #e5e7eb",
     borderRadius: "10px",
     padding: "0.8rem",
   },
+
   obsBox: {
     marginTop: "0.8rem",
     background: "#f9fafb",
@@ -364,18 +408,21 @@ const styles = {
     borderRadius: "10px",
     padding: "0.8rem",
   },
+
   estadosBox: {
     display: "flex",
     gap: "0.6rem",
     flexWrap: "wrap",
     marginTop: "1rem",
   },
+
   accionesTop: {
     display: "flex",
     gap: "0.6rem",
     flexWrap: "wrap",
     marginTop: "1rem",
   },
+
   button: {
     padding: "0.75rem 1rem",
     border: "none",
@@ -384,6 +431,7 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
   },
+
   pdfButton: {
     padding: "0.75rem 1rem",
     border: "none",
@@ -392,6 +440,7 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
   },
+
   revisionButton: {
     padding: "0.65rem 0.9rem",
     border: "none",
@@ -400,6 +449,7 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
   },
+
   aprobarButton: {
     padding: "0.65rem 0.9rem",
     border: "none",
@@ -408,6 +458,7 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
   },
+
   rechazarButton: {
     padding: "0.65rem 0.9rem",
     border: "none",
@@ -416,26 +467,31 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
   },
+
   detalleBox: {
     marginTop: "1rem",
     paddingTop: "1rem",
     borderTop: "1px solid #e5e7eb",
   },
+
   detalleListado: {
     display: "grid",
     gap: "0.8rem",
   },
+
   detalleItem: {
     border: "1px solid #e5e7eb",
     borderRadius: "10px",
     padding: "0.8rem",
     background: "#fafafa",
   },
+
   provisionInput: {
     marginLeft: "10px",
     padding: "4px",
     width: "80px",
   },
+
   saveButton: {
     marginTop: "12px",
     padding: "10px 14px",
@@ -446,6 +502,7 @@ const styles = {
     cursor: "pointer",
     fontWeight: "bold",
   },
+
   error: {
     color: "crimson",
   },

@@ -10,9 +10,23 @@ const formInicial = {
   motivo: "",
 };
 
+const normalizar = (texto = "") =>
+  texto
+    .toString()
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 export default function StockOficina() {
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-  const esAdmin = usuario.role === "ADMIN";
+
+  const oficinaNombre = normalizar(usuario.oficina_nombre || "");
+
+  const esDireccion =
+    usuario.role === "ADMIN" &&
+    oficinaNombre.includes("DIRECCION") &&
+    oficinaNombre.includes("POLICIA JUDICIAL");
 
   const [stock, setStock] = useState([]);
   const [oficinas, setOficinas] = useState([]);
@@ -36,6 +50,7 @@ export default function StockOficina() {
       setOficinas(response.data || []);
     } catch (err) {
       console.error("Error oficinas:", err.response?.data || err.message);
+      toast.error("Error al cargar oficinas");
     }
   };
 
@@ -45,6 +60,7 @@ export default function StockOficina() {
       setInsumos(response.data || []);
     } catch (err) {
       console.error("Error insumos:", err.response?.data || err.message);
+      toast.error("Error al cargar insumos");
     }
   };
 
@@ -58,6 +74,8 @@ export default function StockOficina() {
       const response = await api.get(`/stock-oficina/${oficinaId}`);
       setStock(response.data || []);
     } catch (err) {
+      console.error("Error stock oficina:", err.response?.data || err.message);
+
       setError(
         err.response?.data?.mensaje ||
           err.response?.data?.error ||
@@ -71,7 +89,7 @@ export default function StockOficina() {
   useEffect(() => {
     cargarOficinas();
 
-    if (esAdmin) {
+    if (esDireccion) {
       cargarInsumos();
     }
 
@@ -98,7 +116,10 @@ export default function StockOficina() {
 
     return stock.filter((item) => {
       const nombre = item.Insumo?.nombre?.toLowerCase() || "";
-      const categoria = item.Insumo?.categoria?.toLowerCase() || "";
+      const categoria =
+        item.Insumo?.categoria?.toLowerCase() ||
+        item.Insumo?.Categoria?.nombre?.toLowerCase() ||
+        "";
 
       return nombre.includes(texto) || categoria.includes(texto);
     });
@@ -133,7 +154,16 @@ export default function StockOficina() {
   const asignarStock = async (e) => {
     e.preventDefault();
 
-    if (!formAsignacion.insumo_id || !formAsignacion.oficina_id || !formAsignacion.cantidad) {
+    if (!esDireccion) {
+      toast.error("No tenés permisos para asignar stock");
+      return;
+    }
+
+    if (
+      !formAsignacion.insumo_id ||
+      !formAsignacion.oficina_id ||
+      !formAsignacion.cantidad
+    ) {
       toast.error("Insumo, oficina y cantidad son obligatorios");
       return;
     }
@@ -171,6 +201,8 @@ export default function StockOficina() {
       await cargarStock(formAsignacion.oficina_id);
       await cargarInsumos();
     } catch (err) {
+      console.error("Error asignar stock:", err.response?.data || err.message);
+
       toast.error(
         err.response?.data?.mensaje ||
           err.response?.data?.error ||
@@ -187,18 +219,21 @@ export default function StockOficina() {
         <div>
           <h1 style={styles.titulo}>Stock por oficina</h1>
           <p style={styles.subtitulo}>
-            Consulta y asignación de stock a cada oficina o unidad judicial.
+            {esDireccion
+              ? "Consulta y asignación de stock a cada oficina o unidad judicial."
+              : "Consulta del stock asignado a tu oficina o unidad judicial."}
           </p>
         </div>
       </div>
 
-      {esAdmin && (
+      {esDireccion && (
         <div style={styles.card}>
           <div style={styles.cardHeader}>
             <div>
               <h2 style={styles.cardTitle}>Asignar stock desde depósito</h2>
               <p style={styles.cardSubtitle}>
-                Esta operación descuenta del stock central y suma al stock de la oficina seleccionada.
+                Esta operación descuenta del stock central y suma al stock de la
+                oficina seleccionada.
               </p>
             </div>
           </div>
@@ -268,7 +303,7 @@ export default function StockOficina() {
 
       <div style={styles.card}>
         <div style={styles.filters}>
-          {esAdmin && (
+          {esDireccion ? (
             <select
               value={oficinaSeleccionada}
               onChange={(e) => setOficinaSeleccionada(e.target.value)}
@@ -281,6 +316,13 @@ export default function StockOficina() {
                 </option>
               ))}
             </select>
+          ) : (
+            <input
+              value={usuario.oficina_nombre || "Mi oficina"}
+              style={styles.input}
+              disabled
+              readOnly
+            />
           )}
 
           <input
@@ -296,9 +338,9 @@ export default function StockOficina() {
           <div style={styles.summaryCard}>
             <span style={styles.summaryLabel}>Oficina</span>
             <strong style={styles.summaryValue}>
-              {esAdmin
+              {esDireccion
                 ? oficinaActual?.nombre || "Sin seleccionar"
-                : usuario.oficina_nombre || usuario.Oficina?.nombre || "-"}
+                : usuario.oficina_nombre || "-"}
             </strong>
           </div>
 
@@ -343,12 +385,17 @@ export default function StockOficina() {
                     <td style={styles.td}>
                       <strong>{item.Insumo?.nombre || "-"}</strong>
                     </td>
+
                     <td style={styles.td}>
-                      {item.Insumo?.categoria || "-"}
+                      {item.Insumo?.categoria ||
+                        item.Insumo?.Categoria?.nombre ||
+                        "-"}
                     </td>
+
                     <td style={styles.td}>
                       {item.Insumo?.unidad_medida || "-"}
                     </td>
+
                     <td style={styles.tdRight}>{item.cantidad}</td>
                   </tr>
                 ))}
@@ -365,6 +412,7 @@ const styles = {
   pageHeader: {
     marginBottom: 24,
   },
+
   titulo: {
     margin: 0,
     fontSize: 34,
@@ -372,12 +420,14 @@ const styles = {
     color: "#1f2937",
     letterSpacing: "-0.03em",
   },
+
   subtitulo: {
     margin: "6px 0 0 0",
     fontSize: 15,
     color: "#6b7280",
     fontWeight: 500,
   },
+
   card: {
     background: "#fff",
     border: "1px solid #dde3ea",
@@ -386,6 +436,7 @@ const styles = {
     boxShadow: "0 2px 8px rgba(31,41,55,0.04)",
     marginBottom: 20,
   },
+
   cardHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -393,29 +444,34 @@ const styles = {
     gap: 16,
     marginBottom: 16,
   },
+
   cardTitle: {
     margin: 0,
     fontSize: 20,
     fontWeight: 700,
     color: "#1f2937",
   },
+
   cardSubtitle: {
     margin: "5px 0 0 0",
     fontSize: 14,
     color: "#6b7280",
   },
+
   formGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: 14,
     alignItems: "center",
   },
+
   filters: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
     gap: 14,
     marginBottom: 18,
   },
+
   input: {
     width: "100%",
     padding: "12px 14px",
@@ -425,7 +481,9 @@ const styles = {
     color: "#1f2937",
     fontSize: 14,
     outline: "none",
+    boxSizing: "border-box",
   },
+
   primaryButton: {
     padding: "12px 16px",
     border: "none",
@@ -436,18 +494,21 @@ const styles = {
     fontWeight: 700,
     cursor: "pointer",
   },
+
   summaryGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
     gap: 14,
     marginBottom: 20,
   },
+
   summaryCard: {
     background: "#f8fafc",
     border: "1px solid #e2e8f0",
     borderRadius: 14,
     padding: 16,
   },
+
   summaryLabel: {
     display: "block",
     fontSize: 13,
@@ -455,21 +516,25 @@ const styles = {
     fontWeight: 600,
     marginBottom: 6,
   },
+
   summaryValue: {
     fontSize: 18,
     color: "#1f2937",
     fontWeight: 700,
   },
+
   tableWrapper: {
     overflowX: "auto",
     border: "1px solid #e2e8f0",
     borderRadius: 14,
   },
+
   table: {
     width: "100%",
     borderCollapse: "collapse",
     fontSize: 14,
   },
+
   th: {
     textAlign: "left",
     padding: "14px 16px",
@@ -478,6 +543,7 @@ const styles = {
     fontWeight: 700,
     borderBottom: "1px solid #e2e8f0",
   },
+
   thRight: {
     textAlign: "right",
     padding: "14px 16px",
@@ -486,19 +552,23 @@ const styles = {
     fontWeight: 700,
     borderBottom: "1px solid #e2e8f0",
   },
+
   tr: {
     borderBottom: "1px solid #edf2f7",
   },
+
   td: {
     padding: "14px 16px",
     color: "#334155",
   },
+
   tdRight: {
     padding: "14px 16px",
     color: "#334155",
     textAlign: "right",
     fontWeight: 700,
   },
+
   emptyBox: {
     border: "1px dashed #cbd5e1",
     borderRadius: 14,
@@ -508,6 +578,7 @@ const styles = {
     textAlign: "center",
     fontWeight: 600,
   },
+
   error: {
     color: "#b03a3a",
     fontWeight: 600,

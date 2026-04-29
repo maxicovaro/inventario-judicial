@@ -112,6 +112,7 @@ const login = async (req, res) => {
         email: usuario.email,
         role: usuario.Role?.nombre,
         oficina_id: usuario.oficina_id,
+        oficina_nombre: usuario.Oficina?.nombre || "",
       },
     });
   } catch (error) {
