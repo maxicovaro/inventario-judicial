@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
 const {
@@ -6,26 +6,22 @@ const {
   listarAdjuntos,
   descargarAdjunto,
   eliminarAdjunto,
-} = require('../controllers/adjuntoController');
+} = require("../controllers/adjuntoController");
 
-const { verificarToken, verificarRol } = require('../middlewares/authMiddleware');
-const upload = require('../middlewares/uploadMiddleware');
+const { verificarToken } = require("../middlewares/authMiddleware");
+const upload = require("../middlewares/uploadMiddleware");
 
-router.get('/', verificarToken, listarAdjuntos);
-router.get('/:id/download', verificarToken, descargarAdjunto);
+router.get("/", verificarToken, listarAdjuntos);
 
 router.post(
-  '/',
+  "/",
   verificarToken,
-  upload.single('archivo'),
+  upload.single("archivo"),
   subirAdjunto
 );
 
-router.delete(
-  '/:id',
-  verificarToken,
-  verificarRol('ADMIN'),
-  eliminarAdjunto
-);
+router.get("/:id/download", verificarToken, descargarAdjunto);
+
+router.delete("/:id", verificarToken, eliminarAdjunto);
 
 module.exports = router;

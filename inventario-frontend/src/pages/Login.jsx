@@ -29,16 +29,32 @@ export default function Login() {
     try {
       const response = await api.post("/auth/login", data);
 
+      localStorage.removeItem("token");
+      localStorage.removeItem("usuario");
+
       localStorage.setItem("token", response.data.token);
 
-      const usuarioBackend = response.data.usuario;
+      const usuarioBackend = response.data.usuario || {};
 
       const usuarioNormalizado = {
         ...usuarioBackend,
+
         role:
           usuarioBackend.role ||
           usuarioBackend.rol ||
           usuarioBackend.Role?.nombre ||
+          "",
+
+        oficina_id:
+          usuarioBackend.oficina_id ||
+          usuarioBackend.Oficina?.id ||
+          usuarioBackend.oficina?.id ||
+          null,
+
+        oficina_nombre:
+          usuarioBackend.oficina_nombre ||
+          usuarioBackend.Oficina?.nombre ||
+          usuarioBackend.oficina?.nombre ||
           "",
       };
 
@@ -49,7 +65,7 @@ export default function Login() {
       setErrorGeneral(
         err.response?.data?.mensaje ||
           err.response?.data?.error ||
-          "Error al iniciar sesión",
+          "Error al iniciar sesión"
       );
     } finally {
       setCargando(false);

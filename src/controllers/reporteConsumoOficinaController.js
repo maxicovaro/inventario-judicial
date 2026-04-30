@@ -9,6 +9,31 @@ const {
 
 const { esAdminGeneral } = require("../utils/permisos");
 
+const validarMesAnio = (mes, anio) => {
+  const mesNum = Number(mes);
+  const anioNum = Number(anio);
+
+  if (!Number.isInteger(mesNum) || mesNum < 1 || mesNum > 12) {
+    return {
+      valido: false,
+      mensaje: "El mes debe ser un número entre 1 y 12",
+    };
+  }
+
+  if (!Number.isInteger(anioNum) || anioNum < 2020 || anioNum > 2100) {
+    return {
+      valido: false,
+      mensaje: "El año ingresado no es válido",
+    };
+  }
+
+  return {
+    valido: true,
+    mesNum,
+    anioNum,
+  };
+};
+
 const obtenerReporteMensualOficina = async (req, res) => {
   try {
     const { oficina_id, mes, anio } = req.query;
@@ -19,9 +44,25 @@ const obtenerReporteMensualOficina = async (req, res) => {
       });
     }
 
+    const validacionFecha = validarMesAnio(mes, anio);
+
+    if (!validacionFecha.valido) {
+      return res.status(400).json({
+        mensaje: validacionFecha.mensaje,
+      });
+    }
+
+    const { mesNum, anioNum } = validacionFecha;
+
     let oficinaPermitida = oficina_id;
 
     if (!esAdminGeneral(req.usuario)) {
+      if (!req.usuario.oficina_id) {
+        return res.status(400).json({
+          mensaje: "El usuario no tiene oficina asignada",
+        });
+      }
+
       oficinaPermitida = req.usuario.oficina_id;
 
       if (String(oficina_id) !== String(req.usuario.oficina_id)) {
@@ -42,13 +83,17 @@ const obtenerReporteMensualOficina = async (req, res) => {
     const pedido = await PedidoInsumo.findOne({
       where: {
         oficina_id: oficinaPermitida,
-        mes,
-        anio,
+        mes: mesNum,
+        anio: anioNum,
       },
       include: [
         {
           model: PedidoInsumoDetalle,
-          include: [{ model: Insumo }],
+          include: [
+            {
+              model: Insumo,
+            },
+          ],
         },
       ],
     });
@@ -56,17 +101,25 @@ const obtenerReporteMensualOficina = async (req, res) => {
     const consumos = await ConsumoOficina.findAll({
       where: {
         oficina_id: oficinaPermitida,
-        mes,
-        anio,
+        mes: mesNum,
+        anio: anioNum,
       },
-      include: [{ model: Insumo }],
+      include: [
+        {
+          model: Insumo,
+        },
+      ],
     });
 
     const stockActual = await StockOficina.findAll({
       where: {
         oficina_id: oficinaPermitida,
       },
-      include: [{ model: Insumo }],
+      include: [
+        {
+          model: Insumo,
+        },
+      ],
     });
 
     const mapa = {};
@@ -95,7 +148,9 @@ const obtenerReporteMensualOficina = async (req, res) => {
         const fila = asegurarInsumo(detalle.Insumo);
         if (!fila) return;
 
-        fila.cantidad_solicitada += Number(detalle.cantidad_solicitada) || 0;
+        fila.cantidad_solicitada +=
+          Number(detalle.cantidad_solicitada) || 0;
+
         fila.cantidad_provista += Number(detalle.cantidad_provista) || 0;
       });
     }
@@ -115,15 +170,16 @@ const obtenerReporteMensualOficina = async (req, res) => {
     });
 
     const detalle = Object.values(mapa).sort((a, b) =>
-      a.nombre.localeCompare(b.nombre),
+      a.nombre.localeCompare(b.nombre, "es")
     );
 
     const totales = detalle.reduce(
       (acc, item) => {
-        acc.total_solicitado += item.cantidad_solicitada;
-        acc.total_provisto += item.cantidad_provista;
-        acc.total_consumido += item.cantidad_consumida;
-        acc.total_stock_actual += item.stock_actual_oficina;
+        acc.total_solicitado += Number(item.cantidad_solicitada) || 0;
+        acc.total_provisto += Number(item.cantidad_provista) || 0;
+        acc.total_consumido += Number(item.cantidad_consumida) || 0;
+        acc.total_stock_actual += Number(item.stock_actual_oficina) || 0;
+
         return acc;
       },
       {
@@ -131,7 +187,7 @@ const obtenerReporteMensualOficina = async (req, res) => {
         total_provisto: 0,
         total_consumido: 0,
         total_stock_actual: 0,
-      },
+      }
     );
 
     return res.status(200).json({
@@ -140,8 +196,8 @@ const obtenerReporteMensualOficina = async (req, res) => {
         nombre: oficina.nombre,
       },
       periodo: {
-        mes: Number(mes),
-        anio: Number(anio),
+        mes: mesNum,
+        anio: anioNum,
       },
       pedido: pedido
         ? {

@@ -1,16 +1,26 @@
-const { Notificacion } = require('../models');
+const { Notificacion } = require("../models");
+
+const mismoId = (a, b) => {
+  if (a === null || a === undefined || b === null || b === undefined) {
+    return false;
+  }
+
+  return Number(a) === Number(b);
+};
 
 const listarNotificaciones = async (req, res) => {
   try {
     const notificaciones = await Notificacion.findAll({
-      where: { usuario_id: req.usuario.id },
-      order: [['id', 'DESC']],
+      where: {
+        usuario_id: req.usuario.id,
+      },
+      order: [["id", "DESC"]],
     });
 
     return res.status(200).json(notificaciones);
   } catch (error) {
     return res.status(500).json({
-      mensaje: 'Error al listar notificaciones',
+      mensaje: "Error al listar notificaciones",
       error: error.message,
     });
   }
@@ -24,25 +34,27 @@ const marcarComoLeida = async (req, res) => {
 
     if (!notificacion) {
       return res.status(404).json({
-        mensaje: 'Notificación no encontrada',
+        mensaje: "Notificación no encontrada",
       });
     }
 
-    if (notificacion.usuario_id !== req.usuario.id) {
+    if (!mismoId(notificacion.usuario_id, req.usuario.id)) {
       return res.status(403).json({
-        mensaje: 'No tenés permiso para modificar esta notificación',
+        mensaje: "No tenés permiso para modificar esta notificación",
       });
     }
 
-    await notificacion.update({ leida: true });
+    await notificacion.update({
+      leida: true,
+    });
 
     return res.status(200).json({
-      mensaje: 'Notificación marcada como leída',
+      mensaje: "Notificación marcada como leída",
       notificacion,
     });
   } catch (error) {
     return res.status(500).json({
-      mensaje: 'Error al marcar notificación como leída',
+      mensaje: "Error al marcar notificación como leída",
       error: error.message,
     });
   }
@@ -60,7 +72,7 @@ const contarNoLeidas = async (req, res) => {
     return res.status(200).json({ total });
   } catch (error) {
     return res.status(500).json({
-      mensaje: 'Error al contar notificaciones',
+      mensaje: "Error al contar notificaciones",
       error: error.message,
     });
   }

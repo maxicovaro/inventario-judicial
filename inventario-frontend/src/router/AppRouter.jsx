@@ -1,10 +1,10 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
 import Login from "../pages/Login";
 import Dashboard from "../pages/Dashboard";
 import Activos from "../pages/Activos";
 import Insumos from "../pages/Insumos";
 import Solicitudes from "../pages/Solicitudes";
-import PrivateRoute from "../components/PrivateRoute";
 import MovimientosStock from "../pages/MovimientosStock";
 import Notificaciones from "../pages/Notificaciones";
 import Adjuntos from "../pages/Adjuntos";
@@ -16,6 +16,8 @@ import Bitacora from "../pages/Bitacora";
 import StockOficina from "../pages/StockOficina";
 import ConsumoOficina from "../pages/ConsumoOficina";
 import ReporteConsumoOficina from "../pages/ReporteConsumoOficina";
+
+import PrivateRoute from "../components/PrivateRoute";
 
 export default function AppRouter() {
   return (
@@ -42,28 +44,10 @@ export default function AppRouter() {
         />
 
         <Route
-          path="/insumos"
-          element={
-            <PrivateRoute>
-              <Insumos />
-            </PrivateRoute>
-          }
-        />
-
-        <Route
           path="/solicitudes"
           element={
             <PrivateRoute>
               <Solicitudes />
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/movimientos-stock"
-          element={
-            <PrivateRoute>
-              <MovimientosStock />
             </PrivateRoute>
           }
         />
@@ -94,6 +78,7 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="/historial-pedidos"
           element={
@@ -102,6 +87,7 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="/reportes-pedidos"
           element={
@@ -110,22 +96,7 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         />
-        <Route
-          path="/usuarios"
-          element={
-            <PrivateRoute rolesPermitidos={["ADMIN"]}>
-              <Usuarios />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/bitacora"
-          element={
-            <PrivateRoute rolesPermitidos={["ADMIN"]}>
-              <Bitacora />
-            </PrivateRoute>
-          }
-        />
+
         <Route
           path="/stock-oficina"
           element={
@@ -134,6 +105,7 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="/consumo-oficina"
           element={
@@ -142,6 +114,7 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="/reporte-consumo-oficina"
           element={
@@ -150,6 +123,45 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         />
+
+        {/* RUTAS SOLO DIRECCIÓN DE POLICÍA JUDICIAL */}
+        <Route
+          path="/insumos"
+          element={
+            <PrivateRoute rolesPermitidos={["ADMIN"]}>
+              <Insumos />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/movimientos-stock"
+          element={
+            <PrivateRoute rolesPermitidos={["ADMIN"]}>
+              <MovimientosStock />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/usuarios"
+          element={
+            <PrivateRoute rolesPermitidos={["ADMIN"]}>
+              <Usuarios />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/bitacora"
+          element={
+            <PrivateRoute rolesPermitidos={["ADMIN"]}>
+              <Bitacora />
+            </PrivateRoute>
+          }
+        />
+
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );

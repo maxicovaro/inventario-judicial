@@ -1,3 +1,5 @@
+const sequelize = require("../config/database");
+
 const {
   ConsumoOficina,
   StockOficina,
@@ -9,6 +11,12 @@ const {
 const { registrarBitacora } = require("../utils/bitacora");
 const { esAdminGeneral } = require("../utils/permisos");
 
+const crearError = (mensaje, status = 400) => {
+  const error = new Error(mensaje);
+  error.status = status;
+  return error;
+};
+
 const resolverOficinaPermitida = (req, oficinaSolicitada) => {
   if (esAdminGeneral(req.usuario)) {
     return oficinaSolicitada;
@@ -17,7 +25,24 @@ const resolverOficinaPermitida = (req, oficinaSolicitada) => {
   return req.usuario.oficina_id;
 };
 
+const validarMesAnio = (mes, anio) => {
+  const mesNum = Number(mes);
+  const anioNum = Number(anio);
+
+  if (!Number.isInteger(mesNum) || mesNum < 1 || mesNum > 12) {
+    return "El mes debe ser un número entre 1 y 12";
+  }
+
+  if (!Number.isInteger(anioNum) || anioNum < 2020 || anioNum > 2100) {
+    return "El año ingresado no es válido";
+  }
+
+  return null;
+};
+
 const registrarConsumoOficina = async (req, res) => {
+  let transaction;
+
   try {
     const {
       oficina_id,
@@ -35,11 +60,25 @@ const registrarConsumoOficina = async (req, res) => {
       });
     }
 
+    if (!req.usuario.oficina_id && !esAdminGeneral(req.usuario)) {
+      return res.status(400).json({
+        mensaje: "El usuario no tiene oficina asignada",
+      });
+    }
+
     const oficinaPermitida = resolverOficinaPermitida(req, oficina_id);
 
     if (String(oficina_id) !== String(oficinaPermitida)) {
       return res.status(403).json({
         mensaje: "No tenés permisos para registrar consumo de otra oficina",
+      });
+    }
+
+    const errorFecha = validarMesAnio(mes, anio);
+
+    if (errorFecha) {
+      return res.status(400).json({
+        mensaje: errorFecha,
       });
     }
 
@@ -51,20 +90,26 @@ const registrarConsumoOficina = async (req, res) => {
       });
     }
 
-    const oficina = await Oficina.findByPk(oficinaPermitida);
+    transaction = await sequelize.transaction();
+
+    const oficina = await Oficina.findByPk(oficinaPermitida, {
+      transaction,
+    });
 
     if (!oficina) {
-      return res.status(404).json({
-        mensaje: "Oficina no encontrada",
-      });
+      throw crearError("Oficina no encontrada", 404);
     }
 
-    const insumo = await Insumo.findByPk(insumo_id);
+    const insumo = await Insumo.findByPk(insumo_id, {
+      transaction,
+    });
 
     if (!insumo) {
-      return res.status(404).json({
-        mensaje: "Insumo no encontrado",
-      });
+      throw crearError("Insumo no encontrado", 404);
+    }
+
+    if (insumo.activo === false) {
+      throw crearError("No se puede registrar consumo de un insumo inactivo", 400);
     }
 
     const stockOficina = await StockOficina.findOne({
@@ -72,50 +117,95 @@ const registrarConsumoOficina = async (req, res) => {
         oficina_id: oficinaPermitida,
         insumo_id,
       },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
     });
 
     if (!stockOficina) {
-      return res.status(400).json({
-        mensaje: `La oficina "${oficina.nombre}" no tiene stock asignado de "${insumo.nombre}"`,
-      });
+      throw crearError(
+        `La oficina "${oficina.nombre}" no tiene stock asignado de "${insumo.nombre}"`,
+        400
+      );
     }
 
-    if (Number(stockOficina.cantidad) < cantidadNum) {
-      return res.status(400).json({
-        mensaje: `Stock insuficiente en la oficina. Disponible: ${stockOficina.cantidad}, requerido: ${cantidadNum}`,
-      });
+    const stockDisponible = Number(stockOficina.cantidad) || 0;
+
+    if (stockDisponible < cantidadNum) {
+      throw crearError(
+        `Stock insuficiente en la oficina. Disponible: ${stockDisponible}, requerido: ${cantidadNum}`,
+        400
+      );
     }
 
-    await stockOficina.update({
-      cantidad: Number(stockOficina.cantidad) - cantidadNum,
-    });
+    const nuevoStockOficina = stockDisponible - cantidadNum;
 
-    const consumo = await ConsumoOficina.create({
-      oficina_id: oficinaPermitida,
-      insumo_id,
-      usuario_id: req.usuario.id,
-      mes,
-      anio,
-      cantidad_consumida: cantidadNum,
-      observaciones: observaciones || null,
-    });
+    await stockOficina.update(
+      {
+        cantidad: nuevoStockOficina,
+      },
+      { transaction }
+    );
 
-    await registrarBitacora({
-      usuario_id: req.usuario.id,
-      accion: "REGISTRAR_CONSUMO",
-      modulo: "CONSUMO_OFICINA",
-      descripcion: `Registró consumo de ${cantidadNum} unidad(es) de "${insumo.nombre}" en ${oficina.nombre} correspondiente a ${mes}/${anio}`,
+    const consumo = await ConsumoOficina.create(
+      {
+        oficina_id: oficinaPermitida,
+        insumo_id,
+        usuario_id: req.usuario.id,
+        mes: Number(mes),
+        anio: Number(anio),
+        cantidad_consumida: cantidadNum,
+        observaciones: observaciones?.trim() || null,
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+    transaction = null;
+
+    try {
+      await registrarBitacora({
+        usuario_id: req.usuario.id,
+        accion: "REGISTRAR_CONSUMO",
+        modulo: "CONSUMO_OFICINA",
+        descripcion: `Registró consumo de ${cantidadNum} unidad(es) de "${insumo.nombre}" en ${oficina.nombre} correspondiente a ${mes}/${anio}. Stock restante oficina: ${nuevoStockOficina}`,
+      });
+    } catch (errorBitacora) {
+      console.error("Error al registrar bitácora:", errorBitacora);
+    }
+
+    const consumoCreado = await ConsumoOficina.findByPk(consumo.id, {
+      include: [
+        {
+          model: Oficina,
+          attributes: ["id", "nombre"],
+        },
+        {
+          model: Insumo,
+          attributes: ["id", "nombre", "categoria", "unidad_medida"],
+        },
+        {
+          model: Usuario,
+          attributes: ["id", "nombre", "apellido", "email"],
+        },
+      ],
     });
 
     return res.status(201).json({
       mensaje: "Consumo registrado correctamente",
-      consumo,
+      consumo: consumoCreado,
+      stock_oficina: nuevoStockOficina,
     });
   } catch (error) {
+    if (transaction) {
+      await transaction.rollback();
+    }
+
     console.error("ERROR registrarConsumoOficina:", error);
 
-    return res.status(500).json({
-      mensaje: "Error al registrar consumo de oficina",
+    return res.status(error.status || 500).json({
+      mensaje: error.status
+        ? error.message
+        : "Error al registrar consumo de oficina",
       error: error.message,
     });
   }
@@ -130,6 +220,12 @@ const listarConsumosOficina = async (req, res) => {
     if (esAdminGeneral(req.usuario)) {
       if (oficina_id) where.oficina_id = oficina_id;
     } else {
+      if (!req.usuario.oficina_id) {
+        return res.status(400).json({
+          mensaje: "El usuario no tiene oficina asignada",
+        });
+      }
+
       where.oficina_id = req.usuario.oficina_id;
 
       if (oficina_id && String(oficina_id) !== String(req.usuario.oficina_id)) {
@@ -139,8 +235,29 @@ const listarConsumosOficina = async (req, res) => {
       }
     }
 
-    if (mes) where.mes = mes;
-    if (anio) where.anio = anio;
+    if (mes) {
+      const mesNum = Number(mes);
+
+      if (!Number.isInteger(mesNum) || mesNum < 1 || mesNum > 12) {
+        return res.status(400).json({
+          mensaje: "El mes debe ser un número entre 1 y 12",
+        });
+      }
+
+      where.mes = mesNum;
+    }
+
+    if (anio) {
+      const anioNum = Number(anio);
+
+      if (!Number.isInteger(anioNum) || anioNum < 2020 || anioNum > 2100) {
+        return res.status(400).json({
+          mensaje: "El año ingresado no es válido",
+        });
+      }
+
+      where.anio = anioNum;
+    }
 
     const consumos = await ConsumoOficina.findAll({
       where,
@@ -175,9 +292,21 @@ const obtenerResumenConsumoPorOficina = async (req, res) => {
     const { oficina_id } = req.params;
     const { mes, anio } = req.query;
 
+    if (!oficina_id) {
+      return res.status(400).json({
+        mensaje: "Debe indicar una oficina",
+      });
+    }
+
     let oficinaPermitida = oficina_id;
 
     if (!esAdminGeneral(req.usuario)) {
+      if (!req.usuario.oficina_id) {
+        return res.status(400).json({
+          mensaje: "El usuario no tiene oficina asignada",
+        });
+      }
+
       oficinaPermitida = req.usuario.oficina_id;
 
       if (String(oficina_id) !== String(req.usuario.oficina_id)) {
@@ -187,10 +316,41 @@ const obtenerResumenConsumoPorOficina = async (req, res) => {
       }
     }
 
-    const where = { oficina_id: oficinaPermitida };
+    const oficina = await Oficina.findByPk(oficinaPermitida);
 
-    if (mes) where.mes = mes;
-    if (anio) where.anio = anio;
+    if (!oficina) {
+      return res.status(404).json({
+        mensaje: "Oficina no encontrada",
+      });
+    }
+
+    const where = {
+      oficina_id: oficinaPermitida,
+    };
+
+    if (mes) {
+      const mesNum = Number(mes);
+
+      if (!Number.isInteger(mesNum) || mesNum < 1 || mesNum > 12) {
+        return res.status(400).json({
+          mensaje: "El mes debe ser un número entre 1 y 12",
+        });
+      }
+
+      where.mes = mesNum;
+    }
+
+    if (anio) {
+      const anioNum = Number(anio);
+
+      if (!Number.isInteger(anioNum) || anioNum < 2020 || anioNum > 2100) {
+        return res.status(400).json({
+          mensaje: "El año ingresado no es válido",
+        });
+      }
+
+      where.anio = anioNum;
+    }
 
     const consumos = await ConsumoOficina.findAll({
       where,

@@ -1,30 +1,15 @@
 const { Op } = require("sequelize");
 const { Activo, Categoria, Oficina } = require("../models");
 const { registrarBitacora } = require("../utils/bitacora");
-
-const normalizar = (texto = "") =>
-  texto
-    .toString()
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-
-const esDireccion = (usuario = {}) => {
-  const oficinaNombre = normalizar(usuario.oficina_nombre || "");
-
-  return (
-    usuario.role === "ADMIN" &&
-    oficinaNombre.includes("DIRECCION") &&
-    oficinaNombre.includes("POLICIA JUDICIAL")
-  );
-};
+const { esAdminGeneral } = require("../utils/permisos");
 
 const listarActivos = async (req, res) => {
   try {
+    const direccion = esAdminGeneral(req.usuario);
+
     const where = {};
 
-    if (!esDireccion(req.usuario)) {
+    if (!direccion) {
       if (!req.usuario?.oficina_id) {
         return res.status(403).json({
           mensaje: "El usuario no tiene oficina asignada",
@@ -32,6 +17,7 @@ const listarActivos = async (req, res) => {
       }
 
       where.oficina_id = req.usuario.oficina_id;
+      where.activo = true;
     }
 
     const activos = await Activo.findAll({
@@ -54,7 +40,7 @@ const listarActivos = async (req, res) => {
 
 const crearActivo = async (req, res) => {
   try {
-    const direccion = esDireccion(req.usuario);
+    const direccion = esAdminGeneral(req.usuario);
 
     const {
       nombre,
@@ -155,7 +141,7 @@ const crearActivo = async (req, res) => {
 
 const actualizarActivo = async (req, res) => {
   try {
-    const direccion = esDireccion(req.usuario);
+    const direccion = esAdminGeneral(req.usuario);
     const { id } = req.params;
 
     const {
@@ -220,6 +206,7 @@ const actualizarActivo = async (req, res) => {
     }
 
     const categoriaFinal = categoria_id || activoDb.categoria_id;
+
     const oficinaFinal = direccion
       ? oficina_id || activoDb.oficina_id
       : req.usuario.oficina_id;
@@ -242,25 +229,37 @@ const actualizarActivo = async (req, res) => {
 
     await activoDb.update({
       nombre: nombre !== undefined ? nombre : activoDb.nombre,
+
       descripcion:
         descripcion !== undefined ? descripcion || null : activoDb.descripcion,
+
       codigo_interno: codigoFinal,
+
       marca: marca !== undefined ? marca || null : activoDb.marca,
+
       modelo: modelo !== undefined ? modelo || null : activoDb.modelo,
+
       numero_serie:
         numero_serie !== undefined
           ? numero_serie || null
           : activoDb.numero_serie,
+
       cantidad: cantidad !== undefined ? Number(cantidad) : activoDb.cantidad,
+
       categoria_id: categoriaFinal,
+
       oficina_id: oficinaFinal,
+
       estado: estado !== undefined ? estado : activoDb.estado,
+
       fecha_alta:
         fecha_alta !== undefined ? fecha_alta || null : activoDb.fecha_alta,
+
       observaciones:
         observaciones !== undefined
           ? observaciones || null
           : activoDb.observaciones,
+
       activo: direccion
         ? activo !== undefined
           ? activo
@@ -291,7 +290,9 @@ const actualizarActivo = async (req, res) => {
 
 const darDeBajaActivo = async (req, res) => {
   try {
-    if (!esDireccion(req.usuario)) {
+    const direccion = esAdminGeneral(req.usuario);
+
+    if (!direccion) {
       return res.status(403).json({
         mensaje: "Solo Dirección puede dar de baja activos",
       });
@@ -339,6 +340,6 @@ module.exports = {
   actualizarActivo,
   darDeBajaActivo,
 
-  // Alias por si tu archivo de rutas lo importa como eliminarActivo
+  // Alias por compatibilidad si alguna ruta vieja lo importa como eliminarActivo
   eliminarActivo: darDeBajaActivo,
 };

@@ -16,11 +16,27 @@ const login = async (req, res) => {
       });
     }
 
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({
+        mensaje: "JWT_SECRET no configurado en el servidor",
+      });
+    }
+
+    const emailNormalizado = email.trim().toLowerCase();
+
     const usuario = await Usuario.findOne({
-      where: { email },
+      where: {
+        email: emailNormalizado,
+      },
       include: [
-        { model: Role, attributes: ["id", "nombre"] },
-        { model: Oficina, attributes: ["id", "nombre"] },
+        {
+          model: Role,
+          attributes: ["id", "nombre"],
+        },
+        {
+          model: Oficina,
+          attributes: ["id", "nombre"],
+        },
       ],
     });
 
@@ -34,16 +50,20 @@ const login = async (req, res) => {
       usuario.bloqueado_hasta &&
       new Date(usuario.bloqueado_hasta) > new Date()
     ) {
-      await registrarBitacora({
-        usuario_id: usuario.id,
-        accion: "LOGIN_BLOQUEADO",
-        modulo: "AUTH",
-        descripcion: `Intento de login bloqueado (${usuario.email})`,
-      });
+      try {
+        await registrarBitacora({
+          usuario_id: usuario.id,
+          accion: "LOGIN_BLOQUEADO",
+          modulo: "AUTH",
+          descripcion: `Intento de login bloqueado (${usuario.email})`,
+        });
+      } catch (errorBitacora) {
+        console.error("Error al registrar bitácora:", errorBitacora);
+      }
 
       return res.status(403).json({
         mensaje: `Usuario bloqueado hasta ${new Date(
-          usuario.bloqueado_hasta,
+          usuario.bloqueado_hasta
         ).toLocaleTimeString("es-AR")}`,
       });
     }
@@ -51,13 +71,12 @@ const login = async (req, res) => {
     const passwordValida = await bcrypt.compare(password, usuario.password);
 
     if (!passwordValida) {
-      // 🔥 IMPORTANTE: sumar correctamente
-      const nuevosIntentos = (usuario.intentos_fallidos || 0) + 1;
+      const nuevosIntentos = Number(usuario.intentos_fallidos || 0) + 1;
 
       let bloqueo = null;
 
-      if (nuevosIntentos >= 3) {
-        bloqueo = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+      if (nuevosIntentos >= MAX_INTENTOS) {
+        bloqueo = new Date(Date.now() + BLOQUEO_MINUTOS * 60 * 1000);
       }
 
       await usuario.update({
@@ -65,11 +84,22 @@ const login = async (req, res) => {
         bloqueado_hasta: bloqueo,
       });
 
+      try {
+        await registrarBitacora({
+          usuario_id: usuario.id,
+          accion: "LOGIN_FALLIDO",
+          modulo: "AUTH",
+          descripcion: `Intento fallido de login (${usuario.email}) - intento ${nuevosIntentos}/${MAX_INTENTOS}`,
+        });
+      } catch (errorBitacora) {
+        console.error("Error al registrar bitácora:", errorBitacora);
+      }
+
       return res.status(401).json({
         mensaje:
-          nuevosIntentos >= 3
-            ? "Usuario bloqueado por múltiples intentos fallidos"
-            : `Credenciales inválidas (${nuevosIntentos}/3)`,
+          nuevosIntentos >= MAX_INTENTOS
+            ? `Usuario bloqueado por múltiples intentos fallidos durante ${BLOQUEO_MINUTOS} minutos`
+            : `Credenciales inválidas (${nuevosIntentos}/${MAX_INTENTOS})`,
       });
     }
 
@@ -84,33 +114,39 @@ const login = async (req, res) => {
       bloqueado_hasta: null,
     });
 
-    const token = jwt.sign(
-      {
-        id: usuario.id,
-        email: usuario.email,
-        role: usuario.Role?.nombre || "",
-        oficina_id: usuario.oficina_id,
-        oficina_nombre: usuario.Oficina?.nombre || "",
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "8h" },
-    );
+    const payload = {
+      id: usuario.id,
+      email: usuario.email,
+      role: usuario.Role?.nombre || "",
+      role_id: usuario.role_id,
+      oficina_id: usuario.oficina_id,
+      oficina_nombre: usuario.Oficina?.nombre || "",
+    };
 
-    await registrarBitacora({
-      usuario_id: usuario.id,
-      accion: "LOGIN",
-      modulo: "AUTH",
-      descripcion: `Login exitoso de ${usuario.email}`,
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: "8h",
     });
 
-    return res.json({
+    try {
+      await registrarBitacora({
+        usuario_id: usuario.id,
+        accion: "LOGIN",
+        modulo: "AUTH",
+        descripcion: `Login exitoso de ${usuario.email}`,
+      });
+    } catch (errorBitacora) {
+      console.error("Error al registrar bitácora:", errorBitacora);
+    }
+
+    return res.status(200).json({
       token,
       usuario: {
         id: usuario.id,
         nombre: usuario.nombre,
         apellido: usuario.apellido,
         email: usuario.email,
-        role: usuario.Role?.nombre,
+        role: usuario.Role?.nombre || "",
+        role_id: usuario.role_id,
         oficina_id: usuario.oficina_id,
         oficina_nombre: usuario.Oficina?.nombre || "",
       },

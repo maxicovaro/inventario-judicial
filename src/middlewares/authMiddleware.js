@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
+const { Usuario, Role, Oficina } = require("../models");
 
-const verificarToken = (req, res, next) => {
+const verificarToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -24,14 +25,46 @@ const verificarToken = (req, res, next) => {
       });
     }
 
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({
+        mensaje: "JWT_SECRET no configurado en el servidor",
+      });
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    const usuario = await Usuario.findByPk(decoded.id, {
+      include: [
+        {
+          model: Role,
+          attributes: ["id", "nombre"],
+        },
+        {
+          model: Oficina,
+          attributes: ["id", "nombre"],
+        },
+      ],
+    });
+
+    if (!usuario) {
+      return res.status(401).json({
+        mensaje: "Usuario no encontrado o token inválido",
+      });
+    }
+
+    if (!usuario.activo) {
+      return res.status(403).json({
+        mensaje: "El usuario está inactivo",
+      });
+    }
+
     req.usuario = {
-      id: decoded.id,
-      email: decoded.email,
-      role: decoded.role,
-      oficina_id: decoded.oficina_id,
-      oficina_nombre: decoded.oficina_nombre,
+      id: usuario.id,
+      email: usuario.email,
+      role: usuario.Role?.nombre || "",
+      role_id: usuario.role_id,
+      oficina_id: usuario.oficina_id,
+      oficina_nombre: usuario.Oficina?.nombre || "",
     };
 
     next();

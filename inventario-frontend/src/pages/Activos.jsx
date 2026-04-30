@@ -29,10 +29,34 @@ const normalizar = (texto = "") =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-export default function Activos() {
-  const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
+const obtenerUsuarioLocal = () => {
+  try {
+    return JSON.parse(localStorage.getItem("usuario") || "{}");
+  } catch (error) {
+    localStorage.removeItem("usuario");
+    localStorage.removeItem("token");
+    return {};
+  }
+};
 
-  const oficinaNombre = normalizar(usuario.oficina_nombre || "");
+const formatearFechaInput = (fecha) => {
+  if (!fecha) return "";
+
+  const fechaString = String(fecha);
+
+  if (fechaString.includes("T")) {
+    return fechaString.split("T")[0];
+  }
+
+  return fechaString.slice(0, 10);
+};
+
+export default function Activos() {
+  const usuario = obtenerUsuarioLocal();
+
+  const oficinaNombre = normalizar(
+    usuario.oficina_nombre || usuario.Oficina?.nombre || ""
+  );
 
   const esDireccion =
     usuario.role === "ADMIN" &&
@@ -122,7 +146,7 @@ export default function Activos() {
     const activosBase = esDireccion
       ? activos
       : activos.filter(
-          (activo) => String(activo.oficina_id) === String(usuario.oficina_id),
+          (activo) => String(activo.oficina_id) === String(usuario.oficina_id)
         );
 
     return activosBase.filter((activo) => {
@@ -190,6 +214,7 @@ export default function Activos() {
       });
 
       setEditandoId(null);
+      setActivoAdjuntosAbierto(null);
       await cargarDatos();
     } catch (err) {
       const detalle = err.response?.data?.detalle;
@@ -200,7 +225,7 @@ export default function Activos() {
         setError(
           err.response?.data?.error ||
             err.response?.data?.mensaje ||
-            "Error al guardar el activo",
+            "Error al guardar el activo"
         );
       }
     } finally {
@@ -215,7 +240,7 @@ export default function Activos() {
     }
 
     const confirmar = window.confirm(
-      "¿Seguro que querés dar de baja este activo?",
+      "¿Seguro que querés dar de baja este activo?"
     );
 
     if (!confirmar) return;
@@ -224,7 +249,7 @@ export default function Activos() {
     setMensaje("");
 
     try {
-      await api.delete(`/activos/${id}`);
+      await api.patch(`/activos/${id}/baja`);
       setMensaje("Activo dado de baja correctamente");
       await cargarDatos();
     } catch (err) {
@@ -253,7 +278,7 @@ export default function Activos() {
       numero_serie: activo.numero_serie || "",
       cantidad: activo.cantidad || 1,
       estado: activo.estado || "Buen estado",
-      fecha_alta: activo.fecha_alta || "",
+      fecha_alta: formatearFechaInput(activo.fecha_alta),
       observaciones: activo.observaciones || "",
       categoria_id: activo.categoria_id || "",
       oficina_id: esDireccion
@@ -407,7 +432,11 @@ export default function Activos() {
               ) : (
                 <>
                   <input
-                    value={usuario.oficina_nombre || "Mi oficina"}
+                    value={
+                      usuario.oficina_nombre ||
+                      usuario.Oficina?.nombre ||
+                      "Mi oficina"
+                    }
                     style={styles.input}
                     disabled
                     readOnly
@@ -491,7 +520,7 @@ export default function Activos() {
               <option value="Regular estado">Regular estado</option>
               <option value="Mal estado">Mal estado</option>
               <option value="Sin funcionar">Sin funcionar</option>
-              <option value="Dado de baja">Dado de baja</option>
+              {esDireccion && <option value="Dado de baja">Dado de baja</option>}
             </select>
 
             {esDireccion && (
@@ -519,6 +548,9 @@ export default function Activos() {
                   String(activo.oficina_id) === String(usuario.oficina_id);
 
                 const puedeInteractuar = esDireccion || perteneceAMiOficina;
+
+                const estaDadoDeBaja =
+                  activo.activo === false || activo.estado === "Dado de baja";
 
                 return (
                   <div key={activo.id} style={styles.item}>
@@ -595,7 +627,7 @@ export default function Activos() {
                             setActivoAdjuntosAbierto(
                               activoAdjuntosAbierto === activo.id
                                 ? null
-                                : activo.id,
+                                : activo.id
                             )
                           }
                         >
@@ -604,7 +636,7 @@ export default function Activos() {
                             : "Adjuntos"}
                         </button>
 
-                        {esDireccion && (
+                        {esDireccion && !estaDadoDeBaja && (
                           <button
                             type="button"
                             style={styles.deleteButton}
@@ -631,13 +663,18 @@ export default function Activos() {
 }
 
 const styles = {
-  titulo: { marginTop: 0, marginBottom: "1rem" },
+  titulo: {
+    marginTop: 0,
+    marginBottom: "1rem",
+  },
 
-  subtitulo: { marginTop: 0 },
+  subtitulo: {
+    marginTop: 0,
+  },
 
   grid: {
     display: "grid",
-    gridTemplateColumns: "1fr 1.4fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
     gap: "1rem",
   },
 
@@ -695,6 +732,7 @@ const styles = {
     display: "flex",
     gap: "0.7rem",
     marginTop: "0.5rem",
+    flexWrap: "wrap",
   },
 
   cancelButton: {

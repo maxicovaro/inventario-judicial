@@ -1,7 +1,15 @@
 const { Role } = require("../models");
+const { esAdminGeneral } = require("../utils/permisos");
 
 const listarRoles = async (req, res) => {
   try {
+    if (!esAdminGeneral(req.usuario)) {
+      return res.status(403).json({
+        mensaje:
+          "Acceso denegado. Solo Dirección de Policía Judicial puede consultar roles.",
+      });
+    }
+
     const roles = await Role.findAll({
       order: [["id", "ASC"]],
     });

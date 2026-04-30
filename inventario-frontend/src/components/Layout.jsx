@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 
 const SIDEBAR_EXPANDIDO = 282;
@@ -14,6 +14,16 @@ const normalizar = (texto = "") =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
+const obtenerUsuarioLocal = () => {
+  try {
+    return JSON.parse(localStorage.getItem("usuario") || "{}");
+  } catch (error) {
+    localStorage.removeItem("usuario");
+    localStorage.removeItem("token");
+    return {};
+  }
+};
+
 function Icon({ name, size = 19 }) {
   const common = {
     width: size,
@@ -24,7 +34,7 @@ function Icon({ name, size = 19 }) {
     strokeWidth: 2,
     strokeLinecap: "round",
     strokeLinejoin: "round",
-    ariaHidden: true,
+    "aria-hidden": true,
   };
 
   const icons = {
@@ -96,6 +106,16 @@ function Icon({ name, size = 19 }) {
         <rect x="5" y="4" width="14" height="18" rx="2" />
         <path d="M8 11h8" />
         <path d="M8 15h8" />
+      </>
+    ),
+    solicitudes: (
+      <>
+        <path d="M9 12h6" />
+        <path d="M9 16h6" />
+        <path d="M8 4h8" />
+        <path d="M10 2h4v4h-4z" />
+        <rect x="5" y="4" width="14" height="18" rx="2" />
+        <path d="m9 9 1.5 1.5L14 7" />
       </>
     ),
     historial: (
@@ -183,10 +203,10 @@ function Icon({ name, size = 19 }) {
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
+  const usuario = obtenerUsuarioLocal();
 
   const oficinaNombre = normalizar(
-    usuario.oficina_nombre || usuario.Oficina?.nombre || "",
+    usuario.oficina_nombre || usuario.Oficina?.nombre || ""
   );
 
   const esDireccion =
@@ -218,18 +238,35 @@ export default function Layout({ children }) {
     return () => window.removeEventListener("resize", actualizarPantalla);
   }, []);
 
+  const cargarNoLeidas = useCallback(async () => {
+    try {
+      const response = await api.get("/notificaciones/no-leidas/count");
+      setNoLeidas(response.data.total || 0);
+    } catch (error) {
+      console.error("Error al cargar notificaciones no leídas:", error);
+    }
+  }, []);
+
   useEffect(() => {
-    const cargarNoLeidas = async () => {
-      try {
-        const response = await api.get("/notificaciones/no-leidas/count");
-        setNoLeidas(response.data.total || 0);
-      } catch (error) {
-        console.error(error);
-      }
+    cargarNoLeidas();
+  }, [cargarNoLeidas, location.pathname]);
+
+  useEffect(() => {
+    const actualizarContador = () => {
+      cargarNoLeidas();
     };
 
-    cargarNoLeidas();
-  }, []);
+    window.addEventListener("notificacionesActualizadas", actualizarContador);
+    window.addEventListener("focus", actualizarContador);
+
+    return () => {
+      window.removeEventListener(
+        "notificacionesActualizadas",
+        actualizarContador
+      );
+      window.removeEventListener("focus", actualizarContador);
+    };
+  }, [cargarNoLeidas]);
 
   const cerrarSesion = async () => {
     try {
@@ -239,7 +276,7 @@ export default function Layout({ children }) {
     } finally {
       localStorage.removeItem("token");
       localStorage.removeItem("usuario");
-      navigate("/");
+      navigate("/", { replace: true });
     }
   };
 
@@ -255,8 +292,9 @@ export default function Layout({ children }) {
         "/activos",
         "/stock-oficina",
         "/movimientos-stock",
+        "/solicitudes",
       ]),
-    [location.pathname],
+    [location.pathname]
   );
 
   const miOficinaActiva = useMemo(
@@ -264,10 +302,11 @@ export default function Layout({ children }) {
       isGroupActive([
         "/stock-oficina",
         "/activos",
+        "/solicitudes",
         "/consumo-oficina",
         "/reporte-consumo-oficina",
       ]),
-    [location.pathname],
+    [location.pathname]
   );
 
   const pedidosActivo = useMemo(() => {
@@ -286,12 +325,12 @@ export default function Layout({ children }) {
 
   const administracionActiva = useMemo(
     () => isGroupActive(["/usuarios", "/bitacora"]),
-    [location.pathname],
+    [location.pathname]
   );
 
   const sistemaActivo = useMemo(
     () => isGroupActive(["/notificaciones"]),
-    [location.pathname],
+    [location.pathname]
   );
 
   useEffect(() => {
@@ -380,7 +419,13 @@ export default function Layout({ children }) {
     </Link>
   );
 
-  const renderMenuButton = (label, iconName, menuKey, active = false) => {
+  const renderMenuButton = (
+    label,
+    iconName,
+    menuKey,
+    active = false,
+    extra = null
+  ) => {
     const abierto = menuAbierto === menuKey;
 
     return (
@@ -406,6 +451,12 @@ export default function Layout({ children }) {
 
           {mostrarTexto && <span style={styles.linkText}>{label}</span>}
         </div>
+
+        {mostrarTexto && extra}
+
+        {!mostrarTexto && menuKey === "sistema" && noLeidas > 0 && (
+          <span style={styles.dotBadge} />
+        )}
 
         {mostrarTexto && (
           <span style={styles.chevron}>
@@ -496,7 +547,7 @@ export default function Layout({ children }) {
                   "Gestión central",
                   "central",
                   "direccion",
-                  direccionActiva,
+                  direccionActiva
                 )}
 
                 {mostrarTexto && menuAbierto === "direccion" && (
@@ -504,19 +555,20 @@ export default function Layout({ children }) {
                     {renderLink(
                       "/insumos",
                       "Insumos / stock central",
-                      "package",
+                      "package"
                     )}
                     {renderLink("/activos", "Activos", "asset")}
                     {renderLink(
                       "/stock-oficina",
                       "Stock por oficina",
-                      "warehouse",
+                      "warehouse"
                     )}
                     {renderLink(
                       "/movimientos-stock",
                       "Movimientos de stock",
-                      "movement",
+                      "movement"
                     )}
+                    {renderLink("/solicitudes", "Solicitudes", "solicitudes")}
                   </div>
                 )}
               </div>
@@ -528,7 +580,7 @@ export default function Layout({ children }) {
                   "Pedidos",
                   "pedidos",
                   "pedidos",
-                  pedidosActivo,
+                  pedidosActivo
                 )}
 
                 {mostrarTexto && menuAbierto === "pedidos" && (
@@ -537,22 +589,22 @@ export default function Layout({ children }) {
                     {renderLink(
                       "/historial-pedidos",
                       "Historial pedidos",
-                      "historial",
+                      "historial"
                     )}
                     {renderLink(
                       "/reportes-pedidos",
                       "Reportes pedidos",
-                      "reportes",
+                      "reportes"
                     )}
                     {renderLink(
                       "/consumo-oficina",
                       "Consumos por oficina",
-                      "consumo",
+                      "consumo"
                     )}
                     {renderLink(
                       "/reporte-consumo-oficina",
                       "Reporte mensual oficina",
-                      "reportes",
+                      "reportes"
                     )}
                   </div>
                 )}
@@ -567,7 +619,7 @@ export default function Layout({ children }) {
                   "Administración",
                   "admin",
                   "administracion",
-                  administracionActiva,
+                  administracionActiva
                 )}
 
                 {mostrarTexto && menuAbierto === "administracion" && (
@@ -591,22 +643,23 @@ export default function Layout({ children }) {
                   "Mi oficina",
                   "oficina",
                   "miOficina",
-                  miOficinaActiva,
+                  miOficinaActiva
                 )}
 
                 {mostrarTexto && menuAbierto === "miOficina" && (
                   <div style={styles.submenu}>
                     {renderLink("/stock-oficina", "Mis insumos", "package")}
                     {renderLink("/activos", "Mis activos", "asset")}
+                    {renderLink("/solicitudes", "Solicitudes", "solicitudes")}
                     {renderLink(
                       "/consumo-oficina",
                       "Consumo mensual",
-                      "consumo",
+                      "consumo"
                     )}
                     {renderLink(
                       "/reporte-consumo-oficina",
                       "Mi reporte mensual",
-                      "reportes",
+                      "reportes"
                     )}
                   </div>
                 )}
@@ -619,7 +672,7 @@ export default function Layout({ children }) {
                   "Pedidos",
                   "pedidos",
                   "pedidos",
-                  pedidosActivo,
+                  pedidosActivo
                 )}
 
                 {mostrarTexto && menuAbierto === "pedidos" && (
@@ -628,7 +681,7 @@ export default function Layout({ children }) {
                     {renderLink(
                       "/historial-pedidos",
                       "Mis pedidos",
-                      "historial",
+                      "historial"
                     )}
                   </div>
                 )}
@@ -639,7 +692,15 @@ export default function Layout({ children }) {
           <div style={styles.section}>
             {mostrarTexto && <div style={styles.sectionTitle}>SISTEMA</div>}
 
-            {renderMenuButton("Sistema", "sistema", "sistema", sistemaActivo)}
+            {renderMenuButton(
+              "Sistema",
+              "sistema",
+              "sistema",
+              sistemaActivo,
+              noLeidas > 0 ? (
+                <span style={styles.badge}>{noLeidas}</span>
+              ) : null
+            )}
 
             {mostrarTexto && menuAbierto === "sistema" && (
               <div style={styles.submenu}>
@@ -649,7 +710,7 @@ export default function Layout({ children }) {
                   "bell",
                   noLeidas > 0 ? (
                     <span style={styles.badge}>{noLeidas}</span>
-                  ) : null,
+                  ) : null
                 )}
               </div>
             )}
@@ -942,6 +1003,7 @@ const styles = {
     fontSize: 14,
     transition: "background 0.18s ease, color 0.18s ease",
     boxSizing: "border-box",
+    position: "relative",
   },
 
   menuButtonActive: {

@@ -1,10 +1,32 @@
 const bcrypt = require("bcryptjs");
+const { Op } = require("sequelize");
 const { Usuario, Role, Oficina } = require("../models");
 const { registrarBitacora } = require("../utils/bitacora");
+const { esAdminGeneral } = require("../utils/permisos");
+
+const exigirAdminGeneral = (req, res) => {
+  if (!esAdminGeneral(req.usuario)) {
+    res.status(403).json({
+      mensaje:
+        "Acceso denegado. Solo Dirección de Policía Judicial puede administrar usuarios.",
+    });
+
+    return false;
+  }
+
+  return true;
+};
+
+const mismoId = (a, b) => Number(a) === Number(b);
 
 const listarUsuarios = async (req, res) => {
   try {
+    if (!exigirAdminGeneral(req, res)) return;
+
     const usuarios = await Usuario.findAll({
+      attributes: {
+        exclude: ["password"],
+      },
       include: [
         { model: Role, attributes: ["id", "nombre"] },
         { model: Oficina, attributes: ["id", "nombre"] },
@@ -23,6 +45,8 @@ const listarUsuarios = async (req, res) => {
 
 const crearUsuario = async (req, res) => {
   try {
+    if (!exigirAdminGeneral(req, res)) return;
+
     const { nombre, apellido, email, password, role_id, oficina_id, activo } =
       req.body;
 
@@ -40,8 +64,16 @@ const crearUsuario = async (req, res) => {
       });
     }
 
+    if (password.trim().length < 6) {
+      return res.status(400).json({
+        mensaje: "La contraseña debe tener al menos 6 caracteres",
+      });
+    }
+
+    const emailNormalizado = email.trim().toLowerCase();
+
     const existe = await Usuario.findOne({
-      where: { email },
+      where: { email: emailNormalizado },
     });
 
     if (existe) {
@@ -51,6 +83,7 @@ const crearUsuario = async (req, res) => {
     }
 
     const role = await Role.findByPk(role_id);
+
     if (!role) {
       return res.status(404).json({
         mensaje: "Rol no encontrado",
@@ -58,18 +91,19 @@ const crearUsuario = async (req, res) => {
     }
 
     const oficina = await Oficina.findByPk(oficina_id);
+
     if (!oficina) {
       return res.status(404).json({
         mensaje: "Oficina no encontrada",
       });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password.trim(), 10);
 
     const usuario = await Usuario.create({
-      nombre,
-      apellido,
-      email,
+      nombre: nombre.trim(),
+      apellido: apellido.trim(),
+      email: emailNormalizado,
       password: passwordHash,
       role_id,
       oficina_id,
@@ -83,9 +117,19 @@ const crearUsuario = async (req, res) => {
       descripcion: `Creó el usuario ${usuario.nombre} ${usuario.apellido} (${usuario.email})`,
     });
 
+    const usuarioCreado = await Usuario.findByPk(usuario.id, {
+      attributes: {
+        exclude: ["password"],
+      },
+      include: [
+        { model: Role, attributes: ["id", "nombre"] },
+        { model: Oficina, attributes: ["id", "nombre"] },
+      ],
+    });
+
     return res.status(201).json({
       mensaje: "Usuario creado correctamente",
-      usuario,
+      usuario: usuarioCreado,
     });
   } catch (error) {
     return res.status(500).json({
@@ -97,6 +141,8 @@ const crearUsuario = async (req, res) => {
 
 const actualizarUsuario = async (req, res) => {
   try {
+    if (!exigirAdminGeneral(req, res)) return;
+
     const { id } = req.params;
     const { nombre, apellido, email, password, role_id, oficina_id, activo } =
       req.body;
@@ -109,9 +155,14 @@ const actualizarUsuario = async (req, res) => {
       });
     }
 
-    if (email && email !== usuario.email) {
+    if (email && email.trim().toLowerCase() !== usuario.email) {
       const existe = await Usuario.findOne({
-        where: { email },
+        where: {
+          email: email.trim().toLowerCase(),
+          id: {
+            [Op.ne]: usuario.id,
+          },
+        },
       });
 
       if (existe) {
@@ -123,6 +174,7 @@ const actualizarUsuario = async (req, res) => {
 
     if (role_id) {
       const role = await Role.findByPk(role_id);
+
       if (!role) {
         return res.status(404).json({
           mensaje: "Rol no encontrado",
@@ -132,6 +184,7 @@ const actualizarUsuario = async (req, res) => {
 
     if (oficina_id) {
       const oficina = await Oficina.findByPk(oficina_id);
+
       if (!oficina) {
         return res.status(404).json({
           mensaje: "Oficina no encontrada",
@@ -139,17 +192,27 @@ const actualizarUsuario = async (req, res) => {
       }
     }
 
-    const datosActualizados = {
-      nombre,
-      apellido,
-      email,
-      role_id,
-      oficina_id,
-      activo,
-    };
+    const datosActualizados = {};
+
+    if (nombre !== undefined) datosActualizados.nombre = nombre.trim();
+    if (apellido !== undefined) datosActualizados.apellido = apellido.trim();
+    if (email !== undefined)
+      datosActualizados.email = email.trim().toLowerCase();
+    if (role_id !== undefined) datosActualizados.role_id = role_id;
+    if (oficina_id !== undefined) datosActualizados.oficina_id = oficina_id;
+
+    if (activo !== undefined) {
+      datosActualizados.activo = activo;
+    }
 
     if (password && password.trim() !== "") {
-      datosActualizados.password = await bcrypt.hash(password, 10);
+      if (password.trim().length < 6) {
+        return res.status(400).json({
+          mensaje: "La contraseña debe tener al menos 6 caracteres",
+        });
+      }
+
+      datosActualizados.password = await bcrypt.hash(password.trim(), 10);
     }
 
     await usuario.update(datosActualizados);
@@ -161,9 +224,19 @@ const actualizarUsuario = async (req, res) => {
       descripcion: `Editó el usuario ${usuario.nombre} ${usuario.apellido} (${usuario.email})`,
     });
 
+    const usuarioActualizado = await Usuario.findByPk(usuario.id, {
+      attributes: {
+        exclude: ["password"],
+      },
+      include: [
+        { model: Role, attributes: ["id", "nombre"] },
+        { model: Oficina, attributes: ["id", "nombre"] },
+      ],
+    });
+
     return res.status(200).json({
       mensaje: "Usuario actualizado correctamente",
-      usuario,
+      usuario: usuarioActualizado,
     });
   } catch (error) {
     return res.status(500).json({
@@ -175,6 +248,8 @@ const actualizarUsuario = async (req, res) => {
 
 const cambiarEstadoUsuario = async (req, res) => {
   try {
+    if (!exigirAdminGeneral(req, res)) return;
+
     const { id } = req.params;
 
     const usuario = await Usuario.findByPk(id);
@@ -182,6 +257,12 @@ const cambiarEstadoUsuario = async (req, res) => {
     if (!usuario) {
       return res.status(404).json({
         mensaje: "Usuario no encontrado",
+      });
+    }
+
+    if (mismoId(usuario.id, req.usuario.id)) {
+      return res.status(400).json({
+        mensaje: "No podés activar o desactivar tu propio usuario desde esta acción",
       });
     }
 
@@ -198,9 +279,21 @@ const cambiarEstadoUsuario = async (req, res) => {
       descripcion: `${nuevoEstado ? "Activó" : "Desactivó"} el usuario ${usuario.nombre} ${usuario.apellido} (${usuario.email})`,
     });
 
+    const usuarioActualizado = await Usuario.findByPk(usuario.id, {
+      attributes: {
+        exclude: ["password"],
+      },
+      include: [
+        { model: Role, attributes: ["id", "nombre"] },
+        { model: Oficina, attributes: ["id", "nombre"] },
+      ],
+    });
+
     return res.status(200).json({
-      mensaje: `Usuario ${nuevoEstado ? "activado" : "desactivado"} correctamente`,
-      usuario,
+      mensaje: `Usuario ${
+        nuevoEstado ? "activado" : "desactivado"
+      } correctamente`,
+      usuario: usuarioActualizado,
     });
   } catch (error) {
     return res.status(500).json({
@@ -212,6 +305,8 @@ const cambiarEstadoUsuario = async (req, res) => {
 
 const desbloquearUsuario = async (req, res) => {
   try {
+    if (!exigirAdminGeneral(req, res)) return;
+
     const { id } = req.params;
 
     const usuario = await Usuario.findByPk(id);
@@ -234,9 +329,19 @@ const desbloquearUsuario = async (req, res) => {
       descripcion: `Desbloqueó al usuario ${usuario.nombre} ${usuario.apellido} (${usuario.email})`,
     });
 
+    const usuarioActualizado = await Usuario.findByPk(usuario.id, {
+      attributes: {
+        exclude: ["password"],
+      },
+      include: [
+        { model: Role, attributes: ["id", "nombre"] },
+        { model: Oficina, attributes: ["id", "nombre"] },
+      ],
+    });
+
     return res.status(200).json({
       mensaje: "Usuario desbloqueado correctamente",
-      usuario,
+      usuario: usuarioActualizado,
     });
   } catch (error) {
     return res.status(500).json({
@@ -248,6 +353,8 @@ const desbloquearUsuario = async (req, res) => {
 
 const resetearPasswordUsuario = async (req, res) => {
   try {
+    if (!exigirAdminGeneral(req, res)) return;
+
     const { id } = req.params;
     const { nuevaPassword } = req.body;
 

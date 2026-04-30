@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import {
@@ -15,38 +15,107 @@ import {
   Legend,
 } from "recharts";
 
+const COLORS_MOVIMIENTOS = ["#16a34a", "#dc2626", "#d97706", "#2563eb"];
+
+const formatearNumero = (valor) => {
+  const numero = Number(valor) || 0;
+  return new Intl.NumberFormat("es-AR").format(numero);
+};
+
+const formatearFecha = (fecha) => {
+  if (!fecha) return "-";
+
+  const fechaObj = new Date(fecha);
+
+  if (Number.isNaN(fechaObj.getTime())) {
+    return "-";
+  }
+
+  return fechaObj.toLocaleString("es-AR");
+};
+
+const normalizarSerie = (items = []) =>
+  items.map((item) => ({
+    ...item,
+    total: Number(item.total) || 0,
+  }));
+
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+  const [cargando, setCargando] = useState(true);
 
-  useEffect(() => {
-    const cargarDashboard = async () => {
-      try {
-        const response = await api.get("/dashboard");
-        setData(response.data);
-      } catch (err) {
-        setError(err.response?.data?.mensaje || "Error al cargar el dashboard");
-      }
-    };
+  const cargarDashboard = useCallback(async () => {
+    setCargando(true);
+    setError("");
 
-    cargarDashboard();
+    try {
+      const response = await api.get("/dashboard");
+      setData(response.data);
+    } catch (err) {
+      setData(null);
+      setError(err.response?.data?.mensaje || "Error al cargar el dashboard");
+    } finally {
+      setCargando(false);
+    }
   }, []);
 
-  const formatearFecha = (fecha) => {
-    if (!fecha) return "-";
-    return new Date(fecha).toLocaleString("es-AR");
-  };
+  useEffect(() => {
+    cargarDashboard();
+  }, [cargarDashboard]);
 
   const esVistaOficina = data?.alcance === "OFICINA";
 
+  const resumen = data?.resumen || {};
+
+  const pedidosPorEstado = useMemo(
+    () => normalizarSerie(data?.pedidos_por_estado || []),
+    [data]
+  );
+
+  const movimientosStockPorTipo = useMemo(
+    () => normalizarSerie(data?.movimientos_stock_por_tipo || []),
+    [data]
+  );
+
+  const detalleInsumosStockBajo = data?.detalle_insumos_stock_bajo || [];
+  const ultimosPedidos = data?.ultimos_pedidos || [];
+  const ultimosMovimientosStock = data?.ultimos_movimientos_stock || [];
+  const ultimosMovimientosActivos = data?.ultimos_movimientos_activos || [];
+
   return (
     <Layout>
-      <h1 style={styles.titulo}>Dashboard</h1>
+      <div style={styles.header}>
+        <div>
+          <h1 style={styles.titulo}>Dashboard</h1>
+          <p style={styles.descripcion}>
+            {esVistaOficina
+              ? "Resumen operativo limitado a tu oficina o unidad judicial."
+              : "Resumen general del inventario, pedidos, stock y movimientos."}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={cargarDashboard}
+          style={styles.refreshButton}
+          disabled={cargando}
+        >
+          {cargando ? "Actualizando..." : "Actualizar"}
+        </button>
+      </div>
 
       {error && <p style={styles.error}>{error}</p>}
 
-      {!data ? (
-        <p>Cargando datos...</p>
+      {cargando ? (
+        <p style={styles.loading}>Cargando datos...</p>
+      ) : !data ? (
+        <div style={styles.emptyState}>
+          <p>No se pudieron cargar los datos del dashboard.</p>
+          <button type="button" onClick={cargarDashboard} style={styles.button}>
+            Reintentar
+          </button>
+        </div>
       ) : (
         <>
           {esVistaOficina && (
@@ -58,21 +127,25 @@ export default function Dashboard() {
           <div style={styles.grid}>
             <Card
               titulo={esVistaOficina ? "Mis activos" : "Activos"}
-              valor={data.resumen.total_activos}
+              valor={resumen.total_activos}
               color="#dbeafe"
               texto="#1d4ed8"
             />
 
             <Card
               titulo={esVistaOficina ? "Insumos asignados" : "Insumos"}
-              valor={data.resumen.total_insumos}
+              valor={resumen.total_insumos}
               color="#dcfce7"
               texto="#166534"
             />
 
             <Card
-              titulo={esVistaOficina ? "Usuarios de mi oficina" : "Usuarios activos"}
-              valor={data.resumen.total_usuarios_activos}
+              titulo={
+                esVistaOficina
+                  ? "Usuarios de mi oficina"
+                  : "Usuarios activos"
+              }
+              valor={resumen.total_usuarios_activos}
               color="#f3e8ff"
               texto="#7e22ce"
             />
@@ -83,21 +156,23 @@ export default function Dashboard() {
                   ? "Mis solicitudes pendientes"
                   : "Solicitudes pendientes"
               }
-              valor={data.resumen.total_solicitudes_pendientes}
+              valor={resumen.total_solicitudes_pendientes}
               color="#fef3c7"
               texto="#92400e"
             />
 
             <Card
               titulo={esVistaOficina ? "Insumos agotados" : "Stock bajo"}
-              valor={data.resumen.insumos_stock_bajo}
+              valor={resumen.insumos_stock_bajo}
               color="#fee2e2"
               texto="#991b1b"
             />
 
             <Card
-              titulo={esVistaOficina ? "Mis pedidos enviados" : "Pedidos enviados"}
-              valor={data.resumen.pedidos_enviados}
+              titulo={
+                esVistaOficina ? "Mis pedidos enviados" : "Pedidos enviados"
+              }
+              valor={resumen.pedidos_enviados}
               color="#eff6ff"
               texto="#1d4ed8"
             />
@@ -108,7 +183,7 @@ export default function Dashboard() {
                   ? "Mis pedidos en revisión"
                   : "Pedidos en revisión"
               }
-              valor={data.resumen.pedidos_en_revision}
+              valor={resumen.pedidos_en_revision}
               color="#fefce8"
               texto="#92400e"
             />
@@ -117,7 +192,7 @@ export default function Dashboard() {
               titulo={
                 esVistaOficina ? "Mis pedidos entregados" : "Pedidos entregados"
               }
-              valor={data.resumen.pedidos_entregados}
+              valor={resumen.pedidos_entregados}
               color="#ecfdf5"
               texto="#166534"
             />
@@ -131,17 +206,25 @@ export default function Dashboard() {
                   : "Pedidos por estado"}
               </h2>
 
-              <div style={styles.chartBox}>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={data.pedidos_por_estado || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="estado" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="total" fill="#1f4f82" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              {pedidosPorEstado.length === 0 ? (
+                <p style={styles.emptyText}>No hay datos para graficar.</p>
+              ) : (
+                <div style={styles.chartBox}>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={pedidosPorEstado}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="estado" />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Bar
+                        dataKey="total"
+                        fill="#1f4f82"
+                        radius={[6, 6, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </section>
 
             <section style={styles.section}>
@@ -151,39 +234,36 @@ export default function Dashboard() {
                   : "Movimientos de stock por tipo"}
               </h2>
 
-              <div style={styles.chartBox}>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={data.movimientos_stock_por_tipo || []}
-                      dataKey="total"
-                      nameKey="tipo"
-                      outerRadius={100}
-                      label
-                    >
-                      {(data.movimientos_stock_por_tipo || []).map(
-                        (entry, index) => {
-                          const colors = [
-                            "#16a34a",
-                            "#dc2626",
-                            "#d97706",
-                            "#2563eb",
-                          ];
-
-                          return (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={colors[index % colors.length]}
-                            />
-                          );
-                        },
-                      )}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              {movimientosStockPorTipo.length === 0 ? (
+                <p style={styles.emptyText}>No hay datos para graficar.</p>
+              ) : (
+                <div style={styles.chartBox}>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={movimientosStockPorTipo}
+                        dataKey="total"
+                        nameKey="tipo"
+                        outerRadius={100}
+                        label
+                      >
+                        {movimientosStockPorTipo.map((entry, index) => (
+                          <Cell
+                            key={`cell-${entry.tipo || index}`}
+                            fill={
+                              COLORS_MOVIMIENTOS[
+                                index % COLORS_MOVIMIENTOS.length
+                              ]
+                            }
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </section>
           </div>
 
@@ -195,15 +275,15 @@ export default function Dashboard() {
                   : "Insumos con stock bajo"}
               </h2>
 
-              {(data.detalle_insumos_stock_bajo || []).length === 0 ? (
-                <p>
+              {detalleInsumosStockBajo.length === 0 ? (
+                <p style={styles.emptyText}>
                   {esVistaOficina
                     ? "No hay insumos agotados en tu oficina."
                     : "No hay insumos con stock bajo."}
                 </p>
               ) : (
                 <div style={styles.listado}>
-                  {(data.detalle_insumos_stock_bajo || []).map((insumo) => (
+                  {detalleInsumosStockBajo.map((insumo) => (
                     <div key={insumo.id} style={styles.alertItem}>
                       <strong>
                         {insumo.nombre}
@@ -212,11 +292,15 @@ export default function Dashboard() {
 
                       <p style={styles.itemText}>
                         {esVistaOficina ? (
-                          <>Stock actual en oficina: {insumo.stock_actual}</>
+                          <>
+                            Stock actual en oficina:{" "}
+                            {formatearNumero(insumo.stock_actual)}
+                          </>
                         ) : (
                           <>
-                            Stock actual: {insumo.stock_actual} | Mínimo:{" "}
-                            {insumo.stock_minimo}
+                            Stock actual:{" "}
+                            {formatearNumero(insumo.stock_actual)} | Mínimo:{" "}
+                            {formatearNumero(insumo.stock_minimo)}
                           </>
                         )}
                       </p>
@@ -231,11 +315,11 @@ export default function Dashboard() {
                 {esVistaOficina ? "Mis últimos pedidos" : "Últimos pedidos"}
               </h2>
 
-              {(data.ultimos_pedidos || []).length === 0 ? (
-                <p>No hay pedidos registrados.</p>
+              {ultimosPedidos.length === 0 ? (
+                <p style={styles.emptyText}>No hay pedidos registrados.</p>
               ) : (
                 <div style={styles.listado}>
-                  {(data.ultimos_pedidos || []).map((pedido) => (
+                  {ultimosPedidos.map((pedido) => (
                     <div key={pedido.id} style={styles.item}>
                       <div style={styles.itemHeader}>
                         <span
@@ -244,7 +328,7 @@ export default function Dashboard() {
                             ...getPedidoStyle(pedido.estado),
                           }}
                         >
-                          {pedido.estado}
+                          {pedido.estado || "-"}
                         </span>
                       </div>
 
@@ -254,13 +338,16 @@ export default function Dashboard() {
                       </p>
 
                       <p>
-                        <strong>Oficina:</strong> {pedido.Oficina?.nombre || "-"}
+                        <strong>Oficina:</strong>{" "}
+                        {pedido.Oficina?.nombre || "-"}
                       </p>
 
                       <p>
                         <strong>Usuario:</strong>{" "}
                         {pedido.Usuario
-                          ? `${pedido.Usuario.nombre} ${pedido.Usuario.apellido}`
+                          ? `${pedido.Usuario.nombre || ""} ${
+                              pedido.Usuario.apellido || ""
+                            }`.trim()
                           : "-"}
                       </p>
                     </div>
@@ -278,11 +365,11 @@ export default function Dashboard() {
                   : "Últimos movimientos de stock"}
               </h2>
 
-              {(data.ultimos_movimientos_stock || []).length === 0 ? (
-                <p>No hay movimientos registrados.</p>
+              {ultimosMovimientosStock.length === 0 ? (
+                <p style={styles.emptyText}>No hay movimientos registrados.</p>
               ) : (
                 <div style={styles.listado}>
-                  {(data.ultimos_movimientos_stock || []).map((mov) => (
+                  {ultimosMovimientosStock.map((mov) => (
                     <div key={mov.id} style={styles.item}>
                       <div style={styles.itemHeader}>
                         <span
@@ -291,7 +378,7 @@ export default function Dashboard() {
                             ...getMovimientoStockStyle(mov.tipo),
                           }}
                         >
-                          {mov.tipo}
+                          {mov.tipo || "-"}
                         </span>
                       </div>
 
@@ -301,7 +388,8 @@ export default function Dashboard() {
                       </p>
 
                       <p>
-                        <strong>Cantidad:</strong> {mov.cantidad}
+                        <strong>Cantidad:</strong>{" "}
+                        {formatearNumero(mov.cantidad)}
                       </p>
 
                       <p>
@@ -328,11 +416,11 @@ export default function Dashboard() {
                   : "Últimos movimientos de activos"}
               </h2>
 
-              {(data.ultimos_movimientos_activos || []).length === 0 ? (
-                <p>No hay movimientos registrados.</p>
+              {ultimosMovimientosActivos.length === 0 ? (
+                <p style={styles.emptyText}>No hay movimientos registrados.</p>
               ) : (
                 <div style={styles.listado}>
-                  {(data.ultimos_movimientos_activos || []).map((mov) => (
+                  {ultimosMovimientosActivos.map((mov) => (
                     <div key={mov.id} style={styles.item}>
                       <div style={styles.itemHeader}>
                         <span
@@ -341,7 +429,7 @@ export default function Dashboard() {
                             ...getMovimientoActivoStyle(mov.tipo),
                           }}
                         >
-                          {mov.tipo}
+                          {mov.tipo || "-"}
                         </span>
                       </div>
 
@@ -351,13 +439,15 @@ export default function Dashboard() {
                       </p>
 
                       <p>
-                        <strong>Descripción:</strong> {mov.descripcion}
+                        <strong>Descripción:</strong> {mov.descripcion || "-"}
                       </p>
 
                       <p>
                         <strong>Usuario:</strong>{" "}
                         {mov.Usuario
-                          ? `${mov.Usuario.nombre} ${mov.Usuario.apellido}`
+                          ? `${mov.Usuario.nombre || ""} ${
+                              mov.Usuario.apellido || ""
+                            }`.trim()
                           : "-"}
                       </p>
                     </div>
@@ -376,7 +466,9 @@ function Card({ titulo, valor, color, texto }) {
   return (
     <div style={{ ...styles.card, background: color }}>
       <h3 style={styles.cardTitle}>{titulo}</h3>
-      <p style={{ ...styles.valor, color: texto }}>{valor}</p>
+      <p style={{ ...styles.valor, color: texto }}>
+        {formatearNumero(valor)}
+      </p>
     </div>
   );
 }
@@ -431,9 +523,55 @@ const getPedidoStyle = (estado) => {
 };
 
 const styles = {
-  titulo: {
-    marginTop: 0,
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "1rem",
     marginBottom: "1.5rem",
+    flexWrap: "wrap",
+  },
+
+  titulo: {
+    margin: 0,
+    marginBottom: "0.35rem",
+  },
+
+  descripcion: {
+    margin: 0,
+    color: "#6b7280",
+    fontSize: "0.95rem",
+  },
+
+  refreshButton: {
+    border: "none",
+    borderRadius: "10px",
+    background: "#1f4f82",
+    color: "#ffffff",
+    padding: "0.75rem 1rem",
+    fontWeight: "bold",
+    cursor: "pointer",
+  },
+
+  button: {
+    border: "none",
+    borderRadius: "10px",
+    background: "#1f4f82",
+    color: "#ffffff",
+    padding: "0.75rem 1rem",
+    fontWeight: "bold",
+    cursor: "pointer",
+  },
+
+  loading: {
+    color: "#4b5563",
+  },
+
+  emptyState: {
+    background: "#ffffff",
+    borderRadius: "14px",
+    padding: "1rem",
+    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
   },
 
   scopeBox: {
@@ -449,6 +587,7 @@ const styles = {
   subtitulo: {
     marginTop: 0,
     marginBottom: "1rem",
+    fontSize: "1.1rem",
   },
 
   grid: {
@@ -478,7 +617,7 @@ const styles = {
 
   sectionsGrid: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
     gap: "1rem",
     marginBottom: "1rem",
   },
@@ -488,11 +627,13 @@ const styles = {
     borderRadius: "14px",
     padding: "1rem",
     boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+    minWidth: 0,
   },
 
   chartBox: {
     width: "100%",
     height: "300px",
+    minWidth: 0,
   },
 
   listado: {
@@ -523,6 +664,8 @@ const styles = {
     borderRadius: "999px",
     fontSize: "0.8rem",
     fontWeight: "bold",
+    display: "inline-flex",
+    alignItems: "center",
   },
 
   itemText: {
@@ -530,7 +673,16 @@ const styles = {
     color: "#4b5563",
   },
 
+  emptyText: {
+    color: "#6b7280",
+    margin: 0,
+  },
+
   error: {
     color: "crimson",
+    background: "#fee2e2",
+    border: "1px solid #fecaca",
+    borderRadius: "10px",
+    padding: "0.75rem 1rem",
   },
 };
