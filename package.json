@@ -19,7 +19,8 @@
     "test:safe-errors": "node scripts/test-safe-errors.js",
     "test:db-lifecycle": "node scripts/test-db-lifecycle.js",
     "test:quality-baseline": "node scripts/test-quality-baseline.js",
-    "test": "npm run test:pedido-rules && npm run test:security-rules && npm run test:env-config && npm run test:safe-errors && npm run test:db-lifecycle && npm run test:quality-baseline",
+    "test:ci-config": "node scripts/test-ci-config.js",
+    "test": "npm run test:pedido-rules && npm run test:security-rules && npm run test:env-config && npm run test:safe-errors && npm run test:db-lifecycle && npm run test:quality-baseline && npm run test:ci-config",
     "check": "npm run check:backend && npm test && npm run check:frontend"
   },
   "keywords": [],
