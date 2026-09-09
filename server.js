@@ -4,7 +4,6 @@ const env = require("./src/config/env");
 
 const sequelize = require("./src/config/database");
 require("./src/models");
-const seedInitialData = require("./src/seeders/initialData");
 const {
   safeErrorResponses,
   globalErrorHandler,
@@ -77,10 +76,6 @@ sequelize
   .authenticate()
   .then(() => {
     console.log("✓ Conectado a MySQL correctamente");
-    return sequelize.sync();
-  })
-  .then(() => seedInitialData())
-  .then(() => {
     app.listen(env.PORT, () => {
       console.log(`✓ Servidor iniciado en ambiente ${env.NODE_ENV}, puerto ${env.PORT}`);
     });
