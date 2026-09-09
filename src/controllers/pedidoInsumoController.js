@@ -23,14 +23,13 @@ const {
 
 const { registrarBitacora } = require("../utils/bitacora");
 
-const ESTADOS_VALIDOS = [
-  "BORRADOR",
-  "ENVIADO",
-  "EN_REVISION",
-  "APROBADO",
-  "ENTREGADO",
-  "RECHAZADO",
-];
+const {
+  ESTADOS_VALIDOS,
+  ESTADOS_PROVISIONABLES,
+  ESTADOS_PERMITIDOS_DESDE_PROVISION,
+  validarTransicionEstado,
+  normalizarEnteroNoNegativo,
+} = require("../utils/pedidoRules");
 
 const validarMesAnio = (mes, anio) => {
   const mesNum = Number(mes);
@@ -85,6 +84,28 @@ const crearPedido = async (req, res) => {
     }
 
     const { mesNum, anioNum } = validacionFecha;
+
+    const validacionHechos = normalizarEnteroNoNegativo(
+      cantidad_hechos_delictivos,
+      "La cantidad de hechos delictivos"
+    );
+
+    if (!validacionHechos.valido) {
+      return res.status(400).json({
+        mensaje: validacionHechos.mensaje,
+      });
+    }
+
+    const validacionAutopsias = normalizarEnteroNoNegativo(
+      cantidad_autopsias,
+      "La cantidad de autopsias"
+    );
+
+    if (!validacionAutopsias.valido) {
+      return res.status(400).json({
+        mensaje: validacionAutopsias.mensaje,
+      });
+    }
 
     transaction = await sequelize.transaction();
 
@@ -147,31 +168,90 @@ const crearPedido = async (req, res) => {
         oficina_id: usuario.oficina_id,
         mes: mesNum,
         anio: anioNum,
-        cantidad_hechos_delictivos:
-          Number(cantidad_hechos_delictivos) || 0,
-        cantidad_autopsias: Number(cantidad_autopsias) || 0,
+        cantidad_hechos_delictivos: validacionHechos.valor,
+        cantidad_autopsias: validacionAutopsias.valor,
         observaciones: observaciones?.trim() || null,
         estado: "ENVIADO",
+        fecha_envio: new Date(),
       },
       { transaction }
     );
 
-    for (const item of detalles) {
-      const cantidadSolicitada = Number(item.cantidad_solicitada) || 0;
-      const cantidadProvista = Number(item.cantidad_provista) || 0;
+    const insumosIncluidos = new Set();
 
-      if (cantidadSolicitada < 0 || cantidadProvista < 0) {
+    for (const item of detalles) {
+      const cantidadSolicitada = Number(item.cantidad_solicitada);
+
+      if (
+        !Number.isInteger(cantidadSolicitada) ||
+        cantidadSolicitada < 0
+      ) {
         await transaction.rollback();
         transaction = null;
 
         return res.status(400).json({
           mensaje:
-            "Las cantidades solicitadas o provistas no pueden ser negativas",
+            "La cantidad solicitada debe ser un número entero igual o mayor a 0",
         });
       }
 
+      /*
+       * La oficina solicitante nunca puede definir stock provisto.
+       * Ese dato pertenece exclusivamente al circuito de Dirección.
+       */
+      if (
+        item.cantidad_provista !== undefined &&
+        Number(item.cantidad_provista) !== 0
+      ) {
+        await transaction.rollback();
+        transaction = null;
+
+        return res.status(403).json({
+          mensaje:
+            "La cantidad provista solo puede ser definida por Dirección de Policía Judicial",
+        });
+      }
+
+      const articuloManual =
+        item.articulo_manual?.trim() || null;
+
+      if (!item.insumo_id && !articuloManual) {
+        await transaction.rollback();
+        transaction = null;
+
+        return res.status(400).json({
+          mensaje:
+            "Cada detalle debe indicar un insumo del catálogo o un artículo manual",
+        });
+      }
+
+      let insumoId = null;
+
       if (item.insumo_id) {
-        const insumo = await Insumo.findByPk(item.insumo_id, {
+        insumoId = Number(item.insumo_id);
+
+        if (!Number.isInteger(insumoId) || insumoId <= 0) {
+          await transaction.rollback();
+          transaction = null;
+
+          return res.status(400).json({
+            mensaje: "El identificador del insumo no es válido",
+          });
+        }
+
+        if (insumosIncluidos.has(insumoId)) {
+          await transaction.rollback();
+          transaction = null;
+
+          return res.status(400).json({
+            mensaje:
+              `El insumo con ID ${insumoId} está repetido dentro del pedido`,
+          });
+        }
+
+        insumosIncluidos.add(insumoId);
+
+        const insumo = await Insumo.findByPk(insumoId, {
           transaction,
         });
 
@@ -180,7 +260,17 @@ const crearPedido = async (req, res) => {
           transaction = null;
 
           return res.status(404).json({
-            mensaje: `El insumo con ID ${item.insumo_id} no existe`,
+            mensaje: `El insumo con ID ${insumoId} no existe`,
+          });
+        }
+
+        if (insumo.activo === false) {
+          await transaction.rollback();
+          transaction = null;
+
+          return res.status(400).json({
+            mensaje:
+              `No se puede solicitar el insumo inactivo "${insumo.nombre}"`,
           });
         }
       }
@@ -188,12 +278,15 @@ const crearPedido = async (req, res) => {
       await PedidoInsumoDetalle.create(
         {
           pedido_id: pedido.id,
-          insumo_id: item.insumo_id || null,
-          articulo_manual: item.articulo_manual?.trim() || null,
+          insumo_id: insumoId,
+          articulo_manual: insumoId ? null : articuloManual,
           cantidad_solicitada: cantidadSolicitada,
-          tuvo_problema: item.tuvo_problema || false,
-          detalle_problema: item.detalle_problema?.trim() || null,
-          cantidad_provista: cantidadProvista,
+          tuvo_problema: item.tuvo_problema === true,
+          detalle_problema:
+            item.detalle_problema?.trim() || null,
+
+          // Siempre comienza en cero.
+          cantidad_provista: 0,
         },
         { transaction }
       );
@@ -229,6 +322,16 @@ const crearPedido = async (req, res) => {
   } catch (error) {
     if (transaction) {
       await transaction.rollback();
+    }
+
+    if (
+      error.name === "SequelizeUniqueConstraintError" ||
+      error.original?.code === "ER_DUP_ENTRY"
+    ) {
+      return res.status(409).json({
+        mensaje:
+          "Ya existe un pedido para ese mes y esa oficina",
+      });
     }
 
     return res.status(500).json({
@@ -308,6 +411,16 @@ const actualizarProvision = async (req, res) => {
       });
     }
 
+    if (
+      estado &&
+      !ESTADOS_PERMITIDOS_DESDE_PROVISION.includes(estado)
+    ) {
+      return res.status(400).json({
+        mensaje:
+          "Ese estado no puede establecerse desde la provisión del pedido",
+      });
+    }
+
     if (!detalles || !Array.isArray(detalles) || detalles.length === 0) {
       return res.status(400).json({
         mensaje: "Debés enviar el detalle de provisión",
@@ -331,6 +444,29 @@ const actualizarProvision = async (req, res) => {
 
       return res.status(404).json({
         mensaje: "Pedido no encontrado",
+      });
+    }
+
+    if (!ESTADOS_PROVISIONABLES.includes(pedido.estado)) {
+      await transaction.rollback();
+      transaction = null;
+
+      return res.status(409).json({
+        mensaje:
+          `El pedido está en estado ${pedido.estado} y ya no admite modificaciones de provisión`,
+      });
+    }
+
+    if (
+      estado &&
+      !validarTransicionEstado(pedido.estado, estado)
+    ) {
+      await transaction.rollback();
+      transaction = null;
+
+      return res.status(409).json({
+        mensaje:
+          `Transición de estado no permitida: ${pedido.estado} -> ${estado}`,
       });
     }
 
@@ -592,6 +728,17 @@ const actualizarEstadoPedido = async (req, res) => {
       });
     }
 
+    /*
+     * ENTREGADO implica transferencia real de stock.
+     * Por eso solo puede establecerse desde /proveer.
+     */
+    if (estado === "ENTREGADO") {
+      return res.status(400).json({
+        mensaje:
+          "El estado ENTREGADO debe registrarse mediante la provisión del pedido",
+      });
+    }
+
     const pedido = await PedidoInsumo.findByPk(req.params.id, {
       include: [{ model: Oficina, attributes: ["nombre"] }],
     });
@@ -603,6 +750,13 @@ const actualizarEstadoPedido = async (req, res) => {
     }
 
     const estadoAnterior = pedido.estado;
+
+    if (!validarTransicionEstado(estadoAnterior, estado)) {
+      return res.status(409).json({
+        mensaje:
+          `Transición de estado no permitida: ${estadoAnterior} -> ${estado}`,
+      });
+    }
 
     pedido.estado = estado;
     await pedido.save();
