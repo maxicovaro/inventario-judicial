@@ -19,8 +19,9 @@
     "test:safe-errors": "node scripts/test-safe-errors.js",
     "test:db-lifecycle": "node scripts/test-db-lifecycle.js",
     "test:quality-baseline": "node scripts/test-quality-baseline.js",
+    "test:dependencies": "node scripts/test-dependency-security.js",
     "test:ci-config": "node scripts/test-ci-config.js",
-    "test": "npm run test:pedido-rules && npm run test:security-rules && npm run test:env-config && npm run test:safe-errors && npm run test:db-lifecycle && npm run test:quality-baseline && npm run test:ci-config",
+    "test": "npm run test:pedido-rules && npm run test:security-rules && npm run test:env-config && npm run test:safe-errors && npm run test:db-lifecycle && npm run test:quality-baseline && npm run test:dependencies && npm run test:ci-config",
     "check": "npm run check:backend && npm test && npm run check:frontend"
   },
   "keywords": [],
@@ -36,13 +37,21 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.8.0",
-    "multer": "^2.1.1",
-    "mysql2": "^3.21.1",
+    "multer": "^2.3.0",
+    "mysql2": "^3.23.1",
     "pdfkit": "^0.18.0",
     "sequelize": "^6.37.8",
-    "sharp": "^0.34.5"
+    "sharp": "^0.35.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "11.1.1"
+    },
+    "sequelize": {
+      "uuid": "11.1.1"
+    }
   }
 }
