@@ -15,6 +15,11 @@ assert.match(workflow, /npm test/);
 assert.match(workflow, /npm run lint/);
 assert.match(workflow, /npm run build/);
 assert.match(workflow, /node-version:\s*22/);
+
+const auditCommands = workflow.match(/npm audit --audit-level=moderate/g) || [];
+assert.strictEqual(auditCommands.length, 2);
+
+assert.ok(packageJson.scripts["test:dependencies"]);
 assert.ok(packageJson.scripts["test:ci-config"]);
 
 console.log("Configuración de CI validada correctamente.");
