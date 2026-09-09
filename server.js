@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-require("dotenv").config();
+const env = require("./src/config/env");
 
 const sequelize = require("./src/config/database");
 require("./src/models");
@@ -27,20 +27,19 @@ const bitacoraRoutes = require("./src/routes/bitacoraRoutes");
 
 const app = express();
 
-const PORT = process.env.PORT || 3000;
-
-app.use(cors());
+app.use(
+  cors({
+    origin: env.CORS_ORIGIN,
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (req, res) => {
-  res.json({
-    mensaje: "Servidor del sistema de inventario funcionando ✓",
-  });
+  res.json({ mensaje: "Servidor del sistema de inventario funcionando ✓" });
 });
 
 app.use("/api/auth", authRoutes);
-
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/usuarios", usuarioRoutes);
 app.use("/api/roles", roleRoutes);
@@ -48,19 +47,15 @@ app.use("/api/oficinas", oficinaRoutes);
 app.use("/api/categorias", categoriaRoutes);
 app.use("/api/bitacora", bitacoraRoutes);
 app.use("/api/notificaciones", notificacionRoutes);
-
 app.use("/api/activos", activoRoutes);
 app.use("/api/solicitudes", solicitudRoutes);
 app.use("/api/adjuntos", adjuntoRoutes);
-
 app.use("/api/insumos", insumoRoutes);
 app.use("/api/movimientos-stock", movimientoStockRoutes);
 app.use("/api/stock-oficina", stockOficinaRoutes);
 app.use("/api/consumo-oficina", consumoOficinaRoutes);
-
 app.use("/api/pedidos", pedidoInsumoRoutes);
 app.use("/api/pedidos-insumos", pedidoInsumoRoutes);
-
 app.use("/api/reportes", reporteConsumoOficinaRoutes);
 app.use("/api/reportes-pedidos", reportePedidoRoutes);
 
@@ -70,7 +65,6 @@ app.use((error, req, res, next) => {
       mensaje: error.message || "Error en la carga del archivo",
     });
   }
-
   next();
 });
 
@@ -89,8 +83,8 @@ sequelize
   })
   .then(() => seedInitialData())
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`✓ Servidor corriendo en http://localhost:${PORT}`);
+    app.listen(env.PORT, () => {
+      console.log(`✓ Servidor iniciado en ambiente ${env.NODE_ENV}, puerto ${env.PORT}`);
     });
   })
   .catch((error) => {
