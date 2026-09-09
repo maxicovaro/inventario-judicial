@@ -26,8 +26,9 @@ const verificarToken = async (req, res, next) => {
     }
 
     if (!process.env.JWT_SECRET) {
+      console.error("JWT_SECRET no está configurado");
       return res.status(500).json({
-        mensaje: "JWT_SECRET no configurado en el servidor",
+        mensaje: "Error interno de autenticación",
       });
     }
 
@@ -35,14 +36,8 @@ const verificarToken = async (req, res, next) => {
 
     const usuario = await Usuario.findByPk(decoded.id, {
       include: [
-        {
-          model: Role,
-          attributes: ["id", "nombre"],
-        },
-        {
-          model: Oficina,
-          attributes: ["id", "nombre"],
-        },
+        { model: Role, attributes: ["id", "nombre"] },
+        { model: Oficina, attributes: ["id", "nombre"] },
       ],
     });
 
@@ -69,9 +64,9 @@ const verificarToken = async (req, res, next) => {
 
     next();
   } catch (error) {
+    console.warn("Token rechazado:", error.name);
     return res.status(401).json({
       mensaje: "Token inválido o expirado",
-      error: error.message,
     });
   }
 };
@@ -79,15 +74,11 @@ const verificarToken = async (req, res, next) => {
 const verificarRol = (...rolesPermitidos) => {
   return (req, res, next) => {
     if (!req.usuario || !req.usuario.role) {
-      return res.status(403).json({
-        mensaje: "Acceso denegado. Rol no identificado",
-      });
+      return res.status(403).json({ mensaje: "Acceso denegado. Rol no identificado" });
     }
 
     if (!rolesPermitidos.includes(req.usuario.role)) {
-      return res.status(403).json({
-        mensaje: "No tenés permisos para acceder a este recurso",
-      });
+      return res.status(403).json({ mensaje: "No tenés permisos para acceder a este recurso" });
     }
 
     next();
@@ -97,23 +88,15 @@ const verificarRol = (...rolesPermitidos) => {
 const permitirRoles = (...rolesPermitidos) => {
   return (req, res, next) => {
     if (!req.usuario || !req.usuario.role) {
-      return res.status(403).json({
-        mensaje: "Acceso denegado. Rol no identificado",
-      });
+      return res.status(403).json({ mensaje: "Acceso denegado. Rol no identificado" });
     }
 
     if (!rolesPermitidos.includes(req.usuario.role)) {
-      return res.status(403).json({
-        mensaje: "No tenés permisos para esta acción",
-      });
+      return res.status(403).json({ mensaje: "No tenés permisos para esta acción" });
     }
 
     next();
   };
 };
 
-module.exports = {
-  verificarToken,
-  verificarRol,
-  permitirRoles,
-};
+module.exports = { verificarToken, verificarRol, permitirRoles };

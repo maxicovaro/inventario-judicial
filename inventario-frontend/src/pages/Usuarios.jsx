@@ -18,6 +18,16 @@ const defaultValues = {
   esEdicion: false,
 };
 
+const passwordSegura = (password) =>
+  password.length >= 12 &&
+  /[a-z]/.test(password) &&
+  /[A-Z]/.test(password) &&
+  /\d/.test(password) &&
+  /[^A-Za-z0-9]/.test(password);
+
+const passwordPolicyMessage =
+  "La contraseña debe tener al menos 12 caracteres e incluir mayúscula, minúscula, número y símbolo";
+
 export default function Usuarios() {
   const [usuarios, setUsuarios] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -271,19 +281,21 @@ export default function Usuarios() {
 
   const resetearPasswordUsuario = async (usuario) => {
     const nuevaPassword = window.prompt(
-      `Ingresá la nueva contraseña para ${usuario.nombre} ${usuario.apellido} (mínimo 6 caracteres):`,
+      `Ingresá la nueva contraseña para ${usuario.nombre} ${usuario.apellido}. Debe tener al menos 12 caracteres e incluir mayúscula, minúscula, número y símbolo:`,
     );
 
     if (nuevaPassword === null) return;
 
-    if (!nuevaPassword || nuevaPassword.trim().length < 6) {
-      toast.error("La nueva contraseña debe tener al menos 6 caracteres");
+    const password = nuevaPassword.trim();
+
+    if (!passwordSegura(password)) {
+      toast.error(passwordPolicyMessage);
       return;
     }
 
     try {
       await api.patch(`/usuarios/${usuario.id}/reset-password`, {
-        nuevaPassword: nuevaPassword.trim(),
+        nuevaPassword: password,
       });
       toast.success("Contraseña reseteada correctamente");
       await cargarDatos();

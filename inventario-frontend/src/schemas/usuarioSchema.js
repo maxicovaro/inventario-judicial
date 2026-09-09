@@ -1,13 +1,20 @@
 import { z } from "zod";
 
+const passwordValida = (password) =>
+  password.length >= 12 &&
+  /[a-z]/.test(password) &&
+  /[A-Z]/.test(password) &&
+  /\d/.test(password) &&
+  /[^A-Za-z0-9]/.test(password);
+
+const passwordMessage =
+  "La contraseña debe tener al menos 12 caracteres e incluir mayúscula, minúscula, número y símbolo";
+
 export const usuarioSchema = z
   .object({
     nombre: z.string().min(1, "El nombre es obligatorio"),
     apellido: z.string().min(1, "El apellido es obligatorio"),
-    email: z
-      .string()
-      .min(1, "El email es obligatorio")
-      .email("Email inválido"),
+    email: z.string().min(1, "El email es obligatorio").email("Email inválido"),
     password: z.string(),
     confirmPassword: z.string(),
     role_id: z.coerce.number().min(1, "El rol es obligatorio"),
@@ -20,39 +27,35 @@ export const usuarioSchema = z
     const confirmPassword = data.confirmPassword?.trim() || "";
     const esEdicion = Boolean(data.esEdicion);
 
-    if (!esEdicion) {
-      if (password.length < 6) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["password"],
-          message: "La contraseña debe tener al menos 6 caracteres",
-        });
-      }
-
-      if (confirmPassword.length < 6) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["confirmPassword"],
-          message: "Confirmá la contraseña",
-        });
-      }
-    }
-
-    if (esEdicion && password.length > 0 && password.length < 6) {
+    if (!esEdicion && !passwordValida(password)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["password"],
-        message: "La contraseña debe tener al menos 6 caracteres",
+        message: passwordMessage,
       });
     }
 
-    if (password || confirmPassword) {
-      if (password !== confirmPassword) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["confirmPassword"],
-          message: "Las contraseñas no coinciden",
-        });
-      }
+    if (!esEdicion && !passwordValida(confirmPassword)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Confirmá una contraseña que cumpla la política de seguridad",
+      });
+    }
+
+    if (esEdicion && password.length > 0 && !passwordValida(password)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["password"],
+        message: passwordMessage,
+      });
+    }
+
+    if ((password || confirmPassword) && password !== confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Las contraseñas no coinciden",
+      });
     }
   });
