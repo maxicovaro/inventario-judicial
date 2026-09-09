@@ -3,6 +3,10 @@ const { Op } = require("sequelize");
 const { Usuario, Role, Oficina } = require("../models");
 const { registrarBitacora } = require("../utils/bitacora");
 const { esAdminGeneral } = require("../utils/permisos");
+const {
+  PASSWORD_BCRYPT_ROUNDS,
+  validarPassword,
+} = require("../utils/passwordPolicy");
 
 const exigirAdminGeneral = (req, res) => {
   if (!esAdminGeneral(req.usuario)) {
@@ -10,10 +14,8 @@ const exigirAdminGeneral = (req, res) => {
       mensaje:
         "Acceso denegado. Solo Dirección de Policía Judicial puede administrar usuarios.",
     });
-
     return false;
   }
-
   return true;
 };
 
@@ -22,83 +24,53 @@ const mismoId = (a, b) => Number(a) === Number(b);
 const listarUsuarios = async (req, res) => {
   try {
     if (!exigirAdminGeneral(req, res)) return;
-
     const usuarios = await Usuario.findAll({
-      attributes: {
-        exclude: ["password"],
-      },
+      attributes: { exclude: ["password"] },
       include: [
         { model: Role, attributes: ["id", "nombre"] },
         { model: Oficina, attributes: ["id", "nombre"] },
       ],
       order: [["id", "DESC"]],
     });
-
     return res.status(200).json(usuarios);
   } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al listar usuarios",
-      error: error.message,
-    });
+    console.error("Error al listar usuarios:", error);
+    return res.status(500).json({ mensaje: "Error al listar usuarios" });
   }
 };
 
 const crearUsuario = async (req, res) => {
   try {
     if (!exigirAdminGeneral(req, res)) return;
+    const { nombre, apellido, email, password, role_id, oficina_id, activo } = req.body;
 
-    const { nombre, apellido, email, password, role_id, oficina_id, activo } =
-      req.body;
-
-    if (
-      !nombre ||
-      !apellido ||
-      !email ||
-      !password ||
-      !role_id ||
-      !oficina_id
-    ) {
+    if (!nombre || !apellido || !email || !password || !role_id || !oficina_id) {
       return res.status(400).json({
-        mensaje:
-          "Nombre, apellido, email, contraseña, rol y oficina son obligatorios",
+        mensaje: "Nombre, apellido, email, contraseña, rol y oficina son obligatorios",
       });
     }
 
-    if (password.trim().length < 6) {
-      return res.status(400).json({
-        mensaje: "La contraseña debe tener al menos 6 caracteres",
-      });
+    const validacionPassword = validarPassword(password);
+    if (!validacionPassword.valida) {
+      return res.status(400).json({ mensaje: validacionPassword.mensaje });
     }
 
     const emailNormalizado = email.trim().toLowerCase();
-
-    const existe = await Usuario.findOne({
-      where: { email: emailNormalizado },
-    });
-
+    const existe = await Usuario.findOne({ where: { email: emailNormalizado } });
     if (existe) {
-      return res.status(400).json({
-        mensaje: "Ya existe un usuario con ese email",
-      });
+      return res.status(400).json({ mensaje: "Ya existe un usuario con ese email" });
     }
 
     const role = await Role.findByPk(role_id);
-
-    if (!role) {
-      return res.status(404).json({
-        mensaje: "Rol no encontrado",
-      });
-    }
+    if (!role) return res.status(404).json({ mensaje: "Rol no encontrado" });
 
     const oficina = await Oficina.findByPk(oficina_id);
+    if (!oficina) return res.status(404).json({ mensaje: "Oficina no encontrada" });
 
-    if (!oficina) {
-      return res.status(404).json({
-        mensaje: "Oficina no encontrada",
-      });
-    }
-
-    const passwordHash = await bcrypt.hash(password.trim(), 10);
+    const passwordHash = await bcrypt.hash(
+      validacionPassword.password,
+      PASSWORD_BCRYPT_ROUNDS,
+    );
 
     const usuario = await Usuario.create({
       nombre: nombre.trim(),
@@ -118,105 +90,68 @@ const crearUsuario = async (req, res) => {
     });
 
     const usuarioCreado = await Usuario.findByPk(usuario.id, {
-      attributes: {
-        exclude: ["password"],
-      },
+      attributes: { exclude: ["password"] },
       include: [
         { model: Role, attributes: ["id", "nombre"] },
         { model: Oficina, attributes: ["id", "nombre"] },
       ],
     });
 
-    return res.status(201).json({
-      mensaje: "Usuario creado correctamente",
-      usuario: usuarioCreado,
-    });
+    return res.status(201).json({ mensaje: "Usuario creado correctamente", usuario: usuarioCreado });
   } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al crear usuario",
-      error: error.message,
-    });
+    console.error("Error al crear usuario:", error);
+    return res.status(500).json({ mensaje: "Error al crear usuario" });
   }
 };
 
 const actualizarUsuario = async (req, res) => {
   try {
     if (!exigirAdminGeneral(req, res)) return;
-
     const { id } = req.params;
-    const { nombre, apellido, email, password, role_id, oficina_id, activo } =
-      req.body;
-
+    const { nombre, apellido, email, password, role_id, oficina_id, activo } = req.body;
     const usuario = await Usuario.findByPk(id);
-
-    if (!usuario) {
-      return res.status(404).json({
-        mensaje: "Usuario no encontrado",
-      });
-    }
+    if (!usuario) return res.status(404).json({ mensaje: "Usuario no encontrado" });
 
     if (email && email.trim().toLowerCase() !== usuario.email) {
       const existe = await Usuario.findOne({
         where: {
           email: email.trim().toLowerCase(),
-          id: {
-            [Op.ne]: usuario.id,
-          },
+          id: { [Op.ne]: usuario.id },
         },
       });
-
-      if (existe) {
-        return res.status(400).json({
-          mensaje: "Ya existe un usuario con ese email",
-        });
-      }
+      if (existe) return res.status(400).json({ mensaje: "Ya existe un usuario con ese email" });
     }
 
     if (role_id) {
       const role = await Role.findByPk(role_id);
-
-      if (!role) {
-        return res.status(404).json({
-          mensaje: "Rol no encontrado",
-        });
-      }
+      if (!role) return res.status(404).json({ mensaje: "Rol no encontrado" });
     }
 
     if (oficina_id) {
       const oficina = await Oficina.findByPk(oficina_id);
-
-      if (!oficina) {
-        return res.status(404).json({
-          mensaje: "Oficina no encontrada",
-        });
-      }
+      if (!oficina) return res.status(404).json({ mensaje: "Oficina no encontrada" });
     }
 
     const datosActualizados = {};
-
     if (nombre !== undefined) datosActualizados.nombre = nombre.trim();
     if (apellido !== undefined) datosActualizados.apellido = apellido.trim();
-    if (email !== undefined)
-      datosActualizados.email = email.trim().toLowerCase();
+    if (email !== undefined) datosActualizados.email = email.trim().toLowerCase();
     if (role_id !== undefined) datosActualizados.role_id = role_id;
     if (oficina_id !== undefined) datosActualizados.oficina_id = oficina_id;
-
-    if (activo !== undefined) {
-      datosActualizados.activo = activo;
-    }
+    if (activo !== undefined) datosActualizados.activo = activo;
 
     if (password && password.trim() !== "") {
-      if (password.trim().length < 6) {
-        return res.status(400).json({
-          mensaje: "La contraseña debe tener al menos 6 caracteres",
-        });
+      const validacionPassword = validarPassword(password);
+      if (!validacionPassword.valida) {
+        return res.status(400).json({ mensaje: validacionPassword.mensaje });
       }
-
-      datosActualizados.password = await bcrypt.hash(password.trim(), 10);
+      datosActualizados.password = await bcrypt.hash(
+        validacionPassword.password,
+        PASSWORD_BCRYPT_ROUNDS,
+      );
     }
 
     await usuario.update(datosActualizados);
-
     await registrarBitacora({
       usuario_id: req.usuario.id,
       accion: "EDITAR",
@@ -225,53 +160,31 @@ const actualizarUsuario = async (req, res) => {
     });
 
     const usuarioActualizado = await Usuario.findByPk(usuario.id, {
-      attributes: {
-        exclude: ["password"],
-      },
+      attributes: { exclude: ["password"] },
       include: [
         { model: Role, attributes: ["id", "nombre"] },
         { model: Oficina, attributes: ["id", "nombre"] },
       ],
     });
 
-    return res.status(200).json({
-      mensaje: "Usuario actualizado correctamente",
-      usuario: usuarioActualizado,
-    });
+    return res.status(200).json({ mensaje: "Usuario actualizado correctamente", usuario: usuarioActualizado });
   } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al actualizar usuario",
-      error: error.message,
-    });
+    console.error("Error al actualizar usuario:", error);
+    return res.status(500).json({ mensaje: "Error al actualizar usuario" });
   }
 };
 
 const cambiarEstadoUsuario = async (req, res) => {
   try {
     if (!exigirAdminGeneral(req, res)) return;
-
-    const { id } = req.params;
-
-    const usuario = await Usuario.findByPk(id);
-
-    if (!usuario) {
-      return res.status(404).json({
-        mensaje: "Usuario no encontrado",
-      });
-    }
-
+    const usuario = await Usuario.findByPk(req.params.id);
+    if (!usuario) return res.status(404).json({ mensaje: "Usuario no encontrado" });
     if (mismoId(usuario.id, req.usuario.id)) {
-      return res.status(400).json({
-        mensaje: "No podés activar o desactivar tu propio usuario desde esta acción",
-      });
+      return res.status(400).json({ mensaje: "No podés activar o desactivar tu propio usuario desde esta acción" });
     }
 
     const nuevoEstado = !usuario.activo;
-
-    await usuario.update({
-      activo: nuevoEstado,
-    });
-
+    await usuario.update({ activo: nuevoEstado });
     await registrarBitacora({
       usuario_id: req.usuario.id,
       accion: nuevoEstado ? "ACTIVAR" : "DESACTIVAR",
@@ -280,9 +193,7 @@ const cambiarEstadoUsuario = async (req, res) => {
     });
 
     const usuarioActualizado = await Usuario.findByPk(usuario.id, {
-      attributes: {
-        exclude: ["password"],
-      },
+      attributes: { exclude: ["password"] },
       include: [
         { model: Role, attributes: ["id", "nombre"] },
         { model: Oficina, attributes: ["id", "nombre"] },
@@ -290,38 +201,22 @@ const cambiarEstadoUsuario = async (req, res) => {
     });
 
     return res.status(200).json({
-      mensaje: `Usuario ${
-        nuevoEstado ? "activado" : "desactivado"
-      } correctamente`,
+      mensaje: `Usuario ${nuevoEstado ? "activado" : "desactivado"} correctamente`,
       usuario: usuarioActualizado,
     });
   } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al cambiar estado del usuario",
-      error: error.message,
-    });
+    console.error("Error al cambiar estado del usuario:", error);
+    return res.status(500).json({ mensaje: "Error al cambiar estado del usuario" });
   }
 };
 
 const desbloquearUsuario = async (req, res) => {
   try {
     if (!exigirAdminGeneral(req, res)) return;
+    const usuario = await Usuario.findByPk(req.params.id);
+    if (!usuario) return res.status(404).json({ mensaje: "Usuario no encontrado" });
 
-    const { id } = req.params;
-
-    const usuario = await Usuario.findByPk(id);
-
-    if (!usuario) {
-      return res.status(404).json({
-        mensaje: "Usuario no encontrado",
-      });
-    }
-
-    await usuario.update({
-      intentos_fallidos: 0,
-      bloqueado_hasta: null,
-    });
-
+    await usuario.update({ intentos_fallidos: 0, bloqueado_hasta: null });
     await registrarBitacora({
       usuario_id: req.usuario.id,
       accion: "DESBLOQUEAR",
@@ -330,55 +225,36 @@ const desbloquearUsuario = async (req, res) => {
     });
 
     const usuarioActualizado = await Usuario.findByPk(usuario.id, {
-      attributes: {
-        exclude: ["password"],
-      },
+      attributes: { exclude: ["password"] },
       include: [
         { model: Role, attributes: ["id", "nombre"] },
         { model: Oficina, attributes: ["id", "nombre"] },
       ],
     });
 
-    return res.status(200).json({
-      mensaje: "Usuario desbloqueado correctamente",
-      usuario: usuarioActualizado,
-    });
+    return res.status(200).json({ mensaje: "Usuario desbloqueado correctamente", usuario: usuarioActualizado });
   } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al desbloquear usuario",
-      error: error.message,
-    });
+    console.error("Error al desbloquear usuario:", error);
+    return res.status(500).json({ mensaje: "Error al desbloquear usuario" });
   }
 };
 
 const resetearPasswordUsuario = async (req, res) => {
   try {
     if (!exigirAdminGeneral(req, res)) return;
-
-    const { id } = req.params;
-    const { nuevaPassword } = req.body;
-
-    if (!nuevaPassword || nuevaPassword.trim().length < 6) {
-      return res.status(400).json({
-        mensaje: "La nueva contraseña debe tener al menos 6 caracteres",
-      });
+    const validacionPassword = validarPassword(req.body.nuevaPassword);
+    if (!validacionPassword.valida) {
+      return res.status(400).json({ mensaje: validacionPassword.mensaje });
     }
 
-    const usuario = await Usuario.findByPk(id);
+    const usuario = await Usuario.findByPk(req.params.id);
+    if (!usuario) return res.status(404).json({ mensaje: "Usuario no encontrado" });
 
-    if (!usuario) {
-      return res.status(404).json({
-        mensaje: "Usuario no encontrado",
-      });
-    }
-
-    const passwordHash = await bcrypt.hash(nuevaPassword.trim(), 10);
-
-    await usuario.update({
-      password: passwordHash,
-      intentos_fallidos: 0,
-      bloqueado_hasta: null,
-    });
+    const passwordHash = await bcrypt.hash(
+      validacionPassword.password,
+      PASSWORD_BCRYPT_ROUNDS,
+    );
+    await usuario.update({ password: passwordHash, intentos_fallidos: 0, bloqueado_hasta: null });
 
     await registrarBitacora({
       usuario_id: req.usuario.id,
@@ -387,14 +263,10 @@ const resetearPasswordUsuario = async (req, res) => {
       descripcion: `Reseteó la contraseña del usuario ${usuario.nombre} ${usuario.apellido} (${usuario.email})`,
     });
 
-    return res.status(200).json({
-      mensaje: "Contraseña reseteada correctamente",
-    });
+    return res.status(200).json({ mensaje: "Contraseña reseteada correctamente" });
   } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al resetear contraseña",
-      error: error.message,
-    });
+    console.error("Error al resetear contraseña:", error);
+    return res.status(500).json({ mensaje: "Error al resetear contraseña" });
   }
 };
 

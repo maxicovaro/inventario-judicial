@@ -1,7 +1,13 @@
 import axios from "axios";
 
+const baseURL = import.meta.env.VITE_API_URL;
+
+if (!baseURL) {
+  throw new Error("Falta configurar VITE_API_URL para el frontend");
+}
+
 const api = axios.create({
-  baseURL: "http://localhost:3000/api",
+  baseURL,
 });
 
 api.interceptors.request.use(
@@ -14,9 +20,7 @@ api.interceptors.request.use(
 
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error),
 );
 
 api.interceptors.response.use(
@@ -34,7 +38,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

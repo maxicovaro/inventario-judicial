@@ -1,14 +1,11 @@
-const bcrypt = require('bcryptjs');
 const {
   Role,
   Oficina,
-  Usuario,
   Categoria,
 } = require('../models');
 
 const seedInitialData = async () => {
   try {
-    // Roles
     const roles = ['ADMIN', 'RESPONSABLE', 'USUARIO'];
 
     for (const nombre of roles) {
@@ -17,7 +14,6 @@ const seedInitialData = async () => {
       });
     }
 
-    // Categorías
     const categorias = [
       {
         nombre: 'Muebles de oficina',
@@ -56,7 +52,6 @@ const seedInitialData = async () => {
       });
     }
 
-    // Oficinas iniciales
     const oficinas = [
       { nombre: 'Dirección de Policía Judicial', descripcion: 'Oficina central' },
       { nombre: 'Depósito', descripcion: 'Depósito central de bienes e insumos' },
@@ -94,30 +89,10 @@ const seedInitialData = async () => {
       });
     }
 
-    // Usuario admin inicial
-    const adminRole = await Role.findOne({ where: { nombre: 'ADMIN' } });
-    const oficinaDireccion = await Oficina.findOne({
-      where: { nombre: 'Dirección de Policía Judicial' },
-    });
-
-    const hashedPassword = await bcrypt.hash('Admin1234', 10);
-
-    await Usuario.findOrCreate({
-      where: { email: 'admin@inventariojudicial.local' },
-      defaults: {
-        nombre: 'Administrador',
-        apellido: 'General',
-        email: 'admin@inventariojudicial.local',
-        password: hashedPassword,
-        activo: true,
-        role_id: adminRole.id,
-        oficina_id: oficinaDireccion.id,
-      },
-    });
-
-    console.log('✓ Datos iniciales cargados correctamente');
+    console.log('✓ Datos base cargados correctamente');
   } catch (error) {
-    console.error('✗ Error al cargar datos iniciales:', error.message);
+    console.error('✗ Error al cargar datos base:', error);
+    throw error;
   }
 };
 

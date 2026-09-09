@@ -11,45 +11,26 @@ const login = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({
-        mensaje: "Email y contraseña son obligatorios",
-      });
+      return res.status(400).json({ mensaje: "Email y contraseña son obligatorios" });
     }
 
     if (!process.env.JWT_SECRET) {
-      return res.status(500).json({
-        mensaje: "JWT_SECRET no configurado en el servidor",
-      });
+      console.error("JWT_SECRET no está configurado");
+      return res.status(500).json({ mensaje: "Error interno de autenticación" });
     }
 
     const emailNormalizado = email.trim().toLowerCase();
-
     const usuario = await Usuario.findOne({
-      where: {
-        email: emailNormalizado,
-      },
+      where: { email: emailNormalizado },
       include: [
-        {
-          model: Role,
-          attributes: ["id", "nombre"],
-        },
-        {
-          model: Oficina,
-          attributes: ["id", "nombre"],
-        },
+        { model: Role, attributes: ["id", "nombre"] },
+        { model: Oficina, attributes: ["id", "nombre"] },
       ],
     });
 
-    if (!usuario) {
-      return res.status(401).json({
-        mensaje: "Credenciales inválidas",
-      });
-    }
+    if (!usuario) return res.status(401).json({ mensaje: "Credenciales inválidas" });
 
-    if (
-      usuario.bloqueado_hasta &&
-      new Date(usuario.bloqueado_hasta) > new Date()
-    ) {
+    if (usuario.bloqueado_hasta && new Date(usuario.bloqueado_hasta) > new Date()) {
       try {
         await registrarBitacora({
           usuario_id: usuario.id,
@@ -60,30 +41,19 @@ const login = async (req, res) => {
       } catch (errorBitacora) {
         console.error("Error al registrar bitácora:", errorBitacora);
       }
-
       return res.status(403).json({
-        mensaje: `Usuario bloqueado hasta ${new Date(
-          usuario.bloqueado_hasta
-        ).toLocaleTimeString("es-AR")}`,
+        mensaje: `Usuario bloqueado hasta ${new Date(usuario.bloqueado_hasta).toLocaleTimeString("es-AR")}`,
       });
     }
 
     const passwordValida = await bcrypt.compare(password, usuario.password);
-
     if (!passwordValida) {
       const nuevosIntentos = Number(usuario.intentos_fallidos || 0) + 1;
+      const bloqueo = nuevosIntentos >= MAX_INTENTOS
+        ? new Date(Date.now() + BLOQUEO_MINUTOS * 60 * 1000)
+        : null;
 
-      let bloqueo = null;
-
-      if (nuevosIntentos >= MAX_INTENTOS) {
-        bloqueo = new Date(Date.now() + BLOQUEO_MINUTOS * 60 * 1000);
-      }
-
-      await usuario.update({
-        intentos_fallidos: nuevosIntentos,
-        bloqueado_hasta: bloqueo,
-      });
-
+      await usuario.update({ intentos_fallidos: nuevosIntentos, bloqueado_hasta: bloqueo });
       try {
         await registrarBitacora({
           usuario_id: usuario.id,
@@ -96,23 +66,15 @@ const login = async (req, res) => {
       }
 
       return res.status(401).json({
-        mensaje:
-          nuevosIntentos >= MAX_INTENTOS
-            ? `Usuario bloqueado por múltiples intentos fallidos durante ${BLOQUEO_MINUTOS} minutos`
-            : `Credenciales inválidas (${nuevosIntentos}/${MAX_INTENTOS})`,
+        mensaje: nuevosIntentos >= MAX_INTENTOS
+          ? `Usuario bloqueado por múltiples intentos fallidos durante ${BLOQUEO_MINUTOS} minutos`
+          : `Credenciales inválidas (${nuevosIntentos}/${MAX_INTENTOS})`,
       });
     }
 
-    if (!usuario.activo) {
-      return res.status(403).json({
-        mensaje: "El usuario está inactivo",
-      });
-    }
+    if (!usuario.activo) return res.status(403).json({ mensaje: "El usuario está inactivo" });
 
-    await usuario.update({
-      intentos_fallidos: 0,
-      bloqueado_hasta: null,
-    });
+    await usuario.update({ intentos_fallidos: 0, bloqueado_hasta: null });
 
     const payload = {
       id: usuario.id,
@@ -123,9 +85,7 @@ const login = async (req, res) => {
       oficina_nombre: usuario.Oficina?.nombre || "",
     };
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: "8h",
-    });
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "8h" });
 
     try {
       await registrarBitacora({
@@ -152,10 +112,8 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error en login",
-      error: error.message,
-    });
+    console.error("Error en login:", error);
+    return res.status(500).json({ mensaje: "Error en login" });
   }
 };
 
@@ -167,19 +125,11 @@ const logout = async (req, res) => {
       modulo: "AUTH",
       descripcion: `Cierre de sesión del usuario ID ${req.usuario.id}`,
     });
-
-    return res.status(200).json({
-      mensaje: "Logout registrado correctamente",
-    });
+    return res.status(200).json({ mensaje: "Logout registrado correctamente" });
   } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al registrar logout",
-      error: error.message,
-    });
+    console.error("Error al registrar logout:", error);
+    return res.status(500).json({ mensaje: "Error al registrar logout" });
   }
 };
 
-module.exports = {
-  login,
-  logout,
-};
+module.exports = { login, logout };
