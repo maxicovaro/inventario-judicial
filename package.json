@@ -36,13 +36,21 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.8.0",
-    "multer": "^2.1.1",
-    "mysql2": "^3.21.1",
+    "multer": "^2.3.0",
+    "mysql2": "^3.23.1",
     "pdfkit": "^0.18.0",
     "sequelize": "^6.37.8",
-    "sharp": "^0.34.5"
+    "sharp": "^0.35.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "11.1.1"
+    },
+    "sequelize": {
+      "uuid": "11.1.1"
+    }
   }
 }
