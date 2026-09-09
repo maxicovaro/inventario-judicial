@@ -16,14 +16,13 @@ const TRANSICIONES_PERMITIDAS = Object.freeze({
   RECHAZADO: [],
 });
 
-const ESTADOS_PROVISIONABLES = [
-  "ENVIADO",
-  "EN_REVISION",
-  "APROBADO",
-];
+/*
+ * La provisión mueve stock real. Por integridad, solo un pedido
+ * previamente APROBADO puede modificar cantidades provistas.
+ */
+const ESTADOS_PROVISIONABLES = ["APROBADO"];
 
 const ESTADOS_PERMITIDOS_DESDE_PROVISION = [
-  "EN_REVISION",
   "APROBADO",
   "ENTREGADO",
 ];
