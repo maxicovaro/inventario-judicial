@@ -98,6 +98,27 @@ probar("APROBADO no puede volver a BORRADOR", () => {
 // PROVISIÓN
 // --------------------------------------------------
 
+probar("solo APROBADO puede mover stock por provisión", () => {
+  assert.deepStrictEqual(
+    ESTADOS_PROVISIONABLES,
+    ["APROBADO"]
+  );
+});
+
+probar("ENVIADO todavía no puede mover stock", () => {
+  assert.strictEqual(
+    ESTADOS_PROVISIONABLES.includes("ENVIADO"),
+    false
+  );
+});
+
+probar("EN_REVISION todavía no puede mover stock", () => {
+  assert.strictEqual(
+    ESTADOS_PROVISIONABLES.includes("EN_REVISION"),
+    false
+  );
+});
+
 probar("ENTREGADO no es estado modificable", () => {
   assert.strictEqual(
     ESTADOS_PROVISIONABLES.includes("ENTREGADO"),
@@ -116,6 +137,20 @@ probar("ENTREGADO puede ser resultado de provisión", () => {
   assert.strictEqual(
     ESTADOS_PERMITIDOS_DESDE_PROVISION.includes("ENTREGADO"),
     true
+  );
+});
+
+probar("APROBADO puede conservarse durante provisión parcial", () => {
+  assert.strictEqual(
+    ESTADOS_PERMITIDOS_DESDE_PROVISION.includes("APROBADO"),
+    true
+  );
+});
+
+probar("EN_REVISION no puede establecerse desde provisión", () => {
+  assert.strictEqual(
+    ESTADOS_PERMITIDOS_DESDE_PROVISION.includes("EN_REVISION"),
+    false
   );
 });
 
@@ -213,6 +248,13 @@ probar("controlador valida transición de estados", () => {
   assert.match(
     controller,
     /validarTransicionEstado/
+  );
+});
+
+probar("controlador exige estado provisionable", () => {
+  assert.match(
+    controller,
+    /ESTADOS_PROVISIONABLES\.includes\(pedido\.estado\)/
   );
 });
 
