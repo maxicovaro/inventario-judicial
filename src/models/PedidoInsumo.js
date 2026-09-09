@@ -28,7 +28,7 @@ const PedidoInsumo = sequelize.define(
         "EN_REVISION",
         "APROBADO",
         "ENTREGADO",
-        "RECHAZADO"
+        "RECHAZADO",
       ),
       defaultValue: "BORRADOR",
     },
@@ -48,7 +48,14 @@ const PedidoInsumo = sequelize.define(
   {
     tableName: "pedidos_insumos",
     timestamps: false,
-  }
+    indexes: [
+      {
+        name: "uq_pedido_oficina_mes_anio",
+        unique: true,
+        fields: ["oficina_id", "mes", "anio"],
+      },
+    ],
+  },
 );
 
 module.exports = PedidoInsumo;

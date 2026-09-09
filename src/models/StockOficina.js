@@ -26,6 +26,13 @@ const StockOficina = sequelize.define(
   {
     tableName: "stock_oficina",
     timestamps: true,
+    indexes: [
+      {
+        name: "uq_stock_oficina_insumo_oficina",
+        unique: true,
+        fields: ["insumo_id", "oficina_id"],
+      },
+    ],
   },
 );
 
