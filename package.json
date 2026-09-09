@@ -9,7 +9,8 @@
     "bootstrap:admin": "node scripts/bootstrap-admin.js",
     "test:pedido-rules": "node scripts/test-pedido-rules.js",
     "test:security-rules": "node scripts/test-security-rules.js",
-    "test:env-config": "node scripts/test-env-config.js"
+    "test:env-config": "node scripts/test-env-config.js",
+    "test:safe-errors": "node scripts/test-safe-errors.js"
   },
   "keywords": [],
   "author": "",

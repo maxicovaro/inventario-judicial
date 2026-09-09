@@ -5,6 +5,10 @@ const env = require("./src/config/env");
 const sequelize = require("./src/config/database");
 require("./src/models");
 const seedInitialData = require("./src/seeders/initialData");
+const {
+  safeErrorResponses,
+  globalErrorHandler,
+} = require("./src/middlewares/safeErrorResponses");
 
 const authRoutes = require("./src/routes/authRoutes");
 const activoRoutes = require("./src/routes/activoRoutes");
@@ -34,6 +38,7 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(safeErrorResponses);
 
 app.get("/", (req, res) => {
   res.json({ mensaje: "Servidor del sistema de inventario funcionando ✓" });
@@ -59,14 +64,7 @@ app.use("/api/pedidos-insumos", pedidoInsumoRoutes);
 app.use("/api/reportes", reporteConsumoOficinaRoutes);
 app.use("/api/reportes-pedidos", reportePedidoRoutes);
 
-app.use((error, req, res, next) => {
-  if (error) {
-    return res.status(400).json({
-      mensaje: error.message || "Error en la carga del archivo",
-    });
-  }
-  next();
-});
+app.use(globalErrorHandler);
 
 app.use((req, res) => {
   return res.status(404).json({
