@@ -2,6 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+  SectionHeader,
+  Skeleton,
+  StatCard,
+} from "../components/ui";
+import {
   ResponsiveContainer,
   BarChart,
   Bar,
@@ -17,10 +28,8 @@ import "../styles/dashboard.css";
 
 const COLORES_MOVIMIENTOS = ["#16794b", "#b42318", "#9a5b00", "#175cd3"];
 
-const formatearNumero = (valor) => {
-  const numero = Number(valor) || 0;
-  return new Intl.NumberFormat("es-AR").format(numero);
-};
+const formatearNumero = (valor) =>
+  new Intl.NumberFormat("es-AR").format(Number(valor) || 0);
 
 const formatearFecha = (fecha) => {
   if (!fecha) return "Sin fecha";
@@ -38,41 +47,19 @@ const formatearFecha = (fecha) => {
 };
 
 const normalizarSerie = (items = []) =>
-  items.map((item) => ({
-    ...item,
-    total: Number(item.total) || 0,
-  }));
+  items.map((item) => ({ ...item, total: Number(item.total) || 0 }));
 
 const badgeTone = (valor = "") => {
   const normalizado = String(valor).toUpperCase();
-
   if (["INGRESO", "ALTA", "APROBADO", "ENTREGADO"].includes(normalizado)) {
-    return "ui-badge--success";
+    return "success";
   }
-
-  if (["EGRESO", "BAJA", "RECHAZADO"].includes(normalizado)) {
-    return "ui-badge--danger";
-  }
-
+  if (["EGRESO", "BAJA", "RECHAZADO"].includes(normalizado)) return "danger";
   if (["AJUSTE", "CAMBIO_ESTADO", "EN_REVISION"].includes(normalizado)) {
-    return "ui-badge--warning";
+    return "warning";
   }
-
-  return "ui-badge--info";
+  return "info";
 };
-
-function MetricCard({ label, value, tone = "primary" }) {
-  return (
-    <article className={`dashboard-stat dashboard-stat--${tone}`}>
-      <p className="dashboard-stat-label">{label}</p>
-      <p className="dashboard-stat-value">{formatearNumero(value)}</p>
-    </article>
-  );
-}
-
-function EmptyState({ children }) {
-  return <div className="dashboard-empty">{children}</div>;
-}
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -105,7 +92,6 @@ export default function Dashboard() {
     () => normalizarSerie(data?.pedidos_por_estado || []),
     [data]
   );
-
   const movimientosStockPorTipo = useMemo(
     () => normalizarSerie(data?.movimientos_stock_por_tipo || []),
     [data]
@@ -120,148 +106,147 @@ export default function Dashboard() {
     {
       label: esVistaOficina ? "Mis activos" : "Activos registrados",
       value: resumen.total_activos,
+      detail: "Bienes dentro del alcance actual",
       tone: "primary",
     },
     {
       label: esVistaOficina ? "Insumos asignados" : "Insumos registrados",
       value: resumen.total_insumos,
+      detail: "Catálogo disponible",
       tone: "accent",
     },
     {
       label: esVistaOficina ? "Usuarios de mi oficina" : "Usuarios activos",
       value: resumen.total_usuarios_activos,
-      tone: "primary",
+      detail: "Cuentas habilitadas",
+      tone: "info",
     },
     {
       label: esVistaOficina ? "Mis solicitudes pendientes" : "Solicitudes pendientes",
       value: resumen.total_solicitudes_pendientes,
+      detail: "Esperando resolución",
       tone: "warning",
     },
     {
       label: esVistaOficina ? "Insumos agotados" : "Stock bajo",
       value: resumen.insumos_stock_bajo,
+      detail: "Requieren atención",
       tone: Number(resumen.insumos_stock_bajo) > 0 ? "danger" : "success",
     },
     {
       label: esVistaOficina ? "Mis pedidos enviados" : "Pedidos enviados",
       value: resumen.pedidos_enviados,
+      detail: "Pendientes de tratamiento",
       tone: "primary",
     },
     {
       label: esVistaOficina ? "Mis pedidos en revisión" : "Pedidos en revisión",
       value: resumen.pedidos_en_revision,
+      detail: "En análisis administrativo",
       tone: "warning",
     },
     {
       label: esVistaOficina ? "Mis pedidos entregados" : "Pedidos entregados",
       value: resumen.pedidos_entregados,
+      detail: "Ciclo completado",
       tone: "success",
     },
   ];
 
   return (
     <Layout>
-      <div className="ui-page">
-        <header className="dashboard-header">
-          <div>
-            <h1 className="dashboard-title">Dashboard</h1>
-            <p className="dashboard-description">
-              {esVistaOficina
-                ? "Resumen operativo de bienes, insumos, solicitudes y pedidos de tu oficina."
-                : "Estado general del inventario, stock, pedidos y actividad reciente."}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={cargarDashboard}
-            className="ui-button ui-button--secondary"
-            disabled={cargando}
-            aria-busy={cargando}
-          >
-            {cargando ? "Actualizando…" : "Actualizar datos"}
-          </button>
-        </header>
+      <div className="ui-page dashboard-page">
+        <PageHeader
+          title="Dashboard"
+          description={
+            esVistaOficina
+              ? "Resumen operativo de bienes, insumos, solicitudes y pedidos de tu oficina."
+              : "Estado general del inventario, stock, pedidos y actividad reciente."
+          }
+          actions={
+            <Button
+              variant="secondary"
+              onClick={cargarDashboard}
+              disabled={cargando}
+              busy={cargando}
+            >
+              {cargando ? "Actualizando…" : "Actualizar datos"}
+            </Button>
+          }
+        />
 
         {error && (
-          <div className="ui-alert ui-alert--danger" role="alert">
+          <Alert tone="danger" className="dashboard-scope">
             <span aria-hidden="true">!</span>
             <span>{error}</span>
-          </div>
+          </Alert>
         )}
 
         {cargando ? (
-          <div className="dashboard-loading" aria-label="Cargando dashboard">
-            <div className="dashboard-skeleton" />
-            <div className="dashboard-skeleton" />
-            <div className="dashboard-skeleton" />
+          <div className="dashboard-loading" aria-label="Cargando dashboard" aria-busy="true">
+            <Skeleton className="dashboard-skeleton" />
+            <Skeleton className="dashboard-skeleton" />
+            <Skeleton className="dashboard-skeleton" />
           </div>
         ) : !data ? (
-          <div className="ui-card ui-card-pad">
-            <EmptyState>
-              <div>
-                <strong>No se pudieron cargar los datos.</strong>
-                <p>Reintentá para recuperar el resumen del inventario.</p>
-                <button
-                  type="button"
-                  onClick={cargarDashboard}
-                  className="ui-button ui-button--primary"
-                >
-                  Reintentar
-                </button>
-              </div>
-            </EmptyState>
-          </div>
+          <Card padded>
+            <EmptyState
+              title="No se pudieron cargar los datos"
+              description="Reintentá para recuperar el resumen del inventario."
+              actions={<Button onClick={cargarDashboard}>Reintentar</Button>}
+            />
+          </Card>
         ) : (
           <>
             {esVistaOficina && (
-              <div className="ui-alert dashboard-scope" role="status">
+              <Alert tone="info" className="dashboard-scope">
                 <span aria-hidden="true">i</span>
                 <span>
                   Esta vista muestra únicamente la información correspondiente a tu
                   oficina o unidad judicial.
                 </span>
-              </div>
+              </Alert>
             )}
 
             <section aria-label="Indicadores principales" className="dashboard-stats">
               {metricas.map((metrica) => (
-                <MetricCard key={metrica.label} {...metrica} />
+                <StatCard
+                  key={metrica.label}
+                  label={metrica.label}
+                  value={formatearNumero(metrica.value)}
+                  detail={metrica.detail}
+                  tone={metrica.tone}
+                />
               ))}
             </section>
 
             <div className="dashboard-grid">
-              <section className="dashboard-panel dashboard-panel--attention">
-                <div className="dashboard-panel-header">
-                  <div>
-                    <h2 className="dashboard-panel-title">
-                      {esVistaOficina
-                        ? "Insumos que requieren atención"
-                        : "Stock que requiere atención"}
-                    </h2>
-                    <p className="dashboard-panel-kicker">
-                      Prioridad operativa para reposición o seguimiento.
-                    </p>
-                  </div>
-                  <span
-                    className={`ui-badge ${
-                      detalleInsumosStockBajo.length > 0
-                        ? "ui-badge--danger"
-                        : "ui-badge--success"
-                    }`}
-                  >
-                    {detalleInsumosStockBajo.length > 0
-                      ? `${detalleInsumosStockBajo.length} pendientes`
-                      : "Sin alertas"}
-                  </span>
-                </div>
+              <Card className="dashboard-panel dashboard-panel--attention">
+                <SectionHeader
+                  title={
+                    esVistaOficina
+                      ? "Insumos que requieren atención"
+                      : "Stock que requiere atención"
+                  }
+                  description="Prioridad operativa para reposición o seguimiento."
+                  aside={
+                    <Badge tone={detalleInsumosStockBajo.length > 0 ? "danger" : "success"}>
+                      {detalleInsumosStockBajo.length > 0
+                        ? `${detalleInsumosStockBajo.length} pendientes`
+                        : "Sin alertas"}
+                    </Badge>
+                  }
+                />
 
                 {detalleInsumosStockBajo.length === 0 ? (
-                  <EmptyState>
-                    {esVistaOficina
-                      ? "No hay insumos agotados en tu oficina."
-                      : "No hay insumos con stock por debajo del mínimo."}
-                  </EmptyState>
+                  <EmptyState
+                    title="Sin alertas de stock"
+                    description={
+                      esVistaOficina
+                        ? "No hay insumos agotados en tu oficina."
+                        : "No hay insumos por debajo del mínimo definido."
+                    }
+                  />
                 ) : (
                   <ul className="dashboard-list">
                     {detalleInsumosStockBajo.map((insumo) => (
@@ -283,22 +268,16 @@ export default function Dashboard() {
                     ))}
                   </ul>
                 )}
-              </section>
+              </Card>
 
-              <section className="dashboard-panel">
-                <div className="dashboard-panel-header">
-                  <div>
-                    <h2 className="dashboard-panel-title">
-                      {esVistaOficina ? "Mis últimos pedidos" : "Últimos pedidos"}
-                    </h2>
-                    <p className="dashboard-panel-kicker">
-                      Estado de las solicitudes más recientes.
-                    </p>
-                  </div>
-                </div>
+              <Card className="dashboard-panel">
+                <SectionHeader
+                  title={esVistaOficina ? "Mis últimos pedidos" : "Últimos pedidos"}
+                  description="Estado de las solicitudes más recientes."
+                />
 
                 {ultimosPedidos.length === 0 ? (
-                  <EmptyState>No hay pedidos registrados.</EmptyState>
+                  <EmptyState title="Sin pedidos" description="No hay pedidos registrados." />
                 ) : (
                   <ul className="dashboard-list">
                     {ultimosPedidos.map((pedido) => {
@@ -319,33 +298,27 @@ export default function Dashboard() {
                             </p>
                           </div>
                           <div className="dashboard-list-side">
-                            <span className={`ui-badge ${badgeTone(pedido.estado)}`}>
+                            <Badge tone={badgeTone(pedido.estado)}>
                               {pedido.estado || "Sin estado"}
-                            </span>
+                            </Badge>
                           </div>
                         </li>
                       );
                     })}
                   </ul>
                 )}
-              </section>
+              </Card>
             </div>
 
             <div className="dashboard-grid">
-              <section className="dashboard-panel">
-                <div className="dashboard-panel-header">
-                  <div>
-                    <h2 className="dashboard-panel-title">
-                      {esVistaOficina ? "Mis pedidos por estado" : "Pedidos por estado"}
-                    </h2>
-                    <p className="dashboard-panel-kicker">
-                      Distribución actual de pedidos registrados.
-                    </p>
-                  </div>
-                </div>
+              <Card className="dashboard-panel">
+                <SectionHeader
+                  title={esVistaOficina ? "Mis pedidos por estado" : "Pedidos por estado"}
+                  description="Distribución actual de pedidos registrados."
+                />
 
                 {pedidosPorEstado.length === 0 ? (
-                  <EmptyState>No hay datos para graficar.</EmptyState>
+                  <EmptyState title="Sin datos" description="No hay datos para graficar." />
                 ) : (
                   <>
                     <div
@@ -372,24 +345,20 @@ export default function Dashboard() {
                     </ul>
                   </>
                 )}
-              </section>
+              </Card>
 
-              <section className="dashboard-panel">
-                <div className="dashboard-panel-header">
-                  <div>
-                    <h2 className="dashboard-panel-title">
-                      {esVistaOficina
-                        ? "Mis movimientos de stock"
-                        : "Movimientos de stock por tipo"}
-                    </h2>
-                    <p className="dashboard-panel-kicker">
-                      Composición de ingresos, egresos, ajustes y devoluciones.
-                    </p>
-                  </div>
-                </div>
+              <Card className="dashboard-panel">
+                <SectionHeader
+                  title={
+                    esVistaOficina
+                      ? "Mis movimientos de stock"
+                      : "Movimientos de stock por tipo"
+                  }
+                  description="Composición de ingresos, egresos, ajustes y devoluciones."
+                />
 
                 {movimientosStockPorTipo.length === 0 ? (
-                  <EmptyState>No hay datos para graficar.</EmptyState>
+                  <EmptyState title="Sin datos" description="No hay datos para graficar." />
                 ) : (
                   <>
                     <div
@@ -410,11 +379,7 @@ export default function Dashboard() {
                             {movimientosStockPorTipo.map((entry, index) => (
                               <Cell
                                 key={`movimiento-${entry.tipo || index}`}
-                                fill={
-                                  COLORES_MOVIMIENTOS[
-                                    index % COLORES_MOVIMIENTOS.length
-                                  ]
-                                }
+                                fill={COLORES_MOVIMIENTOS[index % COLORES_MOVIMIENTOS.length]}
                               />
                             ))}
                           </Pie>
@@ -431,24 +396,22 @@ export default function Dashboard() {
                     </ul>
                   </>
                 )}
-              </section>
+              </Card>
             </div>
 
             <div className="dashboard-grid">
-              <section className="dashboard-panel">
-                <div className="dashboard-panel-header">
-                  <div>
-                    <h2 className="dashboard-panel-title">
-                      {esVistaOficina
-                        ? "Movimientos recientes de stock"
-                        : "Últimos movimientos de stock"}
-                    </h2>
-                    <p className="dashboard-panel-kicker">Actividad operativa reciente.</p>
-                  </div>
-                </div>
+              <Card className="dashboard-panel">
+                <SectionHeader
+                  title={
+                    esVistaOficina
+                      ? "Movimientos recientes de stock"
+                      : "Últimos movimientos de stock"
+                  }
+                  description="Actividad operativa reciente."
+                />
 
                 {ultimosMovimientosStock.length === 0 ? (
-                  <EmptyState>No hay movimientos registrados.</EmptyState>
+                  <EmptyState title="Sin movimientos" description="No hay movimientos registrados." />
                 ) : (
                   <ul className="dashboard-list">
                     {ultimosMovimientosStock.map((mov) => (
@@ -464,30 +427,26 @@ export default function Dashboard() {
                           </p>
                         </div>
                         <div className="dashboard-list-side">
-                          <span className={`ui-badge ${badgeTone(mov.tipo)}`}>
-                            {mov.tipo || "Sin tipo"}
-                          </span>
+                          <Badge tone={badgeTone(mov.tipo)}>{mov.tipo || "Sin tipo"}</Badge>
                         </div>
                       </li>
                     ))}
                   </ul>
                 )}
-              </section>
+              </Card>
 
-              <section className="dashboard-panel">
-                <div className="dashboard-panel-header">
-                  <div>
-                    <h2 className="dashboard-panel-title">
-                      {esVistaOficina
-                        ? "Movimientos recientes de activos"
-                        : "Últimos movimientos de activos"}
-                    </h2>
-                    <p className="dashboard-panel-kicker">Cambios registrados sobre bienes.</p>
-                  </div>
-                </div>
+              <Card className="dashboard-panel">
+                <SectionHeader
+                  title={
+                    esVistaOficina
+                      ? "Movimientos recientes de activos"
+                      : "Últimos movimientos de activos"
+                  }
+                  description="Cambios registrados sobre bienes."
+                />
 
                 {ultimosMovimientosActivos.length === 0 ? (
-                  <EmptyState>No hay movimientos registrados.</EmptyState>
+                  <EmptyState title="Sin movimientos" description="No hay movimientos registrados." />
                 ) : (
                   <ul className="dashboard-list">
                     {ultimosMovimientosActivos.map((mov) => {
@@ -508,16 +467,14 @@ export default function Dashboard() {
                             </p>
                           </div>
                           <div className="dashboard-list-side">
-                            <span className={`ui-badge ${badgeTone(mov.tipo)}`}>
-                              {mov.tipo || "Sin tipo"}
-                            </span>
+                            <Badge tone={badgeTone(mov.tipo)}>{mov.tipo || "Sin tipo"}</Badge>
                           </div>
                         </li>
                       );
                     })}
                   </ul>
                 )}
-              </section>
+              </Card>
             </div>
           </>
         )}
