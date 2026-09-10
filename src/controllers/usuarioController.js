@@ -1,7 +1,9 @@
 const bcrypt = require("bcryptjs");
 const { Op } = require("sequelize");
+const sequelize = require("../config/database");
 const { Usuario, Role, Oficina } = require("../models");
 const { registrarBitacora } = require("../utils/bitacora");
+const { revocarSesionesUsuario } = require("../utils/authSessions");
 const { esAdminGeneral } = require("../utils/permisos");
 const {
   PASSWORD_BCRYPT_ROUNDS,
@@ -121,6 +123,8 @@ const crearUsuario = async (req, res) => {
 };
 
 const actualizarUsuario = async (req, res) => {
+  let transaction;
+
   try {
     if (!exigirAdminGeneral(req, res)) return;
     const { id } = req.params;
@@ -164,6 +168,7 @@ const actualizarUsuario = async (req, res) => {
     if (oficina_id !== undefined) datosActualizados.oficina_id = oficina_id;
     if (activo !== undefined) datosActualizados.activo = activo;
 
+    let cambioPassword = false;
     if (password && password.trim() !== "") {
       const validacionPassword = validarPassword(password);
       if (!validacionPassword.valida) {
@@ -173,9 +178,21 @@ const actualizarUsuario = async (req, res) => {
         validacionPassword.password,
         PASSWORD_BCRYPT_ROUNDS,
       );
+      cambioPassword = true;
     }
 
-    await usuario.update(datosActualizados);
+    const desactivaUsuario = activo === false && usuario.activo !== false;
+
+    transaction = await sequelize.transaction();
+    await usuario.update(datosActualizados, { transaction });
+
+    if (cambioPassword || desactivaUsuario) {
+      await revocarSesionesUsuario(usuario.id, { transaction });
+    }
+
+    await transaction.commit();
+    transaction = null;
+
     await registrarBitacora({
       usuario_id: req.usuario.id,
       accion: "EDITAR",
@@ -193,22 +210,46 @@ const actualizarUsuario = async (req, res) => {
 
     return res.status(200).json({ mensaje: "Usuario actualizado correctamente", usuario: usuarioActualizado });
   } catch (error) {
+    if (transaction) await transaction.rollback();
     console.error("Error al actualizar usuario:", error);
     return res.status(500).json({ mensaje: "Error al actualizar usuario" });
   }
 };
 
 const cambiarEstadoUsuario = async (req, res) => {
+  let transaction;
+
   try {
     if (!exigirAdminGeneral(req, res)) return;
-    const usuario = await Usuario.findByPk(req.params.id);
-    if (!usuario) return res.status(404).json({ mensaje: "Usuario no encontrado" });
+
+    transaction = await sequelize.transaction();
+    const usuario = await Usuario.findByPk(req.params.id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+
+    if (!usuario) {
+      await transaction.rollback();
+      transaction = null;
+      return res.status(404).json({ mensaje: "Usuario no encontrado" });
+    }
+
     if (mismoId(usuario.id, req.usuario.id)) {
+      await transaction.rollback();
+      transaction = null;
       return res.status(400).json({ mensaje: "No podés activar o desactivar tu propio usuario desde esta acción" });
     }
 
     const nuevoEstado = !usuario.activo;
-    await usuario.update({ activo: nuevoEstado });
+    await usuario.update({ activo: nuevoEstado }, { transaction });
+
+    if (!nuevoEstado) {
+      await revocarSesionesUsuario(usuario.id, { transaction });
+    }
+
+    await transaction.commit();
+    transaction = null;
+
     await registrarBitacora({
       usuario_id: req.usuario.id,
       accion: nuevoEstado ? "ACTIVAR" : "DESACTIVAR",
@@ -229,6 +270,7 @@ const cambiarEstadoUsuario = async (req, res) => {
       usuario: usuarioActualizado,
     });
   } catch (error) {
+    if (transaction) await transaction.rollback();
     console.error("Error al cambiar estado del usuario:", error);
     return res.status(500).json({ mensaje: "Error al cambiar estado del usuario" });
   }
@@ -264,6 +306,8 @@ const desbloquearUsuario = async (req, res) => {
 };
 
 const resetearPasswordUsuario = async (req, res) => {
+  let transaction;
+
   try {
     if (!exigirAdminGeneral(req, res)) return;
     const validacionPassword = validarPassword(req.body.nuevaPassword);
@@ -271,14 +315,31 @@ const resetearPasswordUsuario = async (req, res) => {
       return res.status(400).json({ mensaje: validacionPassword.mensaje });
     }
 
-    const usuario = await Usuario.findByPk(req.params.id);
-    if (!usuario) return res.status(404).json({ mensaje: "Usuario no encontrado" });
+    transaction = await sequelize.transaction();
+    const usuario = await Usuario.findByPk(req.params.id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+
+    if (!usuario) {
+      await transaction.rollback();
+      transaction = null;
+      return res.status(404).json({ mensaje: "Usuario no encontrado" });
+    }
 
     const passwordHash = await bcrypt.hash(
       validacionPassword.password,
       PASSWORD_BCRYPT_ROUNDS,
     );
-    await usuario.update({ password: passwordHash, intentos_fallidos: 0, bloqueado_hasta: null });
+
+    await usuario.update(
+      { password: passwordHash, intentos_fallidos: 0, bloqueado_hasta: null },
+      { transaction },
+    );
+    await revocarSesionesUsuario(usuario.id, { transaction });
+
+    await transaction.commit();
+    transaction = null;
 
     await registrarBitacora({
       usuario_id: req.usuario.id,
@@ -289,6 +350,7 @@ const resetearPasswordUsuario = async (req, res) => {
 
     return res.status(200).json({ mensaje: "Contraseña reseteada correctamente" });
   } catch (error) {
+    if (transaction) await transaction.rollback();
     console.error("Error al resetear contraseña:", error);
     return res.status(500).json({ mensaje: "Error al resetear contraseña" });
   }
