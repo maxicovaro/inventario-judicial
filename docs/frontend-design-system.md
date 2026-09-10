@@ -133,6 +133,35 @@ Requisitos mínimos del Design System:
 
 Antes de crear CSS o JSX específico, revisar si el patrón puede resolverse con los componentes de `components/ui`. El CSS de página debe describir composición y necesidades particulares del módulo, no reimplementar botones, inputs, badges, cards o estados globales.
 
+## Cobertura actual del rediseño
+
+### Bloque A — Base institucional
+
+- Login.
+- AppShell y navegación por rol.
+- Dashboard.
+- Activos.
+- Design tokens y kit reusable de componentes.
+
+### Bloque B — Operación de inventario
+
+- Insumos.
+- Stock por oficina.
+- Consumo de oficina.
+- Historial de movimientos de stock.
+- Adjuntos.
+
+### Bloque C — Flujos administrativos
+
+- Solicitudes.
+- Pedido mensual de insumos.
+- Historial de pedidos y provisión.
+- Notificaciones.
+- Reporte general de pedidos.
+- Reporte mensual de consumo por oficina.
+
+Los bloques de UX/UI no modifican las reglas de autorización del backend ni la rama `security/hardening`. La adopción del encabezado opcional `Idempotency-Key` en operaciones críticas queda reservada para una integración coordinada posterior con el hardening P6.
+
 ## Validación requerida por bloque
 
 Todo bloque de frontend debe cerrar con:
