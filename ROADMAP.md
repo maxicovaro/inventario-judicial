@@ -23,11 +23,11 @@ Este documento es la fuente de continuidad del proyecto. Cada bloque se trabaja 
 - P2.2 `RESPONSABLE` limitado a la gestión de su propia oficina.
 - P2.3 Historial transaccional de altas, traslados, cambios de estado y bajas.
 
-### P3 — Resiliencia operativa y recuperación 🚧
+### P3 — Resiliencia operativa y recuperación ✅
 - P3.0 Documentación formal de hoja de ruta.
-- P3.1 Backup, verificación y restauración MySQL.
-- P3.2 Health checks, logging estructurado y apagado controlado.
-- P3.3 Runbook de recuperación e incidentes.
+- P3.1 Backup, checksum y restauración segura MySQL con restore drill en CI.
+- P3.2 Health checks, Request ID, logging estructurado y apagado controlado.
+- P3.3 Runbook de recuperación, rollback e incidentes.
 
 ## Próximos bloques
 
