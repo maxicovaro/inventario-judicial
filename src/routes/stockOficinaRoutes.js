@@ -6,14 +6,17 @@ const {
   asignarStockAOficina,
 } = require("../controllers/stockOficinaController");
 
-const { verificarToken, verificarRol } = require("../middlewares/authMiddleware");
+const {
+  verificarToken,
+  verificarAdminGeneral,
+} = require("../middlewares/authMiddleware");
 
 router.get("/:oficina_id", verificarToken, obtenerStockPorOficina);
 
 router.post(
   "/asignar",
   verificarToken,
-  verificarRol("ADMIN"),
+  verificarAdminGeneral,
   asignarStockAOficina,
 );
 

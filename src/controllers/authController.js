@@ -24,7 +24,7 @@ const login = async (req, res) => {
       where: { email: emailNormalizado },
       include: [
         { model: Role, attributes: ["id", "nombre"] },
-        { model: Oficina, attributes: ["id", "nombre"] },
+        { model: Oficina, attributes: ["id", "nombre", "es_central"] },
       ],
     });
 
@@ -76,6 +76,7 @@ const login = async (req, res) => {
 
     await usuario.update({ intentos_fallidos: 0, bloqueado_hasta: null });
 
+    const oficinaEsCentral = Boolean(usuario.Oficina?.es_central);
     const payload = {
       id: usuario.id,
       email: usuario.email,
@@ -83,6 +84,7 @@ const login = async (req, res) => {
       role_id: usuario.role_id,
       oficina_id: usuario.oficina_id,
       oficina_nombre: usuario.Oficina?.nombre || "",
+      oficina_es_central: oficinaEsCentral,
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "8h" });
@@ -109,6 +111,7 @@ const login = async (req, res) => {
         role_id: usuario.role_id,
         oficina_id: usuario.oficina_id,
         oficina_nombre: usuario.Oficina?.nombre || "",
+        oficina_es_central: oficinaEsCentral,
       },
     });
   } catch (error) {

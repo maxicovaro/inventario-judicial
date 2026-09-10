@@ -1,12 +1,23 @@
 const { Op } = require("sequelize");
-const { Activo, Categoria, Oficina } = require("../models");
+const sequelize = require("../config/database");
+const { Activo, Categoria, Oficina, Movimiento } = require("../models");
 const { registrarBitacora } = require("../utils/bitacora");
-const { esAdminGeneral } = require("../utils/permisos");
+const {
+  esAdminGeneral,
+  puedeGestionarOficina,
+} = require("../utils/permisos");
+
+const registrarBitacoraSegura = async (datos) => {
+  try {
+    await registrarBitacora(datos);
+  } catch (error) {
+    console.error("Error al registrar bitácora de activos:", error);
+  }
+};
 
 const listarActivos = async (req, res) => {
   try {
     const direccion = esAdminGeneral(req.usuario);
-
     const where = {};
 
     if (!direccion) {
@@ -31,17 +42,23 @@ const listarActivos = async (req, res) => {
 
     return res.status(200).json(activos);
   } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al listar activos",
-      error: error.message,
-    });
+    console.error("Error al listar activos:", error);
+    return res.status(500).json({ mensaje: "Error al listar activos" });
   }
 };
 
 const crearActivo = async (req, res) => {
-  try {
-    const direccion = esAdminGeneral(req.usuario);
+  let transaction;
 
+  try {
+    if (!puedeGestionarOficina(req.usuario)) {
+      return res.status(403).json({
+        mensaje:
+          "Acceso denegado. Se requiere ser Administrador General o RESPONSABLE de una oficina",
+      });
+    }
+
+    const direccion = esAdminGeneral(req.usuario);
     const {
       nombre,
       descripcion,
@@ -55,8 +72,13 @@ const crearActivo = async (req, res) => {
       estado,
       fecha_alta,
       observaciones,
-      activo,
     } = req.body;
+
+    if (Object.prototype.hasOwnProperty.call(req.body, "activo")) {
+      return res.status(400).json({
+        mensaje: "El campo activo se administra únicamente mediante la baja formal",
+      });
+    }
 
     const oficinaFinal = direccion ? oficina_id : req.usuario.oficina_id;
 
@@ -66,9 +88,9 @@ const crearActivo = async (req, res) => {
       });
     }
 
-    if (!direccion && estado === "Dado de baja") {
-      return res.status(403).json({
-        mensaje: "Solo Dirección puede crear o marcar activos como dados de baja",
+    if (estado === "Dado de baja") {
+      return res.status(400).json({
+        mensaje: "La baja debe realizarse con la acción formal Dar de baja",
       });
     }
 
@@ -86,39 +108,55 @@ const crearActivo = async (req, res) => {
       }
     }
 
-    const categoria = await Categoria.findByPk(categoria_id);
+    const [categoria, oficina] = await Promise.all([
+      Categoria.findByPk(categoria_id),
+      Oficina.findByPk(oficinaFinal),
+    ]);
 
     if (!categoria) {
-      return res.status(404).json({
-        mensaje: "Categoría no encontrada",
-      });
+      return res.status(404).json({ mensaje: "Categoría no encontrada" });
     }
-
-    const oficina = await Oficina.findByPk(oficinaFinal);
 
     if (!oficina) {
-      return res.status(404).json({
-        mensaje: "Oficina no encontrada",
-      });
+      return res.status(404).json({ mensaje: "Oficina no encontrada" });
     }
 
-    const nuevoActivo = await Activo.create({
-      nombre,
-      descripcion: descripcion || null,
-      codigo_interno: codigoFinal,
-      marca: marca || null,
-      modelo: modelo || null,
-      numero_serie: numero_serie || null,
-      cantidad: cantidad ? Number(cantidad) : 1,
-      categoria_id,
-      oficina_id: oficinaFinal,
-      estado: estado || "Buen estado",
-      fecha_alta: fecha_alta || null,
-      observaciones: observaciones || null,
-      activo: direccion ? (activo !== undefined ? activo : true) : true,
-    });
+    transaction = await sequelize.transaction();
 
-    await registrarBitacora({
+    const nuevoActivo = await Activo.create(
+      {
+        nombre,
+        descripcion: descripcion || null,
+        codigo_interno: codigoFinal,
+        marca: marca || null,
+        modelo: modelo || null,
+        numero_serie: numero_serie || null,
+        cantidad: cantidad ? Number(cantidad) : 1,
+        categoria_id,
+        oficina_id: oficinaFinal,
+        estado: estado || "Buen estado",
+        fecha_alta: fecha_alta || null,
+        observaciones: observaciones || null,
+        activo: true,
+      },
+      { transaction },
+    );
+
+    await Movimiento.create(
+      {
+        activo_id: nuevoActivo.id,
+        usuario_id: req.usuario.id,
+        tipo: "ALTA",
+        descripcion: `Alta del activo en ${oficina.nombre}`,
+        fecha: new Date(),
+      },
+      { transaction },
+    );
+
+    await transaction.commit();
+    transaction = null;
+
+    await registrarBitacoraSegura({
       usuario_id: req.usuario.id,
       accion: "CREAR",
       modulo: "ACTIVOS",
@@ -132,18 +170,25 @@ const crearActivo = async (req, res) => {
       activo: nuevoActivo,
     });
   } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al crear activo",
-      error: error.message,
-    });
+    if (transaction) await transaction.rollback();
+    console.error("Error al crear activo:", error);
+    return res.status(500).json({ mensaje: "Error al crear activo" });
   }
 };
 
 const actualizarActivo = async (req, res) => {
+  let transaction;
+
   try {
+    if (!puedeGestionarOficina(req.usuario)) {
+      return res.status(403).json({
+        mensaje:
+          "Acceso denegado. Se requiere ser Administrador General o RESPONSABLE de una oficina",
+      });
+    }
+
     const direccion = esAdminGeneral(req.usuario);
     const { id } = req.params;
-
     const {
       nombre,
       descripcion,
@@ -157,14 +202,23 @@ const actualizarActivo = async (req, res) => {
       estado,
       fecha_alta,
       observaciones,
-      activo,
     } = req.body;
+
+    if (Object.prototype.hasOwnProperty.call(req.body, "activo")) {
+      return res.status(400).json({
+        mensaje: "El campo activo se administra únicamente mediante la baja formal",
+      });
+    }
 
     const activoDb = await Activo.findByPk(id);
 
     if (!activoDb) {
-      return res.status(404).json({
-        mensaje: "Activo no encontrado",
+      return res.status(404).json({ mensaje: "Activo no encontrado" });
+    }
+
+    if (activoDb.activo === false || activoDb.estado === "Dado de baja") {
+      return res.status(409).json({
+        mensaje: "El activo está dado de baja y no puede modificarse",
       });
     }
 
@@ -177,9 +231,9 @@ const actualizarActivo = async (req, res) => {
       });
     }
 
-    if (!direccion && estado === "Dado de baja") {
-      return res.status(403).json({
-        mensaje: "Solo Dirección puede dar de baja activos",
+    if (estado === "Dado de baja") {
+      return res.status(400).json({
+        mensaje: "La baja debe realizarse con la acción formal Dar de baja",
       });
     }
 
@@ -206,68 +260,96 @@ const actualizarActivo = async (req, res) => {
     }
 
     const categoriaFinal = categoria_id || activoDb.categoria_id;
-
+    const oficinaAnterior = activoDb.oficina_id;
+    const estadoAnterior = activoDb.estado;
     const oficinaFinal = direccion
       ? oficina_id || activoDb.oficina_id
       : req.usuario.oficina_id;
 
-    const categoria = await Categoria.findByPk(categoriaFinal);
+    const [categoria, oficina] = await Promise.all([
+      Categoria.findByPk(categoriaFinal),
+      Oficina.findByPk(oficinaFinal),
+    ]);
 
     if (!categoria) {
-      return res.status(404).json({
-        mensaje: "Categoría no encontrada",
-      });
+      return res.status(404).json({ mensaje: "Categoría no encontrada" });
     }
-
-    const oficina = await Oficina.findByPk(oficinaFinal);
 
     if (!oficina) {
-      return res.status(404).json({
-        mensaje: "Oficina no encontrada",
+      return res.status(404).json({ mensaje: "Oficina no encontrada" });
+    }
+
+    const nuevoEstado = estado !== undefined ? estado : activoDb.estado;
+    const traslado = String(oficinaAnterior) !== String(oficinaFinal);
+    const cambioEstado = estadoAnterior !== nuevoEstado;
+
+    transaction = await sequelize.transaction();
+
+    await activoDb.update(
+      {
+        nombre: nombre !== undefined ? nombre : activoDb.nombre,
+        descripcion:
+          descripcion !== undefined ? descripcion || null : activoDb.descripcion,
+        codigo_interno: codigoFinal,
+        marca: marca !== undefined ? marca || null : activoDb.marca,
+        modelo: modelo !== undefined ? modelo || null : activoDb.modelo,
+        numero_serie:
+          numero_serie !== undefined
+            ? numero_serie || null
+            : activoDb.numero_serie,
+        cantidad: cantidad !== undefined ? Number(cantidad) : activoDb.cantidad,
+        categoria_id: categoriaFinal,
+        oficina_id: oficinaFinal,
+        estado: nuevoEstado,
+        fecha_alta:
+          fecha_alta !== undefined ? fecha_alta || null : activoDb.fecha_alta,
+        observaciones:
+          observaciones !== undefined
+            ? observaciones || null
+            : activoDb.observaciones,
+        activo: activoDb.activo,
+      },
+      { transaction },
+    );
+
+    const movimientos = [];
+
+    if (traslado) {
+      movimientos.push({
+        tipo: "TRASLADO",
+        descripcion: `Traslado de oficina ${oficinaAnterior} a ${oficinaFinal}`,
       });
     }
 
-    await activoDb.update({
-      nombre: nombre !== undefined ? nombre : activoDb.nombre,
+    if (cambioEstado) {
+      movimientos.push({
+        tipo: "CAMBIO_ESTADO",
+        descripcion: `Cambio de estado: ${estadoAnterior} -> ${nuevoEstado}`,
+      });
+    }
 
-      descripcion:
-        descripcion !== undefined ? descripcion || null : activoDb.descripcion,
+    if (movimientos.length === 0) {
+      movimientos.push({
+        tipo: "ACTUALIZACION",
+        descripcion: "Actualización de datos del activo",
+      });
+    }
 
-      codigo_interno: codigoFinal,
+    await Movimiento.bulkCreate(
+      movimientos.map((movimiento) => ({
+        activo_id: activoDb.id,
+        usuario_id: req.usuario.id,
+        tipo: movimiento.tipo,
+        descripcion: movimiento.descripcion,
+        fecha: new Date(),
+      })),
+      { transaction },
+    );
 
-      marca: marca !== undefined ? marca || null : activoDb.marca,
+    await transaction.commit();
+    transaction = null;
 
-      modelo: modelo !== undefined ? modelo || null : activoDb.modelo,
-
-      numero_serie:
-        numero_serie !== undefined
-          ? numero_serie || null
-          : activoDb.numero_serie,
-
-      cantidad: cantidad !== undefined ? Number(cantidad) : activoDb.cantidad,
-
-      categoria_id: categoriaFinal,
-
-      oficina_id: oficinaFinal,
-
-      estado: estado !== undefined ? estado : activoDb.estado,
-
-      fecha_alta:
-        fecha_alta !== undefined ? fecha_alta || null : activoDb.fecha_alta,
-
-      observaciones:
-        observaciones !== undefined
-          ? observaciones || null
-          : activoDb.observaciones,
-
-      activo: direccion
-        ? activo !== undefined
-          ? activo
-          : activoDb.activo
-        : activoDb.activo,
-    });
-
-    await registrarBitacora({
+    await registrarBitacoraSegura({
       usuario_id: req.usuario.id,
       accion: "EDITAR",
       modulo: "ACTIVOS",
@@ -281,39 +363,58 @@ const actualizarActivo = async (req, res) => {
       activo: activoDb,
     });
   } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al actualizar activo",
-      error: error.message,
-    });
+    if (transaction) await transaction.rollback();
+    console.error("Error al actualizar activo:", error);
+    return res.status(500).json({ mensaje: "Error al actualizar activo" });
   }
 };
 
 const darDeBajaActivo = async (req, res) => {
+  let transaction;
+
   try {
     const direccion = esAdminGeneral(req.usuario);
 
     if (!direccion) {
-      return res.status(403).json({
-        mensaje: "Solo Dirección puede dar de baja activos",
-      });
+      return res.status(403).json({ mensaje: "Solo Dirección puede dar de baja activos" });
     }
 
     const { id } = req.params;
-
     const activoDb = await Activo.findByPk(id);
 
     if (!activoDb) {
-      return res.status(404).json({
-        mensaje: "Activo no encontrado",
-      });
+      return res.status(404).json({ mensaje: "Activo no encontrado" });
     }
 
-    await activoDb.update({
-      estado: "Dado de baja",
-      activo: false,
-    });
+    if (activoDb.activo === false || activoDb.estado === "Dado de baja") {
+      return res.status(409).json({ mensaje: "El activo ya está dado de baja" });
+    }
 
-    await registrarBitacora({
+    transaction = await sequelize.transaction();
+
+    await activoDb.update(
+      {
+        estado: "Dado de baja",
+        activo: false,
+      },
+      { transaction },
+    );
+
+    await Movimiento.create(
+      {
+        activo_id: activoDb.id,
+        usuario_id: req.usuario.id,
+        tipo: "BAJA",
+        descripcion: "Baja formal del activo",
+        fecha: new Date(),
+      },
+      { transaction },
+    );
+
+    await transaction.commit();
+    transaction = null;
+
+    await registrarBitacoraSegura({
       usuario_id: req.usuario.id,
       accion: "DAR_DE_BAJA",
       modulo: "ACTIVOS",
@@ -327,10 +428,9 @@ const darDeBajaActivo = async (req, res) => {
       activo: activoDb,
     });
   } catch (error) {
-    return res.status(500).json({
-      mensaje: "Error al dar de baja activo",
-      error: error.message,
-    });
+    if (transaction) await transaction.rollback();
+    console.error("Error al dar de baja activo:", error);
+    return res.status(500).json({ mensaje: "Error al dar de baja activo" });
   }
 };
 
@@ -339,7 +439,5 @@ module.exports = {
   crearActivo,
   actualizarActivo,
   darDeBajaActivo,
-
-  // Alias por compatibilidad si alguna ruta vieja lo importa como eliminarActivo
   eliminarActivo: darDeBajaActivo,
 };

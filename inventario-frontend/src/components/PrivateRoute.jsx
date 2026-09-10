@@ -1,12 +1,5 @@
 import { Navigate } from "react-router-dom";
-
-const normalizar = (texto = "") =>
-  texto
-    .toString()
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+import { esAdminGeneral } from "../utils/permisos";
 
 const obtenerUsuarioLocal = () => {
   try {
@@ -18,43 +11,18 @@ const obtenerUsuarioLocal = () => {
   }
 };
 
-const esDireccionUsuario = (usuario) => {
-  const oficinaNombre = normalizar(
-    usuario?.oficina_nombre || usuario?.Oficina?.nombre || ""
-  );
-
-  return (
-    usuario?.role === "ADMIN" &&
-    oficinaNombre.includes("DIRECCION") &&
-    oficinaNombre.includes("POLICIA JUDICIAL")
-  );
-};
-
 export default function PrivateRoute({ children, rolesPermitidos = [] }) {
   const token = localStorage.getItem("token");
   const usuario = obtenerUsuarioLocal();
-
-  const esDireccion = esDireccionUsuario(usuario);
 
   if (!token) {
     return <Navigate to="/" replace />;
   }
 
-  /*
-    En este sistema, una ruta con rolesPermitidos={["ADMIN"]}
-    no habilita a cualquier ADMIN.
-
-    Habilita solamente a:
-    ADMIN + Dirección de Policía Judicial.
-  */
-  if (rolesPermitidos.includes("ADMIN") && !esDireccion) {
+  if (rolesPermitidos.includes("ADMIN") && !esAdminGeneral(usuario)) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  /*
-    Validación para otros roles futuros.
-    Ejemplo: RESPONSABLE, OPERADOR, CONSULTA, etc.
-  */
   if (
     rolesPermitidos.length > 0 &&
     !rolesPermitidos.includes("ADMIN") &&

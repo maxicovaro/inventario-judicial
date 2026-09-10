@@ -5,6 +5,7 @@ import api from "../api/axios";
 import Layout from "../components/Layout";
 import AdjuntosPanel from "../components/AdjuntosPanel";
 import { activoSchema } from "../schemas/activoSchema";
+import { esAdminGeneral, puedeGestionarOficina } from "../utils/permisos";
 
 const defaultValues = {
   codigo_interno: "",
@@ -20,14 +21,6 @@ const defaultValues = {
   categoria_id: "",
   oficina_id: "",
 };
-
-const normalizar = (texto = "") =>
-  texto
-    .toString()
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
 
 const obtenerUsuarioLocal = () => {
   try {
@@ -54,14 +47,8 @@ const formatearFechaInput = (fecha) => {
 export default function Activos() {
   const usuario = obtenerUsuarioLocal();
 
-  const oficinaNombre = normalizar(
-    usuario.oficina_nombre || usuario.Oficina?.nombre || ""
-  );
-
-  const esDireccion =
-    usuario.role === "ADMIN" &&
-    oficinaNombre.includes("DIRECCION") &&
-    oficinaNombre.includes("POLICIA JUDICIAL");
+  const esDireccion = esAdminGeneral(usuario);
+  const puedeGestionar = puedeGestionarOficina(usuario);
 
   const valoresIniciales = {
     ...defaultValues,
@@ -180,6 +167,12 @@ export default function Activos() {
   const onSubmit = async (data) => {
     setError("");
     setMensaje("");
+
+    if (!puedeGestionar) {
+      setError("No tenés permisos para crear o editar activos");
+      return;
+    }
+
     setGuardando(true);
 
     try {
@@ -195,8 +188,8 @@ export default function Activos() {
         fecha_alta: data.fecha_alta || null,
       };
 
-      if (!esDireccion && payload.estado === "Dado de baja") {
-        setError("Solo Dirección puede dar de baja activos");
+      if (payload.estado === "Dado de baja") {
+        setError("La baja debe realizarse con la acción formal Dar de baja");
         return;
       }
 
@@ -261,6 +254,11 @@ export default function Activos() {
     setError("");
     setMensaje("");
 
+    if (!puedeGestionar) {
+      setError("No tenés permisos para editar activos");
+      return;
+    }
+
     const perteneceAMiOficina =
       String(activo.oficina_id) === String(usuario.oficina_id);
 
@@ -305,7 +303,7 @@ export default function Activos() {
       <h1 style={styles.titulo}>Activos</h1>
 
       <div style={styles.grid}>
-        <div style={styles.card}>
+        <div style={{ ...styles.card, display: puedeGestionar ? undefined : "none" }}>
           <h2 style={styles.subtitulo}>
             {editandoId ? "Editar activo" : "Nuevo activo"}
           </h2>
@@ -385,9 +383,6 @@ export default function Activos() {
                 <option value="Regular estado">Regular estado</option>
                 <option value="Mal estado">Mal estado</option>
                 <option value="Sin funcionar">Sin funcionar</option>
-                {esDireccion && (
-                  <option value="Dado de baja">Dado de baja</option>
-                )}
               </select>
               {errors.estado && (
                 <p style={styles.errorText}>{errors.estado.message}</p>
@@ -547,10 +542,11 @@ export default function Activos() {
                 const perteneceAMiOficina =
                   String(activo.oficina_id) === String(usuario.oficina_id);
 
-                const puedeInteractuar = esDireccion || perteneceAMiOficina;
-
+                const puedeVerAdjuntos = esDireccion || perteneceAMiOficina;
                 const estaDadoDeBaja =
                   activo.activo === false || activo.estado === "Dado de baja";
+                const puedeEditar =
+                  puedeGestionar && puedeVerAdjuntos && !estaDadoDeBaja;
 
                 return (
                   <div key={activo.id} style={styles.item}>
@@ -610,15 +606,17 @@ export default function Activos() {
                       </p>
                     )}
 
-                    {puedeInteractuar && (
+                    {puedeVerAdjuntos && (
                       <div style={styles.actionButtons}>
-                        <button
-                          type="button"
-                          style={styles.editButton}
-                          onClick={() => editarActivo(activo)}
-                        >
-                          Editar
-                        </button>
+                        {puedeEditar && (
+                          <button
+                            type="button"
+                            style={styles.editButton}
+                            onClick={() => editarActivo(activo)}
+                          >
+                            Editar
+                          </button>
+                        )}
 
                         <button
                           type="button"
@@ -648,7 +646,7 @@ export default function Activos() {
                       </div>
                     )}
 
-                    {activoAdjuntosAbierto === activo.id && puedeInteractuar && (
+                    {activoAdjuntosAbierto === activo.id && puedeVerAdjuntos && (
                       <AdjuntosPanel activoId={activo.id} />
                     )}
                   </div>

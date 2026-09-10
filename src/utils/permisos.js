@@ -1,32 +1,33 @@
-const normalizar = (texto = "") =>
-  texto
-    .toString()
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+const ROLES = Object.freeze({
+  ADMIN: "ADMIN",
+  RESPONSABLE: "RESPONSABLE",
+  USUARIO: "USUARIO",
+});
 
-const esDireccion = (usuario = {}) => {
-  const oficinaNombre = normalizar(usuario.oficina_nombre || "");
+const esOficinaCentral = (usuario = {}) =>
+  usuario.oficina_es_central === true || usuario.oficina_es_central === 1;
 
-  return (
-    usuario.role === "ADMIN" &&
-    oficinaNombre.includes("DIRECCION") &&
-    oficinaNombre.includes("POLICIA JUDICIAL")
-  );
-};
+const esAdminGeneral = (usuario = {}) =>
+  usuario.role === ROLES.ADMIN && esOficinaCentral(usuario);
 
-const esAdminGeneral = (usuario = {}) => {
-  return esDireccion(usuario);
-};
+const esDireccion = (usuario = {}) => esAdminGeneral(usuario);
 
-const puedeGestionarDeposito = (usuario = {}) => {
-  return esDireccion(usuario);
-};
+const esResponsable = (usuario = {}) => usuario.role === ROLES.RESPONSABLE;
+
+const tieneOficinaAsignada = (usuario = {}) => Boolean(usuario.oficina_id);
+
+const puedeGestionarOficina = (usuario = {}) =>
+  esAdminGeneral(usuario) || (esResponsable(usuario) && tieneOficinaAsignada(usuario));
+
+const puedeGestionarDeposito = (usuario = {}) => esAdminGeneral(usuario);
 
 module.exports = {
-  normalizar,
+  ROLES,
+  esOficinaCentral,
   esDireccion,
   esAdminGeneral,
+  esResponsable,
+  tieneOficinaAsignada,
+  puedeGestionarOficina,
   puedeGestionarDeposito,
 };

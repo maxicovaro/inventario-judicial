@@ -6,9 +6,17 @@ const {
   crearMovimiento,
 } = require("../controllers/movimientoController");
 
-const { verificarToken } = require("../middlewares/authMiddleware");
+const {
+  verificarToken,
+  verificarGestionOficina,
+} = require("../middlewares/authMiddleware");
 
 router.get("/", verificarToken, listarMovimientos);
-router.post("/", verificarToken, crearMovimiento);
+router.post(
+  "/",
+  verificarToken,
+  verificarGestionOficina,
+  crearMovimiento,
+);
 
 module.exports = router;

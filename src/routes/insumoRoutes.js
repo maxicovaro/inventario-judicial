@@ -7,22 +7,25 @@ const {
   actualizarInsumo,
 } = require("../controllers/insumoController");
 
-const { verificarToken, verificarRol } = require("../middlewares/authMiddleware");
+const {
+  verificarToken,
+  verificarAdminGeneral,
+} = require("../middlewares/authMiddleware");
 
 router.get("/", verificarToken, listarInsumos);
 
 router.post(
   "/",
   verificarToken,
-  verificarRol("ADMIN"),
-  crearInsumo
+  verificarAdminGeneral,
+  crearInsumo,
 );
 
 router.put(
   "/:id",
   verificarToken,
-  verificarRol("ADMIN"),
-  actualizarInsumo
+  verificarAdminGeneral,
+  actualizarInsumo,
 );
 
 module.exports = router;

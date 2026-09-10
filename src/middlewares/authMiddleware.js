@@ -1,5 +1,9 @@
 const jwt = require("jsonwebtoken");
 const { Usuario, Role, Oficina } = require("../models");
+const {
+  esAdminGeneral,
+  puedeGestionarOficina,
+} = require("../utils/permisos");
 
 const verificarToken = async (req, res, next) => {
   try {
@@ -37,7 +41,7 @@ const verificarToken = async (req, res, next) => {
     const usuario = await Usuario.findByPk(decoded.id, {
       include: [
         { model: Role, attributes: ["id", "nombre"] },
-        { model: Oficina, attributes: ["id", "nombre"] },
+        { model: Oficina, attributes: ["id", "nombre", "es_central"] },
       ],
     });
 
@@ -60,6 +64,7 @@ const verificarToken = async (req, res, next) => {
       role_id: usuario.role_id,
       oficina_id: usuario.oficina_id,
       oficina_nombre: usuario.Oficina?.nombre || "",
+      oficina_es_central: Boolean(usuario.Oficina?.es_central),
     };
 
     next();
@@ -74,11 +79,15 @@ const verificarToken = async (req, res, next) => {
 const verificarRol = (...rolesPermitidos) => {
   return (req, res, next) => {
     if (!req.usuario || !req.usuario.role) {
-      return res.status(403).json({ mensaje: "Acceso denegado. Rol no identificado" });
+      return res.status(403).json({
+        mensaje: "Acceso denegado. Rol no identificado",
+      });
     }
 
     if (!rolesPermitidos.includes(req.usuario.role)) {
-      return res.status(403).json({ mensaje: "No tenés permisos para acceder a este recurso" });
+      return res.status(403).json({
+        mensaje: "No tenés permisos para acceder a este recurso",
+      });
     }
 
     next();
@@ -88,15 +97,45 @@ const verificarRol = (...rolesPermitidos) => {
 const permitirRoles = (...rolesPermitidos) => {
   return (req, res, next) => {
     if (!req.usuario || !req.usuario.role) {
-      return res.status(403).json({ mensaje: "Acceso denegado. Rol no identificado" });
+      return res.status(403).json({
+        mensaje: "Acceso denegado. Rol no identificado",
+      });
     }
 
     if (!rolesPermitidos.includes(req.usuario.role)) {
-      return res.status(403).json({ mensaje: "No tenés permisos para esta acción" });
+      return res.status(403).json({
+        mensaje: "No tenés permisos para esta acción",
+      });
     }
 
     next();
   };
 };
 
-module.exports = { verificarToken, verificarRol, permitirRoles };
+const verificarAdminGeneral = (req, res, next) => {
+  if (!esAdminGeneral(req.usuario)) {
+    return res.status(403).json({
+      mensaje: "Acceso denegado. Se requiere permiso de Administrador General",
+    });
+  }
+
+  next();
+};
+
+const verificarGestionOficina = (req, res, next) => {
+  if (!puedeGestionarOficina(req.usuario)) {
+    return res.status(403).json({
+      mensaje: "Acceso denegado. Se requiere ser Administrador General o RESPONSABLE de una oficina",
+    });
+  }
+
+  next();
+};
+
+module.exports = {
+  verificarToken,
+  verificarRol,
+  permitirRoles,
+  verificarAdminGeneral,
+  verificarGestionOficina,
+};

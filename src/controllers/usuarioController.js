@@ -21,6 +21,17 @@ const exigirAdminGeneral = (req, res) => {
 
 const mismoId = (a, b) => Number(a) === Number(b);
 
+const validarAsignacionRolOficina = (role, oficina) => {
+  if (role?.nombre === "ADMIN" && !oficina?.es_central) {
+    return {
+      valida: false,
+      mensaje: "El rol ADMIN solo puede asignarse a la oficina central",
+    };
+  }
+
+  return { valida: true };
+};
+
 const listarUsuarios = async (req, res) => {
   try {
     if (!exigirAdminGeneral(req, res)) return;
@@ -66,6 +77,11 @@ const crearUsuario = async (req, res) => {
 
     const oficina = await Oficina.findByPk(oficina_id);
     if (!oficina) return res.status(404).json({ mensaje: "Oficina no encontrada" });
+
+    const validacionAsignacion = validarAsignacionRolOficina(role, oficina);
+    if (!validacionAsignacion.valida) {
+      return res.status(400).json({ mensaje: validacionAsignacion.mensaje });
+    }
 
     const passwordHash = await bcrypt.hash(
       validacionPassword.password,
@@ -122,14 +138,22 @@ const actualizarUsuario = async (req, res) => {
       if (existe) return res.status(400).json({ mensaje: "Ya existe un usuario con ese email" });
     }
 
-    if (role_id) {
-      const role = await Role.findByPk(role_id);
-      if (!role) return res.status(404).json({ mensaje: "Rol no encontrado" });
-    }
+    if (role_id !== undefined || oficina_id !== undefined) {
+      const roleFinal = await Role.findByPk(role_id || usuario.role_id);
+      if (!roleFinal) return res.status(404).json({ mensaje: "Rol no encontrado" });
 
-    if (oficina_id) {
-      const oficina = await Oficina.findByPk(oficina_id);
-      if (!oficina) return res.status(404).json({ mensaje: "Oficina no encontrada" });
+      const oficinaFinal = await Oficina.findByPk(oficina_id || usuario.oficina_id);
+      if (!oficinaFinal) {
+        return res.status(404).json({ mensaje: "Oficina no encontrada" });
+      }
+
+      const validacionAsignacion = validarAsignacionRolOficina(
+        roleFinal,
+        oficinaFinal,
+      );
+      if (!validacionAsignacion.valida) {
+        return res.status(400).json({ mensaje: validacionAsignacion.mensaje });
+      }
     }
 
     const datosActualizados = {};
