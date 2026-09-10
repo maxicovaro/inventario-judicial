@@ -39,6 +39,12 @@ const globalErrorHandler = (error, req, res, next) => {
     return next(error);
   }
 
+  if (error?.type === "entity.too.large" || error?.status === 413) {
+    return res.status(413).json({
+      mensaje: "El cuerpo de la solicitud supera el tamaño permitido",
+    });
+  }
+
   if (error?.message === "Tipo de archivo no permitido") {
     return res.status(400).json({
       mensaje: "Tipo de archivo no permitido",

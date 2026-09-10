@@ -1,9 +1,13 @@
 const jwt = require("jsonwebtoken");
-const { Usuario, Role, Oficina } = require("../models");
+const { Op } = require("sequelize");
+const { Usuario, Role, Oficina, AuthSession } = require("../models");
+const { opcionesVerificacionJwt } = require("../config/jwt");
 const {
   esAdminGeneral,
   puedeGestionarOficina,
 } = require("../utils/permisos");
+
+const MAX_BEARER_TOKEN_LENGTH = 4096;
 
 const verificarToken = async (req, res, next) => {
   try {
@@ -15,15 +19,19 @@ const verificarToken = async (req, res, next) => {
       });
     }
 
-    if (!authHeader.startsWith("Bearer ")) {
+    if (typeof authHeader !== "string" || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
         mensaje: "Formato de token inválido",
       });
     }
 
-    const token = authHeader.split(" ")[1];
+    const token = authHeader.slice(7).trim();
 
-    if (!token) {
+    if (
+      !token ||
+      token.includes(" ") ||
+      token.length > MAX_BEARER_TOKEN_LENGTH
+    ) {
       return res.status(401).json({
         mensaje: "Token no válido",
       });
@@ -36,7 +44,33 @@ const verificarToken = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET,
+      opcionesVerificacionJwt,
+    );
+
+    if (!decoded?.id || !decoded?.jti || String(decoded.sub) !== String(decoded.id)) {
+      return res.status(401).json({
+        mensaje: "Sesión inválida o expirada",
+      });
+    }
+
+    const sesion = await AuthSession.findOne({
+      where: {
+        usuario_id: decoded.id,
+        jti: decoded.jti,
+        revoked_at: { [Op.is]: null },
+        expires_at: { [Op.gt]: new Date() },
+      },
+      attributes: ["id", "jti", "expires_at"],
+    });
+
+    if (!sesion) {
+      return res.status(401).json({
+        mensaje: "Sesión inválida o expirada",
+      });
+    }
 
     const usuario = await Usuario.findByPk(decoded.id, {
       include: [
@@ -56,6 +90,12 @@ const verificarToken = async (req, res, next) => {
         mensaje: "El usuario está inactivo",
       });
     }
+
+    req.auth = {
+      session_id: sesion.id,
+      jti: decoded.jti,
+      exp: decoded.exp,
+    };
 
     req.usuario = {
       id: usuario.id,
