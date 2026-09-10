@@ -1,0 +1,362 @@
+.ops-page {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.ops-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.ops-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.8fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.ops-stack {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.ops-card {
+  overflow: hidden;
+}
+
+.ops-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-5) 0;
+}
+
+.ops-card__body {
+  padding: var(--space-5);
+}
+
+.ops-card__title {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.ops-card__description {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.ops-toolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.5fr) minmax(180px, 0.7fr) auto;
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(180deg, var(--color-surface), var(--color-surface-subtle));
+}
+
+.ops-toolbar--two {
+  grid-template-columns: minmax(240px, 1fr) minmax(220px, 0.8fr);
+}
+
+.ops-toolbar--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ops-filter-reset {
+  white-space: nowrap;
+}
+
+.ops-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 14px var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ops-meta p {
+  margin: 0;
+}
+
+.ops-meta__count {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.ops-meta__scope {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.ops-table td,
+.ops-table th {
+  vertical-align: middle;
+}
+
+.ops-table .ops-cell-primary {
+  min-width: 210px;
+}
+
+.ops-primary {
+  display: grid;
+  gap: 3px;
+}
+
+.ops-primary__name {
+  font-weight: 750;
+  color: var(--color-text);
+}
+
+.ops-primary__meta {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.ops-muted {
+  color: var(--color-text-muted);
+}
+
+.ops-number {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ops-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ops-detail-row td {
+  padding: 0 !important;
+  background: var(--color-surface-subtle);
+}
+
+.ops-detail {
+  padding: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.ops-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.ops-detail__item {
+  display: grid;
+  gap: 3px;
+}
+
+.ops-detail__label {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ops-detail__value {
+  color: var(--color-text);
+  line-height: 1.45;
+}
+
+.ops-detail__note {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.ops-form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.ops-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.ops-form-grid--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ops-field--full {
+  grid-column: 1 / -1;
+}
+
+.ops-textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.ops-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.ops-inline-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.ops-message-stack {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.ops-stock {
+  display: grid;
+  gap: 7px;
+  min-width: 120px;
+}
+
+.ops-stock__values {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.ops-stock__current {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.ops-stock__minimum {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.ops-stock__track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-strong);
+}
+
+.ops-stock__bar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-success);
+}
+
+.ops-stock--warning .ops-stock__bar {
+  background: var(--color-warning);
+}
+
+.ops-stock--danger .ops-stock__bar {
+  background: var(--color-danger);
+}
+
+.ops-period {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.ops-empty {
+  margin: var(--space-5);
+}
+
+.ops-file-name {
+  max-width: 360px;
+  overflow-wrap: anywhere;
+}
+
+.ops-file-size {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-upload-note {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 1180px) {
+  .ops-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ops-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-inline-form,
+  .ops-form-grid--four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .ops-page {
+    gap: var(--space-5);
+  }
+
+  .ops-summary,
+  .ops-toolbar,
+  .ops-toolbar--two,
+  .ops-toolbar--three,
+  .ops-form-grid,
+  .ops-form-grid--four,
+  .ops-inline-form,
+  .ops-detail__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .ops-meta__scope {
+    text-align: left;
+  }
+
+  .ops-card__header,
+  .ops-card__body,
+  .ops-toolbar {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+
+  .ops-table {
+    min-width: 780px;
+  }
+
+  .ops-form-actions {
+    justify-content: stretch;
+  }
+
+  .ops-form-actions .ui-button,
+  .ops-inline-form .ui-button {
+    width: 100%;
+  }
+}
