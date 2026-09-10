@@ -4,6 +4,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import AdjuntosPanel from "../components/AdjuntosPanel";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  Field,
+  PageHeader,
+  StatCard,
+  TableFrame,
+} from "../components/ui";
 import { activoSchema } from "../schemas/activoSchema";
 import { esAdminGeneral, puedeGestionarOficina } from "../utils/permisos";
 import "../styles/assets.css";
@@ -43,14 +55,8 @@ const obtenerUsuarioLocal = () => {
 
 const formatearFechaInput = (fecha) => {
   if (!fecha) return "";
-
   const fechaString = String(fecha);
-
-  if (fechaString.includes("T")) {
-    return fechaString.split("T")[0];
-  }
-
-  return fechaString.slice(0, 10);
+  return fechaString.includes("T") ? fechaString.split("T")[0] : fechaString.slice(0, 10);
 };
 
 const formatearNumero = (valor) =>
@@ -68,21 +74,11 @@ const getEstadoVariant = (estado) => {
     case "Sin funcionar":
       return "danger";
     case "Dado de baja":
-      return "warning";
+      return "neutral";
     default:
       return "info";
   }
 };
-
-function FieldError({ error, id }) {
-  if (!error) return null;
-
-  return (
-    <p className="ui-field-error" id={id}>
-      {error.message}
-    </p>
-  );
-}
 
 export default function Activos() {
   const usuario = obtenerUsuarioLocal();
@@ -106,6 +102,8 @@ export default function Activos() {
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroOficina, setFiltroOficina] = useState("");
   const [activoAdjuntosAbierto, setActivoAdjuntosAbierto] = useState(null);
+  const [bajaPendiente, setBajaPendiente] = useState(null);
+  const [bajando, setBajando] = useState(false);
 
   const {
     register,
@@ -121,13 +119,11 @@ export default function Activos() {
   const cargarDatos = async () => {
     try {
       setError("");
-
       const [resActivos, resCategorias, resOficinas] = await Promise.all([
         api.get("/activos"),
         api.get("/categorias"),
         api.get("/oficinas"),
       ]);
-
       setActivos(resActivos.data || []);
       setCategorias(resCategorias.data || []);
       setOficinas(resOficinas.data || []);
@@ -192,7 +188,6 @@ export default function Activos() {
         activo.marca?.toLowerCase().includes(texto) ||
         activo.modelo?.toLowerCase().includes(texto) ||
         activo.numero_serie?.toLowerCase().includes(texto);
-
       const coincideEstado = !filtroEstado || activo.estado === filtroEstado;
       const coincideOficina =
         !esDireccion ||
@@ -201,13 +196,7 @@ export default function Activos() {
 
       return coincideBusqueda && coincideEstado && coincideOficina;
     });
-  }, [
-    activosDeAlcance,
-    busqueda,
-    filtroEstado,
-    filtroOficina,
-    esDireccion,
-  ]);
+  }, [activosDeAlcance, busqueda, filtroEstado, filtroOficina, esDireccion]);
 
   const hayFiltros = Boolean(busqueda || filtroEstado || filtroOficina);
 
@@ -281,8 +270,7 @@ export default function Activos() {
       await cargarDatos();
     } catch (err) {
       const detalle = err.response?.data?.detalle;
-
-      if (detalle && detalle.length > 0) {
+      if (detalle?.length) {
         setError(detalle.map((d) => `${d.campo}: ${d.mensaje}`).join(" | "));
       } else {
         setError(
@@ -296,28 +284,31 @@ export default function Activos() {
     }
   };
 
-  const darDeBaja = async (id) => {
+  const solicitarBaja = (activo) => {
     if (!esDireccion) {
       setError("Solo Dirección puede dar de baja activos");
       return;
     }
+    setBajaPendiente(activo);
+  };
 
-    const confirmar = window.confirm(
-      "¿Seguro que querés dar de baja este activo?"
-    );
-
-    if (!confirmar) return;
+  const confirmarBaja = async () => {
+    if (!bajaPendiente) return;
 
     setError("");
     setMensaje("");
+    setBajando(true);
 
     try {
-      await api.patch(`/activos/${id}/baja`);
+      await api.patch(`/activos/${bajaPendiente.id}/baja`);
       setMensaje("Activo dado de baja correctamente");
       setActivoAdjuntosAbierto(null);
+      setBajaPendiente(null);
       await cargarDatos();
     } catch (err) {
       setError(err.response?.data?.mensaje || "Error al dar de baja el activo");
+    } finally {
+      setBajando(false);
     }
   };
 
@@ -365,73 +356,108 @@ export default function Activos() {
     setMensaje("");
   };
 
+  const renderAcciones = (activo, compact = false) => {
+    const perteneceAMiOficina =
+      String(activo.oficina_id) === String(usuario.oficina_id);
+    const puedeVerAdjuntos = esDireccion || perteneceAMiOficina;
+    const estaDadoDeBaja =
+      activo.activo === false || activo.estado === "Dado de baja";
+    const puedeEditar = puedeGestionar && puedeVerAdjuntos && !estaDadoDeBaja;
+    const adjuntosAbiertos = activoAdjuntosAbierto === activo.id;
+
+    return (
+      <div className={compact ? "assets-mobile-actions" : "assets-row-actions"}>
+        {puedeEditar && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="assets-action-button"
+            onClick={() => editarActivo(activo)}
+            aria-label={`Editar ${activo.nombre}`}
+          >
+            Editar
+          </Button>
+        )}
+
+        {puedeVerAdjuntos && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="assets-action-button"
+            onClick={() =>
+              setActivoAdjuntosAbierto(adjuntosAbiertos ? null : activo.id)
+            }
+            aria-expanded={adjuntosAbiertos}
+            aria-controls={`adjuntos-activo-${activo.id}`}
+          >
+            {adjuntosAbiertos ? "Ocultar adjuntos" : "Adjuntos"}
+          </Button>
+        )}
+
+        {esDireccion && !estaDadoDeBaja && (
+          <Button
+            variant="danger"
+            size="sm"
+            className="assets-action-button"
+            onClick={() => solicitarBaja(activo)}
+            aria-label={`Dar de baja ${activo.nombre}`}
+          >
+            Dar de baja
+          </Button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <Layout>
       <div className="ui-page assets-page">
-        <header className="ui-page-header assets-page-header">
-          <div className="assets-header-copy">
-            <h1 className="ui-page-title">Activos</h1>
-            <p className="ui-page-description">
-              {esDireccion
-                ? "Consultá, registrá y administrá los bienes patrimoniales de todas las dependencias."
-                : "Consultá los bienes asignados a tu oficina y mantené su información actualizada según tus permisos."}
-            </p>
-          </div>
-
-          {puedeGestionar && (
-            <div className="assets-header-actions">
-              <button
-                type="button"
-                className="ui-button ui-button--primary"
-                onClick={abrirNuevoActivo}
-              >
-                + Nuevo activo
-              </button>
-            </div>
-          )}
-        </header>
+        <PageHeader
+          className="assets-page-header"
+          title="Activos"
+          description={
+            esDireccion
+              ? "Consultá, registrá y administrá los bienes patrimoniales de todas las dependencias."
+              : "Consultá los bienes asignados a tu oficina y mantené su información actualizada según tus permisos."
+          }
+          actions={
+            puedeGestionar ? (
+              <Button onClick={abrirNuevoActivo}>+ Nuevo activo</Button>
+            ) : null
+          }
+        />
 
         <section className="assets-summary" aria-label="Resumen de activos">
-          <article className="assets-stat">
-            <p className="assets-stat-label">Registrados</p>
-            <p className="assets-stat-value">{formatearNumero(resumen.total)}</p>
-            <p className="assets-stat-detail">Dentro de tu alcance actual</p>
-          </article>
-
-          <article className="assets-stat">
-            <p className="assets-stat-label">Vigentes</p>
-            <p className="assets-stat-value">{formatearNumero(resumen.vigentes)}</p>
-            <p className="assets-stat-detail">Bienes actualmente operativos</p>
-          </article>
-
-          <article className="assets-stat">
-            <p className="assets-stat-label">Requieren atención</p>
-            <p className="assets-stat-value">{formatearNumero(resumen.atencion)}</p>
-            <p className="assets-stat-detail">Mal estado o sin funcionamiento</p>
-          </article>
-
-          <article className="assets-stat">
-            <p className="assets-stat-label">
-              {esDireccion ? "Oficinas con activos" : "Categorías"}
-            </p>
-            <p className="assets-stat-value">{formatearNumero(resumen.diversidad)}</p>
-            <p className="assets-stat-detail">
-              {esDireccion ? "Dependencias con bienes vigentes" : "Tipos de bienes vigentes"}
-            </p>
-          </article>
+          <StatCard
+            label="Registrados"
+            value={formatearNumero(resumen.total)}
+            detail="Dentro de tu alcance actual"
+          />
+          <StatCard
+            label="Vigentes"
+            value={formatearNumero(resumen.vigentes)}
+            detail="Bienes actualmente operativos"
+            tone="success"
+          />
+          <StatCard
+            label="Requieren atención"
+            value={formatearNumero(resumen.atencion)}
+            detail="Mal estado o sin funcionamiento"
+            tone={resumen.atencion > 0 ? "danger" : "success"}
+          />
+          <StatCard
+            label={esDireccion ? "Oficinas con activos" : "Categorías"}
+            value={formatearNumero(resumen.diversidad)}
+            detail={
+              esDireccion ? "Dependencias con bienes vigentes" : "Tipos de bienes vigentes"
+            }
+            tone="accent"
+          />
         </section>
 
         <div className="assets-message-stack" aria-live="polite">
-          {mensaje && (
-            <div className="ui-alert ui-alert--success" role="status">
-              {mensaje}
-            </div>
-          )}
-          {error && (
-            <div className="ui-alert ui-alert--danger" role="alert">
-              {error}
-            </div>
-          )}
+          {mensaje && <Alert tone="success">{mensaje}</Alert>}
+          {error && <Alert tone="danger">{error}</Alert>}
         </div>
 
         <div
@@ -439,12 +465,9 @@ export default function Activos() {
             formularioAbierto && puedeGestionar ? " assets-workspace--editing" : ""
           }`}
         >
-          <section className="ui-card assets-list-card" aria-labelledby="activos-listado-title">
+          <Card className="assets-list-card" aria-labelledby="activos-listado-title">
             <div className={esDireccion ? "assets-toolbar" : "assets-toolbar assets-toolbar--office"}>
-              <div className="ui-field assets-search-field">
-                <label className="ui-label" htmlFor="buscar-activos">
-                  Buscar
-                </label>
+              <Field label="Buscar" htmlFor="buscar-activos" className="assets-search-field">
                 <div className="assets-search-wrap">
                   <input
                     id="buscar-activos"
@@ -455,12 +478,9 @@ export default function Activos() {
                     onChange={(e) => setBusqueda(e.target.value)}
                   />
                 </div>
-              </div>
+              </Field>
 
-              <div className="ui-field">
-                <label className="ui-label" htmlFor="filtro-estado-activos">
-                  Estado
-                </label>
+              <Field label="Estado" htmlFor="filtro-estado-activos">
                 <select
                   id="filtro-estado-activos"
                   className="ui-control"
@@ -469,19 +489,14 @@ export default function Activos() {
                 >
                   <option value="">Todos los estados</option>
                   {ESTADOS.map((estado) => (
-                    <option key={estado} value={estado}>
-                      {estado}
-                    </option>
+                    <option key={estado} value={estado}>{estado}</option>
                   ))}
                   {esDireccion && <option value="Dado de baja">Dado de baja</option>}
                 </select>
-              </div>
+              </Field>
 
               {esDireccion && (
-                <div className="ui-field">
-                  <label className="ui-label" htmlFor="filtro-oficina-activos">
-                    Oficina
-                  </label>
+                <Field label="Oficina" htmlFor="filtro-oficina-activos">
                   <select
                     id="filtro-oficina-activos"
                     className="ui-control"
@@ -495,17 +510,17 @@ export default function Activos() {
                       </option>
                     ))}
                   </select>
-                </div>
+                </Field>
               )}
 
-              <button
-                type="button"
-                className="ui-button ui-button--ghost assets-filter-reset"
+              <Button
+                variant="ghost"
+                className="assets-filter-reset"
                 onClick={limpiarFiltros}
                 disabled={!hayFiltros}
               >
                 Limpiar filtros
-              </button>
+              </Button>
             </div>
 
             <div className="assets-list-meta">
@@ -520,151 +535,155 @@ export default function Activos() {
             </div>
 
             {activosFiltrados.length === 0 ? (
-              <div className="assets-empty">
-                <div className="assets-empty-mark" aria-hidden="true">
-                  0
-                </div>
-                <p className="assets-empty-title">No encontramos activos</p>
-                <p className="assets-empty-text">
-                  {hayFiltros
+              <EmptyState
+                className="assets-empty"
+                title="No encontramos activos"
+                description={
+                  hayFiltros
                     ? "Probá cambiando los términos de búsqueda o eliminando alguno de los filtros."
-                    : "Todavía no hay bienes registrados dentro de este alcance."}
-                </p>
-                {hayFiltros && (
-                  <button
-                    type="button"
-                    className="ui-button ui-button--secondary"
-                    onClick={limpiarFiltros}
-                  >
-                    Ver todos
-                  </button>
-                )}
-              </div>
+                    : "Todavía no hay bienes registrados dentro de este alcance."
+                }
+                actions={
+                  hayFiltros ? (
+                    <Button variant="secondary" onClick={limpiarFiltros}>Ver todos</Button>
+                  ) : null
+                }
+              />
             ) : (
-              <div className="ui-table-wrap assets-table-wrap">
-                <table className="ui-table assets-table">
-                  <caption className="sr-only">
-                    Listado de activos patrimoniales
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Activo</th>
-                      <th scope="col">Categoría</th>
-                      <th scope="col">Oficina</th>
-                      <th scope="col">Marca / modelo</th>
-                      <th scope="col">Estado</th>
-                      <th scope="col">Cantidad</th>
-                      <th scope="col">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activosFiltrados.map((activo) => {
-                      const perteneceAMiOficina =
-                        String(activo.oficina_id) === String(usuario.oficina_id);
-                      const puedeVerAdjuntos = esDireccion || perteneceAMiOficina;
-                      const estaDadoDeBaja =
-                        activo.activo === false || activo.estado === "Dado de baja";
-                      const puedeEditar =
-                        puedeGestionar && puedeVerAdjuntos && !estaDadoDeBaja;
-                      const adjuntosAbiertos = activoAdjuntosAbierto === activo.id;
+              <>
+                <TableFrame className="assets-table-wrap" label="Listado de activos patrimoniales">
+                  <table className="ui-table assets-table">
+                    <caption className="sr-only">Listado de activos patrimoniales</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Activo</th>
+                        <th scope="col">Categoría</th>
+                        <th scope="col">Oficina</th>
+                        <th scope="col">Marca / modelo</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col">Cantidad</th>
+                        <th scope="col">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activosFiltrados.map((activo) => {
+                        const perteneceAMiOficina =
+                          String(activo.oficina_id) === String(usuario.oficina_id);
+                        const puedeVerAdjuntos = esDireccion || perteneceAMiOficina;
+                        const estaDadoDeBaja =
+                          activo.activo === false || activo.estado === "Dado de baja";
+                        const adjuntosAbiertos = activoAdjuntosAbierto === activo.id;
 
-                      return (
-                        <Fragment key={activo.id}>
-                          <tr className={estaDadoDeBaja ? "assets-row--inactive" : ""}>
-                            <td>
-                              <div className="assets-primary-cell">
-                                <span className="assets-primary-name">{activo.nombre}</span>
-                                <span className="assets-primary-code">
-                                  {activo.codigo_interno || `ID #${activo.id}`}
-                                  {activo.numero_serie ? ` · Serie ${activo.numero_serie}` : ""}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="assets-muted">{activo.Categoria?.nombre || "-"}</td>
-                            <td className="assets-muted">{activo.Oficina?.nombre || "-"}</td>
-                            <td className="assets-muted">
-                              {[activo.marca, activo.modelo].filter(Boolean).join(" · ") || "-"}
-                            </td>
-                            <td>
-                              <span className={`ui-badge ui-badge--${getEstadoVariant(activo.estado)}`}>
-                                {activo.estado || "Sin estado"}
-                              </span>
-                            </td>
-                            <td className="assets-muted">{formatearNumero(activo.cantidad)}</td>
-                            <td>
-                              <div className="assets-row-actions">
-                                {puedeEditar && (
-                                  <button
-                                    type="button"
-                                    className="ui-button ui-button--secondary assets-action-button"
-                                    onClick={() => editarActivo(activo)}
-                                    aria-label={`Editar ${activo.nombre}`}
-                                  >
-                                    Editar
-                                  </button>
-                                )}
-
-                                {puedeVerAdjuntos && (
-                                  <button
-                                    type="button"
-                                    className="ui-button ui-button--ghost assets-action-button"
-                                    onClick={() =>
-                                      setActivoAdjuntosAbierto(adjuntosAbiertos ? null : activo.id)
-                                    }
-                                    aria-expanded={adjuntosAbiertos}
-                                    aria-controls={`adjuntos-activo-${activo.id}`}
-                                  >
-                                    {adjuntosAbiertos ? "Ocultar adjuntos" : "Adjuntos"}
-                                  </button>
-                                )}
-
-                                {esDireccion && !estaDadoDeBaja && (
-                                  <button
-                                    type="button"
-                                    className="ui-button ui-button--danger assets-action-button"
-                                    onClick={() => darDeBaja(activo.id)}
-                                    aria-label={`Dar de baja ${activo.nombre}`}
-                                  >
-                                    Dar de baja
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-
-                          {adjuntosAbiertos && puedeVerAdjuntos && (
-                            <tr>
-                              <td colSpan="7" className="assets-inline-detail">
-                                <div
-                                  className="assets-detail-shell"
-                                  id={`adjuntos-activo-${activo.id}`}
-                                >
-                                  <div className="assets-detail-header">
-                                    <p className="assets-detail-title">
-                                      Adjuntos · {activo.nombre}
-                                    </p>
-                                  </div>
-                                  <AdjuntosPanel activoId={activo.id} />
+                        return (
+                          <Fragment key={activo.id}>
+                            <tr className={estaDadoDeBaja ? "assets-row--inactive" : ""}>
+                              <td>
+                                <div className="assets-primary-cell">
+                                  <span className="assets-primary-name">{activo.nombre}</span>
+                                  <span className="assets-primary-code">
+                                    {activo.codigo_interno || `ID #${activo.id}`}
+                                    {activo.numero_serie ? ` · Serie ${activo.numero_serie}` : ""}
+                                  </span>
                                 </div>
                               </td>
+                              <td className="assets-muted">{activo.Categoria?.nombre || "-"}</td>
+                              <td className="assets-muted">{activo.Oficina?.nombre || "-"}</td>
+                              <td className="assets-muted">
+                                {[activo.marca, activo.modelo].filter(Boolean).join(" · ") || "-"}
+                              </td>
+                              <td>
+                                <Badge tone={getEstadoVariant(activo.estado)}>
+                                  {activo.estado || "Sin estado"}
+                                </Badge>
+                              </td>
+                              <td className="assets-muted">{formatearNumero(activo.cantidad)}</td>
+                              <td>{renderAcciones(activo)}</td>
                             </tr>
-                          )}
-                        </Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+
+                            {adjuntosAbiertos && puedeVerAdjuntos && (
+                              <tr>
+                                <td colSpan="7" className="assets-inline-detail">
+                                  <div className="assets-detail-shell" id={`adjuntos-activo-${activo.id}`}>
+                                    <div className="assets-detail-header">
+                                      <p className="assets-detail-title">Adjuntos · {activo.nombre}</p>
+                                    </div>
+                                    <AdjuntosPanel activoId={activo.id} />
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </TableFrame>
+
+                <div className="assets-mobile-list" aria-label="Activos en vista compacta">
+                  {activosFiltrados.map((activo) => {
+                    const perteneceAMiOficina =
+                      String(activo.oficina_id) === String(usuario.oficina_id);
+                    const puedeVerAdjuntos = esDireccion || perteneceAMiOficina;
+                    const adjuntosAbiertos = activoAdjuntosAbierto === activo.id;
+
+                    return (
+                      <article className="assets-mobile-card" key={`mobile-${activo.id}`}>
+                        <div className="assets-mobile-card-header">
+                          <div className="assets-primary-cell">
+                            <span className="assets-primary-name">{activo.nombre}</span>
+                            <span className="assets-primary-code">
+                              {activo.codigo_interno || `ID #${activo.id}`}
+                            </span>
+                          </div>
+                          <Badge tone={getEstadoVariant(activo.estado)}>
+                            {activo.estado || "Sin estado"}
+                          </Badge>
+                        </div>
+
+                        <div className="assets-mobile-data">
+                          <div className="assets-mobile-data-item">
+                            <span className="assets-mobile-data-label">Categoría</span>
+                            <span className="assets-mobile-data-value">{activo.Categoria?.nombre || "-"}</span>
+                          </div>
+                          <div className="assets-mobile-data-item">
+                            <span className="assets-mobile-data-label">Oficina</span>
+                            <span className="assets-mobile-data-value">{activo.Oficina?.nombre || "-"}</span>
+                          </div>
+                          <div className="assets-mobile-data-item">
+                            <span className="assets-mobile-data-label">Marca / modelo</span>
+                            <span className="assets-mobile-data-value">
+                              {[activo.marca, activo.modelo].filter(Boolean).join(" · ") || "-"}
+                            </span>
+                          </div>
+                          <div className="assets-mobile-data-item">
+                            <span className="assets-mobile-data-label">Cantidad</span>
+                            <span className="assets-mobile-data-value">{formatearNumero(activo.cantidad)}</span>
+                          </div>
+                        </div>
+
+                        {renderAcciones(activo, true)}
+
+                        {adjuntosAbiertos && puedeVerAdjuntos && (
+                          <div className="assets-detail-shell" id={`adjuntos-activo-${activo.id}`}>
+                            <div className="assets-detail-header">
+                              <p className="assets-detail-title">Adjuntos · {activo.nombre}</p>
+                            </div>
+                            <AdjuntosPanel activoId={activo.id} />
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              </>
             )}
-          </section>
+          </Card>
 
           {formularioAbierto && puedeGestionar && (
-            <aside className="ui-card assets-form-panel" aria-labelledby="activo-form-title">
+            <Card as="aside" className="assets-form-panel" aria-labelledby="activo-form-title">
               <div className="assets-form-header">
                 <div className="assets-form-heading">
-                  <p className="assets-form-eyebrow">
-                    {editandoId ? "Edición" : "Alta patrimonial"}
-                  </p>
+                  <p className="assets-form-eyebrow">{editandoId ? "Edición" : "Alta patrimonial"}</p>
                   <h2 className="assets-form-title" id="activo-form-title">
                     {editandoId ? "Editar activo" : "Nuevo activo"}
                   </h2>
@@ -674,7 +693,6 @@ export default function Activos() {
                       : "Registrá un nuevo bien dentro del inventario."}
                   </p>
                 </div>
-
                 <button
                   type="button"
                   className="assets-form-close"
@@ -688,280 +706,109 @@ export default function Activos() {
 
               <form className="assets-form" onSubmit={handleSubmit(onSubmit)} noValidate>
                 <section className="assets-form-section" aria-labelledby="datos-identificacion-title">
-                  <h3 className="assets-form-section-title" id="datos-identificacion-title">
-                    Identificación
-                  </h3>
-
+                  <h3 className="assets-form-section-title" id="datos-identificacion-title">Identificación</h3>
                   <div className="assets-form-grid">
-                    <div className="ui-field">
-                      <label className="ui-label" htmlFor="activo-codigo">
-                        Código interno
-                      </label>
-                      <input
-                        id="activo-codigo"
-                        className="ui-control"
-                        placeholder="Código interno"
-                        {...register("codigo_interno")}
-                        aria-invalid={Boolean(errors.codigo_interno)}
-                        aria-describedby={errors.codigo_interno ? "error-codigo" : undefined}
-                      />
-                      <FieldError error={errors.codigo_interno} id="error-codigo" />
-                    </div>
-
-                    <div className="ui-field">
-                      <label className="ui-label" htmlFor="activo-nombre">
-                        Nombre
-                      </label>
-                      <input
-                        id="activo-nombre"
-                        className="ui-control"
-                        placeholder="Nombre"
-                        {...register("nombre")}
-                        aria-invalid={Boolean(errors.nombre)}
-                        aria-describedby={errors.nombre ? "error-nombre" : undefined}
-                      />
-                      <FieldError error={errors.nombre} id="error-nombre" />
-                    </div>
-
-                    <div className="ui-field">
-                      <label className="ui-label" htmlFor="activo-marca">
-                        Marca
-                      </label>
-                      <input
-                        id="activo-marca"
-                        className="ui-control"
-                        placeholder="Marca"
-                        {...register("marca")}
-                        aria-invalid={Boolean(errors.marca)}
-                        aria-describedby={errors.marca ? "error-marca" : undefined}
-                      />
-                      <FieldError error={errors.marca} id="error-marca" />
-                    </div>
-
-                    <div className="ui-field">
-                      <label className="ui-label" htmlFor="activo-modelo">
-                        Modelo
-                      </label>
-                      <input
-                        id="activo-modelo"
-                        className="ui-control"
-                        placeholder="Modelo"
-                        {...register("modelo")}
-                        aria-invalid={Boolean(errors.modelo)}
-                        aria-describedby={errors.modelo ? "error-modelo" : undefined}
-                      />
-                      <FieldError error={errors.modelo} id="error-modelo" />
-                    </div>
-
-                    <div className="ui-field assets-field--full">
-                      <label className="ui-label" htmlFor="activo-serie">
-                        Número de serie
-                      </label>
-                      <input
-                        id="activo-serie"
-                        className="ui-control"
-                        placeholder="Número de serie"
-                        {...register("numero_serie")}
-                        aria-invalid={Boolean(errors.numero_serie)}
-                        aria-describedby={errors.numero_serie ? "error-serie" : undefined}
-                      />
-                      <FieldError error={errors.numero_serie} id="error-serie" />
-                    </div>
+                    <Field label="Código interno" htmlFor="activo-codigo" error={errors.codigo_interno} errorId="error-codigo">
+                      <input id="activo-codigo" className="ui-control" placeholder="Código interno" {...register("codigo_interno")} aria-invalid={Boolean(errors.codigo_interno)} aria-describedby={errors.codigo_interno ? "error-codigo" : undefined} />
+                    </Field>
+                    <Field label="Nombre" htmlFor="activo-nombre" error={errors.nombre} errorId="error-nombre">
+                      <input id="activo-nombre" className="ui-control" placeholder="Nombre" {...register("nombre")} aria-invalid={Boolean(errors.nombre)} aria-describedby={errors.nombre ? "error-nombre" : undefined} />
+                    </Field>
+                    <Field label="Marca" htmlFor="activo-marca" error={errors.marca} errorId="error-marca">
+                      <input id="activo-marca" className="ui-control" placeholder="Marca" {...register("marca")} aria-invalid={Boolean(errors.marca)} aria-describedby={errors.marca ? "error-marca" : undefined} />
+                    </Field>
+                    <Field label="Modelo" htmlFor="activo-modelo" error={errors.modelo} errorId="error-modelo">
+                      <input id="activo-modelo" className="ui-control" placeholder="Modelo" {...register("modelo")} aria-invalid={Boolean(errors.modelo)} aria-describedby={errors.modelo ? "error-modelo" : undefined} />
+                    </Field>
+                    <Field className="assets-field--full" label="Número de serie" htmlFor="activo-serie" error={errors.numero_serie} errorId="error-serie">
+                      <input id="activo-serie" className="ui-control" placeholder="Número de serie" {...register("numero_serie")} aria-invalid={Boolean(errors.numero_serie)} aria-describedby={errors.numero_serie ? "error-serie" : undefined} />
+                    </Field>
                   </div>
                 </section>
 
                 <section className="assets-form-section" aria-labelledby="datos-clasificacion-title">
-                  <h3 className="assets-form-section-title" id="datos-clasificacion-title">
-                    Clasificación y ubicación
-                  </h3>
-
+                  <h3 className="assets-form-section-title" id="datos-clasificacion-title">Clasificación y ubicación</h3>
                   <div className="assets-form-grid">
-                    <div className="ui-field">
-                      <label className="ui-label" htmlFor="activo-categoria">
-                        Categoría
-                      </label>
-                      <select
-                        id="activo-categoria"
-                        className="ui-control"
-                        {...register("categoria_id")}
-                        aria-invalid={Boolean(errors.categoria_id)}
-                        aria-describedby={errors.categoria_id ? "error-categoria" : undefined}
-                      >
+                    <Field label="Categoría" htmlFor="activo-categoria" error={errors.categoria_id} errorId="error-categoria">
+                      <select id="activo-categoria" className="ui-control" {...register("categoria_id")} aria-invalid={Boolean(errors.categoria_id)} aria-describedby={errors.categoria_id ? "error-categoria" : undefined}>
                         <option value="">Seleccionar categoría</option>
                         {categorias.map((categoria) => (
-                          <option key={categoria.id} value={String(categoria.id)}>
-                            {categoria.nombre}
-                          </option>
+                          <option key={categoria.id} value={String(categoria.id)}>{categoria.nombre}</option>
                         ))}
                       </select>
-                      <FieldError error={errors.categoria_id} id="error-categoria" />
-                    </div>
-
-                    <div className="ui-field">
-                      <label className="ui-label" htmlFor="activo-estado">
-                        Estado
-                      </label>
-                      <select
-                        id="activo-estado"
-                        className="ui-control"
-                        {...register("estado")}
-                        aria-invalid={Boolean(errors.estado)}
-                        aria-describedby={errors.estado ? "error-estado" : undefined}
-                      >
-                        {ESTADOS.map((estado) => (
-                          <option key={estado} value={estado}>
-                            {estado}
-                          </option>
-                        ))}
+                    </Field>
+                    <Field label="Estado" htmlFor="activo-estado" error={errors.estado} errorId="error-estado">
+                      <select id="activo-estado" className="ui-control" {...register("estado")} aria-invalid={Boolean(errors.estado)} aria-describedby={errors.estado ? "error-estado" : undefined}>
+                        {ESTADOS.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
                       </select>
-                      <FieldError error={errors.estado} id="error-estado" />
-                    </div>
-
-                    <div className="ui-field">
-                      <label className="ui-label" htmlFor="activo-cantidad">
-                        Cantidad
-                      </label>
-                      <input
-                        id="activo-cantidad"
-                        className="ui-control"
-                        type="number"
-                        min="1"
-                        {...register("cantidad")}
-                        aria-invalid={Boolean(errors.cantidad)}
-                        aria-describedby={errors.cantidad ? "error-cantidad" : undefined}
-                      />
-                      <FieldError error={errors.cantidad} id="error-cantidad" />
-                    </div>
-
-                    <div className="ui-field">
-                      <label className="ui-label" htmlFor="activo-fecha-alta">
-                        Fecha de alta
-                      </label>
-                      <input
-                        id="activo-fecha-alta"
-                        className="ui-control"
-                        type="date"
-                        {...register("fecha_alta")}
-                        aria-invalid={Boolean(errors.fecha_alta)}
-                        aria-describedby={errors.fecha_alta ? "error-fecha" : undefined}
-                      />
-                      <FieldError error={errors.fecha_alta} id="error-fecha" />
-                    </div>
-
-                    <div className="ui-field assets-field--full">
-                      <label className="ui-label" htmlFor="activo-oficina">
-                        Oficina
-                      </label>
+                    </Field>
+                    <Field label="Cantidad" htmlFor="activo-cantidad" error={errors.cantidad} errorId="error-cantidad">
+                      <input id="activo-cantidad" className="ui-control" type="number" min="1" {...register("cantidad")} aria-invalid={Boolean(errors.cantidad)} aria-describedby={errors.cantidad ? "error-cantidad" : undefined} />
+                    </Field>
+                    <Field label="Fecha de alta" htmlFor="activo-fecha-alta" error={errors.fecha_alta} errorId="error-fecha">
+                      <input id="activo-fecha-alta" className="ui-control" type="date" {...register("fecha_alta")} aria-invalid={Boolean(errors.fecha_alta)} aria-describedby={errors.fecha_alta ? "error-fecha" : undefined} />
+                    </Field>
+                    <Field className="assets-field--full" label="Oficina" htmlFor="activo-oficina" error={errors.oficina_id} errorId="error-oficina">
                       {esDireccion ? (
-                        <select
-                          id="activo-oficina"
-                          className="ui-control"
-                          {...register("oficina_id")}
-                          aria-invalid={Boolean(errors.oficina_id)}
-                          aria-describedby={errors.oficina_id ? "error-oficina" : undefined}
-                        >
+                        <select id="activo-oficina" className="ui-control" {...register("oficina_id")} aria-invalid={Boolean(errors.oficina_id)} aria-describedby={errors.oficina_id ? "error-oficina" : undefined}>
                           <option value="">Seleccionar oficina</option>
                           {oficinas.map((oficina) => (
-                            <option key={oficina.id} value={String(oficina.id)}>
-                              {oficina.nombre}
-                            </option>
+                            <option key={oficina.id} value={String(oficina.id)}>{oficina.nombre}</option>
                           ))}
                         </select>
                       ) : (
                         <>
-                          <input
-                            id="activo-oficina"
-                            className="ui-control"
-                            value={
-                              usuario.oficina_nombre ||
-                              usuario.Oficina?.nombre ||
-                              "Mi oficina"
-                            }
-                            disabled
-                            readOnly
-                          />
+                          <input id="activo-oficina" className="ui-control" value={usuario.oficina_nombre || usuario.Oficina?.nombre || "Mi oficina"} disabled readOnly />
                           <input type="hidden" {...register("oficina_id")} />
                         </>
                       )}
-                      <FieldError error={errors.oficina_id} id="error-oficina" />
-                    </div>
+                    </Field>
                   </div>
                 </section>
 
                 <section className="assets-form-section" aria-labelledby="datos-adicionales-title">
-                  <h3 className="assets-form-section-title" id="datos-adicionales-title">
-                    Información adicional
-                  </h3>
-
+                  <h3 className="assets-form-section-title" id="datos-adicionales-title">Información adicional</h3>
                   <div className="assets-form-grid">
-                    <div className="ui-field assets-field--full">
-                      <label className="ui-label" htmlFor="activo-descripcion">
-                        Descripción
-                      </label>
-                      <textarea
-                        id="activo-descripcion"
-                        className="ui-control assets-textarea"
-                        placeholder="Descripción"
-                        {...register("descripcion")}
-                        aria-invalid={Boolean(errors.descripcion)}
-                        aria-describedby={errors.descripcion ? "error-descripcion" : undefined}
-                      />
-                      <FieldError error={errors.descripcion} id="error-descripcion" />
-                    </div>
-
-                    <div className="ui-field assets-field--full">
-                      <label className="ui-label" htmlFor="activo-observaciones">
-                        Observaciones
-                      </label>
-                      <textarea
-                        id="activo-observaciones"
-                        className="ui-control assets-textarea"
-                        placeholder="Observaciones"
-                        {...register("observaciones")}
-                        aria-invalid={Boolean(errors.observaciones)}
-                        aria-describedby={errors.observaciones ? "error-observaciones" : undefined}
-                      />
-                      <FieldError error={errors.observaciones} id="error-observaciones" />
-                    </div>
+                    <Field className="assets-field--full" label="Descripción" htmlFor="activo-descripcion" error={errors.descripcion} errorId="error-descripcion">
+                      <textarea id="activo-descripcion" className="ui-control assets-textarea" placeholder="Descripción" {...register("descripcion")} aria-invalid={Boolean(errors.descripcion)} aria-describedby={errors.descripcion ? "error-descripcion" : undefined} />
+                    </Field>
+                    <Field className="assets-field--full" label="Observaciones" htmlFor="activo-observaciones" error={errors.observaciones} errorId="error-observaciones">
+                      <textarea id="activo-observaciones" className="ui-control assets-textarea" placeholder="Observaciones" {...register("observaciones")} aria-invalid={Boolean(errors.observaciones)} aria-describedby={errors.observaciones ? "error-observaciones" : undefined} />
+                    </Field>
                   </div>
                 </section>
 
                 <div className="assets-form-actions">
-                  {editandoId ? (
-                    <button
-                      type="button"
-                      className="ui-button ui-button--secondary"
-                      onClick={cancelarEdicion}
-                    >
-                      Cancelar edición
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="ui-button ui-button--secondary"
-                      onClick={cerrarFormulario}
-                    >
-                      Cancelar
-                    </button>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="ui-button ui-button--primary"
-                    disabled={guardando}
-                  >
+                  <Button variant="secondary" onClick={editandoId ? cancelarEdicion : cerrarFormulario}>
+                    {editandoId ? "Cancelar edición" : "Cancelar"}
+                  </Button>
+                  <Button type="submit" disabled={guardando} busy={guardando}>
                     {guardando
                       ? "Guardando..."
                       : editandoId
                         ? "Actualizar activo"
                         : "Crear activo"}
-                  </button>
+                  </Button>
                 </div>
               </form>
-            </aside>
+            </Card>
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(bajaPendiente)}
+        title="Dar de baja el activo"
+        description={
+          bajaPendiente
+            ? `Vas a dar de baja “${bajaPendiente.nombre}”. Esta acción quedará registrada en la trazabilidad del sistema.`
+            : ""
+        }
+        confirmLabel="Dar de baja"
+        busy={bajando}
+        onCancel={() => !bajando && setBajaPendiente(null)}
+        onConfirm={confirmarBaja}
+      />
     </Layout>
   );
 }
