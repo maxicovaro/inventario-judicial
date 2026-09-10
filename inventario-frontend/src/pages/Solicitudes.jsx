@@ -355,7 +355,7 @@ export default function Solicitudes() {
           <Card className="admin-card" aria-labelledby="bandeja-solicitudes-title">
             <div className="ui-section-header">
               <div>
-                <h2 className="ui-section-title" id="bandeja-solicitudes-title">Bandeja de solicitudes</h2>
+                <h2 className="ui-section-title" id="bandeja-solicitudes-title">Bandeja de gestión</h2>
                 <p className="ui-section-description">Filtrá por estado, prioridad, tipo y dependencia para encontrar rápidamente lo que requiere acción.</p>
               </div>
             </div>
