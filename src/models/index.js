@@ -15,6 +15,7 @@ const Bitacora = require("./Bitacora");
 const StockOficina = require("./StockOficina");
 const ConsumoOficina = require("./ConsumoOficina");
 const OperacionIdempotente = require("./OperacionIdempotente");
+const AuthSession = require("./AuthSession");
 
 // Relaciones Usuario
 Role.hasMany(Usuario, { foreignKey: "role_id" });
@@ -96,6 +97,9 @@ ConsumoOficina.belongsTo(Usuario, { foreignKey: "usuario_id" });
 Usuario.hasMany(OperacionIdempotente, { foreignKey: "usuario_id" });
 OperacionIdempotente.belongsTo(Usuario, { foreignKey: "usuario_id" });
 
+Usuario.hasMany(AuthSession, { foreignKey: "usuario_id" });
+AuthSession.belongsTo(Usuario, { foreignKey: "usuario_id" });
+
 module.exports = {
   Role,
   Oficina,
@@ -114,4 +118,5 @@ module.exports = {
   StockOficina,
   ConsumoOficina,
   OperacionIdempotente,
+  AuthSession,
 };
