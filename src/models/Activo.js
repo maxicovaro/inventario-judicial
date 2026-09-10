@@ -63,6 +63,13 @@ const Activo = sequelize.define('Activo', {
 }, {
   tableName: 'activos',
   timestamps: true,
+  indexes: [
+    {
+      name: 'uq_activos_codigo_interno',
+      unique: true,
+      fields: ['codigo_interno'],
+    },
+  ],
 });
 
 module.exports = Activo;
