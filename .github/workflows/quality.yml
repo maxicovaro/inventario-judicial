@@ -83,6 +83,9 @@ jobs:
       - name: Run MySQL integration flows
         run: npm run test:integration
 
+      - name: Run concurrency and idempotency flows
+        run: node scripts/test-concurrency.js
+
       - name: Verify runtime health
         run: npm run test:runtime-health
 
