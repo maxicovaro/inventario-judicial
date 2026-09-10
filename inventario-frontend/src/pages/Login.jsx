@@ -73,113 +73,118 @@ export default function Login() {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>Iniciar sesión</h1>
-        <p style={styles.subtitle}>Sistema de Inventario Judicial</p>
-
-        <form onSubmit={handleSubmit(onSubmit)} style={styles.form}>
-          <div>
-            <label style={styles.label}>Email</label>
-            <input
-              type="email"
-              placeholder="Ingresá tu email"
-              {...register("email")}
-              style={styles.input}
-            />
-            {errors.email && (
-              <p style={styles.errorText}>{errors.email.message}</p>
-            )}
+    <main className="login-page">
+      <section className="login-hero" aria-labelledby="login-product-title">
+        <div className="login-brand" aria-label="Sistema de Inventario Judicial">
+          <div className="login-brand-mark" aria-hidden="true">
+            IJ
           </div>
-
-          <div>
-            <label style={styles.label}>Contraseña</label>
-            <input
-              type="password"
-              placeholder="Ingresá tu contraseña"
-              {...register("password")}
-              style={styles.input}
-            />
-            {errors.password && (
-              <p style={styles.errorText}>{errors.password.message}</p>
-            )}
+          <div className="login-brand-copy">
+            <strong>Inventario Judicial</strong>
+            <span>Dirección de Policía Judicial</span>
           </div>
+        </div>
 
-          {errorGeneral && <p style={styles.errorGeneral}>{errorGeneral}</p>}
+        <div className="login-hero-content">
+          <p className="login-eyebrow">Gestión institucional</p>
+          <h2 className="login-hero-title" id="login-product-title">
+            Inventario claro, trazable y fácil de gestionar.
+          </h2>
+          <p className="login-hero-text">
+            Consultá bienes, administrá insumos y seguí movimientos desde un único
+            espacio de trabajo.
+          </p>
+        </div>
 
-          <button type="submit" style={styles.button} disabled={cargando}>
-            {cargando ? "Ingresando..." : "Ingresar"}
-          </button>
-        </form>
-      </div>
-    </div>
+        <p className="login-hero-footer">
+          Acceso exclusivo para personal autorizado.
+        </p>
+      </section>
+
+      <section className="login-panel" aria-labelledby="login-title">
+        <div className="login-card">
+          <header className="login-card-header">
+            <h1 className="login-card-title" id="login-title">
+              Iniciar sesión
+            </h1>
+            <p className="login-card-subtitle">
+              Ingresá con las credenciales asignadas a tu cuenta.
+            </p>
+          </header>
+
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="login-form"
+            noValidate
+          >
+            <div className="ui-field">
+              <label className="ui-label" htmlFor="email">
+                Correo electrónico
+              </label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="username"
+                placeholder="Ingresá tu email"
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? "email-error" : undefined}
+                {...register("email")}
+                className="ui-control"
+              />
+              {errors.email && (
+                <p className="ui-field-error" id="email-error" role="alert">
+                  {errors.email.message}
+                </p>
+              )}
+            </div>
+
+            <div className="ui-field">
+              <label className="ui-label" htmlFor="password">
+                Contraseña
+              </label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                placeholder="Ingresá tu contraseña"
+                aria-invalid={Boolean(errors.password)}
+                aria-describedby={errors.password ? "password-error" : undefined}
+                {...register("password")}
+                className="ui-control"
+              />
+              {errors.password && (
+                <p className="ui-field-error" id="password-error" role="alert">
+                  {errors.password.message}
+                </p>
+              )}
+            </div>
+
+            {errorGeneral && (
+              <div className="ui-alert ui-alert--danger" role="alert">
+                <span aria-hidden="true">!</span>
+                <span>{errorGeneral}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="ui-button ui-button--primary login-submit"
+              disabled={cargando}
+              aria-busy={cargando}
+            >
+              {cargando ? "Ingresando..." : "Ingresar"}
+            </button>
+          </form>
+
+          <div className="login-security-note">
+            <span className="login-security-dot" aria-hidden="true" />
+            <span>
+              Tu acceso y las acciones realizadas dentro del sistema quedan asociados
+              a tu usuario.
+            </span>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }
-
-const styles = {
-  container: {
-    minHeight: "100vh",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    background: "#f3f4f6",
-    padding: "1rem",
-  },
-  card: {
-    width: "100%",
-    maxWidth: "420px",
-    background: "#fff",
-    borderRadius: "16px",
-    padding: "2rem",
-    boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
-  },
-  title: {
-    margin: 0,
-    marginBottom: "0.5rem",
-    fontSize: "2rem",
-    textAlign: "center",
-  },
-  subtitle: {
-    margin: 0,
-    marginBottom: "1.5rem",
-    textAlign: "center",
-    color: "#6b7280",
-  },
-  form: {
-    display: "grid",
-    gap: "1rem",
-  },
-  label: {
-    display: "block",
-    marginBottom: "0.4rem",
-    fontWeight: "bold",
-  },
-  input: {
-    width: "100%",
-    padding: "0.85rem",
-    border: "1px solid #d1d5db",
-    borderRadius: "10px",
-    boxSizing: "border-box",
-  },
-  button: {
-    padding: "0.9rem",
-    border: "none",
-    borderRadius: "10px",
-    background: "#1f4f82",
-    color: "#fff",
-    fontWeight: "bold",
-    cursor: "pointer",
-    marginTop: "0.5rem",
-  },
-  errorText: {
-    color: "crimson",
-    marginTop: "0.35rem",
-    marginBottom: 0,
-    fontSize: "0.9rem",
-  },
-  errorGeneral: {
-    color: "crimson",
-    margin: 0,
-    textAlign: "center",
-  },
-};
