@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
 export const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -163,6 +163,8 @@ export function ConfirmDialog({
   onCancel,
 }) {
   const ref = useRef(null);
+  const titleId = useId();
+  const descriptionId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -178,16 +180,26 @@ export function ConfirmDialog({
   };
 
   return (
-    <dialog ref={ref} className="ui-dialog" onCancel={handleCancel}>
+    <dialog
+      ref={ref}
+      className="ui-dialog"
+      onCancel={handleCancel}
+      aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
+    >
       <div className="ui-dialog-content">
         <div className="ui-dialog-mark" aria-hidden="true">!</div>
         <div>
-          <h2 className="ui-dialog-title">{title}</h2>
-          {description && <p className="ui-dialog-description">{description}</p>}
+          <h2 className="ui-dialog-title" id={titleId}>{title}</h2>
+          {description && (
+            <p className="ui-dialog-description" id={descriptionId}>
+              {description}
+            </p>
+          )}
         </div>
       </div>
       <div className="ui-dialog-actions">
-        <Button variant="secondary" onClick={onCancel} disabled={busy}>
+        <Button variant="secondary" onClick={onCancel} disabled={busy} autoFocus>
           {cancelLabel}
         </Button>
         <Button variant={tone} onClick={onConfirm} disabled={busy} busy={busy}>
