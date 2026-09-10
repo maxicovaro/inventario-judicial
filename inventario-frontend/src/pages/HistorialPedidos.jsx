@@ -286,7 +286,7 @@ export default function HistorialPedidos() {
                                     <td>{item.cantidad_provista || 0}</td>
                                     {esDireccion && (
                                       <td>
-                                        <label className="sr-only" htmlFor={`provision-${item.id}`}>Cantidad provista para {item.Insumo?.nombre || item.articulo_manual || "artículo"}</label>
+                                        <label className="sr-only" htmlFor={`provision-${item.id}`}>Nueva provisión</label>
                                         <input
                                           id={`provision-${item.id}`}
                                           className="ui-control order-provision-input"
