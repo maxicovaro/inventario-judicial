@@ -44,6 +44,8 @@ jobs:
       DB_PASSWORD: inventario_ci_password
       JWT_SECRET: ci_only_secret_not_for_real_environments_2026
       CORS_ORIGIN: http://localhost:5173
+      HEALTH_DB_TIMEOUT_MS: 2000
+      SHUTDOWN_TIMEOUT_MS: 10000
 
     steps:
       - name: Checkout
@@ -75,6 +77,26 @@ jobs:
 
       - name: Verify migration status
         run: npm run db:status
+
+      - name: Verify runtime health
+        run: npm run test:runtime-health
+
+      - name: Ensure MySQL client tools
+        run: |
+          if ! command -v mysqldump >/dev/null 2>&1 || ! command -v mysql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y mysql-client || sudo apt-get install -y default-mysql-client
+          fi
+          mysqldump --version
+          mysql --version
+
+      - name: Verify backup and restore drill
+        env:
+          RESTORE_DB_HOST: 127.0.0.1
+          RESTORE_DB_PORT: 3306
+          RESTORE_DB_USER: root
+          RESTORE_DB_PASSWORD: root_ci_password
+        run: npm run test:backup-restore
 
   frontend:
     name: Frontend lint + build

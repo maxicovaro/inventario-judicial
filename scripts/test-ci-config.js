@@ -12,6 +12,8 @@ assert.match(workflow, /npm run db:migrate/);
 assert.match(workflow, /npm run db:status/);
 assert.match(workflow, /npm run check:backend/);
 assert.match(workflow, /npm test/);
+assert.match(workflow, /npm run test:runtime-health/);
+assert.match(workflow, /npm run test:backup-restore/);
 assert.match(workflow, /npm run lint/);
 assert.match(workflow, /npm run build/);
 assert.match(workflow, /node-version:\s*22/);
@@ -20,6 +22,10 @@ const auditCommands = workflow.match(/npm audit --audit-level=moderate/g) || [];
 assert.strictEqual(auditCommands.length, 2);
 
 assert.ok(packageJson.scripts["test:dependencies"]);
+assert.ok(packageJson.scripts["test:operational-contracts"]);
+assert.ok(packageJson.scripts["test:recovery-runbook"]);
+assert.ok(packageJson.scripts["test:backup-restore"]);
+assert.ok(packageJson.scripts["test:runtime-health"]);
 assert.ok(packageJson.scripts["test:ci-config"]);
 
 console.log("Configuración de CI validada correctamente.");

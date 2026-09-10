@@ -1,3 +1,5 @@
+const logger = require("../utils/logger");
+
 const safeErrorResponses = (req, res, next) => {
   const originalJson = res.json.bind(res);
 
@@ -6,10 +8,12 @@ const safeErrorResponses = (req, res, next) => {
       const internalDetail = body?.error;
 
       if (internalDetail) {
-        console.error(
-          `[HTTP ${res.statusCode}] ${req.method} ${req.originalUrl}`,
-          internalDetail,
-        );
+        logger.error("http_internal_error", {
+          request_id: req.requestId,
+          method: req.method,
+          path: req.path || req.originalUrl?.split("?")[0],
+          error: internalDetail,
+        });
       }
 
       return originalJson({
@@ -24,10 +28,12 @@ const safeErrorResponses = (req, res, next) => {
 };
 
 const globalErrorHandler = (error, req, res, next) => {
-  console.error(
-    `[UNHANDLED] ${req.method} ${req.originalUrl}`,
+  logger.error("http_unhandled_error", {
+    request_id: req.requestId,
+    method: req.method,
+    path: req.path || req.originalUrl?.split("?")[0],
     error,
-  );
+  });
 
   if (res.headersSent) {
     return next(error);

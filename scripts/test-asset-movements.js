@@ -1,7 +1,7 @@
 const assert = require("assert");
 const fs = require("fs");
 
-const server = fs.readFileSync("server.js", "utf8");
+const app = fs.readFileSync("src/app.js", "utf8");
 const routes = fs.readFileSync("src/routes/movimientoRoutes.js", "utf8");
 const controller = fs.readFileSync("src/controllers/movimientoController.js", "utf8");
 const activos = fs.readFileSync("src/controllers/activoController.js", "utf8");
@@ -10,8 +10,8 @@ const activosFrontend = fs.readFileSync(
   "utf8",
 );
 
-assert.match(server, /require\("\.\/src\/routes\/movimientoRoutes"\)/);
-assert.match(server, /app\.use\("\/api\/movimientos", movimientoRoutes\)/);
+assert.match(app, /require\("\.\/routes\/movimientoRoutes"\)/);
+assert.match(app, /app\.use\("\/api\/movimientos", movimientoRoutes\)/);
 
 assert.match(routes, /verificarGestionOficina/);
 assert.match(routes, /router\.get\("\/", verificarToken, listarMovimientos\)/);
