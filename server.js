@@ -11,6 +11,7 @@ const {
 
 const authRoutes = require("./src/routes/authRoutes");
 const activoRoutes = require("./src/routes/activoRoutes");
+const movimientoRoutes = require("./src/routes/movimientoRoutes");
 const usuarioRoutes = require("./src/routes/usuarioRoutes");
 const solicitudRoutes = require("./src/routes/solicitudRoutes");
 const adjuntoRoutes = require("./src/routes/adjuntoRoutes");
@@ -52,6 +53,7 @@ app.use("/api/categorias", categoriaRoutes);
 app.use("/api/bitacora", bitacoraRoutes);
 app.use("/api/notificaciones", notificacionRoutes);
 app.use("/api/activos", activoRoutes);
+app.use("/api/movimientos", movimientoRoutes);
 app.use("/api/solicitudes", solicitudRoutes);
 app.use("/api/adjuntos", adjuntoRoutes);
 app.use("/api/insumos", insumoRoutes);

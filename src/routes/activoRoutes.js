@@ -8,19 +8,20 @@ const {
   darDeBajaActivo,
 } = require("../controllers/activoController");
 
-const { verificarToken, verificarRol } = require("../middlewares/authMiddleware");
+const {
+  verificarToken,
+  verificarAdminGeneral,
+  verificarGestionOficina,
+} = require("../middlewares/authMiddleware");
 
 router.get("/", verificarToken, listarActivos);
-
-router.post("/", verificarToken, crearActivo);
-
-router.put("/:id", verificarToken, actualizarActivo);
-
+router.post("/", verificarToken, verificarGestionOficina, crearActivo);
+router.put("/:id", verificarToken, verificarGestionOficina, actualizarActivo);
 router.patch(
   "/:id/baja",
   verificarToken,
-  verificarRol("ADMIN"),
-  darDeBajaActivo
+  verificarAdminGeneral,
+  darDeBajaActivo,
 );
 
 module.exports = router;
