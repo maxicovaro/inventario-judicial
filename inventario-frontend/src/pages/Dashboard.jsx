@@ -12,10 +12,10 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from "recharts";
+import "../styles/dashboard.css";
 
-const COLORS_MOVIMIENTOS = ["#16a34a", "#dc2626", "#d97706", "#2563eb"];
+const COLORES_MOVIMIENTOS = ["#16794b", "#b42318", "#9a5b00", "#175cd3"];
 
 const formatearNumero = (valor) => {
   const numero = Number(valor) || 0;
@@ -23,15 +23,18 @@ const formatearNumero = (valor) => {
 };
 
 const formatearFecha = (fecha) => {
-  if (!fecha) return "-";
+  if (!fecha) return "Sin fecha";
 
   const fechaObj = new Date(fecha);
+  if (Number.isNaN(fechaObj.getTime())) return "Sin fecha";
 
-  if (Number.isNaN(fechaObj.getTime())) {
-    return "-";
-  }
-
-  return fechaObj.toLocaleString("es-AR");
+  return fechaObj.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 const normalizarSerie = (items = []) =>
@@ -39,6 +42,37 @@ const normalizarSerie = (items = []) =>
     ...item,
     total: Number(item.total) || 0,
   }));
+
+const badgeTone = (valor = "") => {
+  const normalizado = String(valor).toUpperCase();
+
+  if (["INGRESO", "ALTA", "APROBADO", "ENTREGADO"].includes(normalizado)) {
+    return "ui-badge--success";
+  }
+
+  if (["EGRESO", "BAJA", "RECHAZADO"].includes(normalizado)) {
+    return "ui-badge--danger";
+  }
+
+  if (["AJUSTE", "CAMBIO_ESTADO", "EN_REVISION"].includes(normalizado)) {
+    return "ui-badge--warning";
+  }
+
+  return "ui-badge--info";
+};
+
+function MetricCard({ label, value, tone = "primary" }) {
+  return (
+    <article className={`dashboard-stat dashboard-stat--${tone}`}>
+      <p className="dashboard-stat-label">{label}</p>
+      <p className="dashboard-stat-value">{formatearNumero(value)}</p>
+    </article>
+  );
+}
+
+function EmptyState({ children }) {
+  return <div className="dashboard-empty">{children}</div>;
+}
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -65,7 +99,6 @@ export default function Dashboard() {
   }, [cargarDashboard]);
 
   const esVistaOficina = data?.alcance === "OFICINA";
-
   const resumen = data?.resumen || {};
 
   const pedidosPorEstado = useMemo(
@@ -83,606 +116,412 @@ export default function Dashboard() {
   const ultimosMovimientosStock = data?.ultimos_movimientos_stock || [];
   const ultimosMovimientosActivos = data?.ultimos_movimientos_activos || [];
 
+  const metricas = [
+    {
+      label: esVistaOficina ? "Mis activos" : "Activos registrados",
+      value: resumen.total_activos,
+      tone: "primary",
+    },
+    {
+      label: esVistaOficina ? "Insumos asignados" : "Insumos registrados",
+      value: resumen.total_insumos,
+      tone: "accent",
+    },
+    {
+      label: esVistaOficina ? "Usuarios de mi oficina" : "Usuarios activos",
+      value: resumen.total_usuarios_activos,
+      tone: "primary",
+    },
+    {
+      label: esVistaOficina ? "Mis solicitudes pendientes" : "Solicitudes pendientes",
+      value: resumen.total_solicitudes_pendientes,
+      tone: "warning",
+    },
+    {
+      label: esVistaOficina ? "Insumos agotados" : "Stock bajo",
+      value: resumen.insumos_stock_bajo,
+      tone: Number(resumen.insumos_stock_bajo) > 0 ? "danger" : "success",
+    },
+    {
+      label: esVistaOficina ? "Mis pedidos enviados" : "Pedidos enviados",
+      value: resumen.pedidos_enviados,
+      tone: "primary",
+    },
+    {
+      label: esVistaOficina ? "Mis pedidos en revisión" : "Pedidos en revisión",
+      value: resumen.pedidos_en_revision,
+      tone: "warning",
+    },
+    {
+      label: esVistaOficina ? "Mis pedidos entregados" : "Pedidos entregados",
+      value: resumen.pedidos_entregados,
+      tone: "success",
+    },
+  ];
+
   return (
     <Layout>
-      <div style={styles.header}>
-        <div>
-          <h1 style={styles.titulo}>Dashboard</h1>
-          <p style={styles.descripcion}>
-            {esVistaOficina
-              ? "Resumen operativo limitado a tu oficina o unidad judicial."
-              : "Resumen general del inventario, pedidos, stock y movimientos."}
-          </p>
-        </div>
+      <div className="ui-page">
+        <header className="dashboard-header">
+          <div>
+            <h1 className="dashboard-title">Dashboard</h1>
+            <p className="dashboard-description">
+              {esVistaOficina
+                ? "Resumen operativo de bienes, insumos, solicitudes y pedidos de tu oficina."
+                : "Estado general del inventario, stock, pedidos y actividad reciente."}
+            </p>
+          </div>
 
-        <button
-          type="button"
-          onClick={cargarDashboard}
-          style={styles.refreshButton}
-          disabled={cargando}
-        >
-          {cargando ? "Actualizando..." : "Actualizar"}
-        </button>
-      </div>
-
-      {error && <p style={styles.error}>{error}</p>}
-
-      {cargando ? (
-        <p style={styles.loading}>Cargando datos...</p>
-      ) : !data ? (
-        <div style={styles.emptyState}>
-          <p>No se pudieron cargar los datos del dashboard.</p>
-          <button type="button" onClick={cargarDashboard} style={styles.button}>
-            Reintentar
+          <button
+            type="button"
+            onClick={cargarDashboard}
+            className="ui-button ui-button--secondary"
+            disabled={cargando}
+            aria-busy={cargando}
+          >
+            {cargando ? "Actualizando…" : "Actualizar datos"}
           </button>
-        </div>
-      ) : (
-        <>
-          {esVistaOficina && (
-            <div style={styles.scopeBox}>
-              Vista limitada a tu oficina o unidad judicial.
+        </header>
+
+        {error && (
+          <div className="ui-alert ui-alert--danger" role="alert">
+            <span aria-hidden="true">!</span>
+            <span>{error}</span>
+          </div>
+        )}
+
+        {cargando ? (
+          <div className="dashboard-loading" aria-label="Cargando dashboard">
+            <div className="dashboard-skeleton" />
+            <div className="dashboard-skeleton" />
+            <div className="dashboard-skeleton" />
+          </div>
+        ) : !data ? (
+          <div className="ui-card ui-card-pad">
+            <EmptyState>
+              <div>
+                <strong>No se pudieron cargar los datos.</strong>
+                <p>Reintentá para recuperar el resumen del inventario.</p>
+                <button
+                  type="button"
+                  onClick={cargarDashboard}
+                  className="ui-button ui-button--primary"
+                >
+                  Reintentar
+                </button>
+              </div>
+            </EmptyState>
+          </div>
+        ) : (
+          <>
+            {esVistaOficina && (
+              <div className="ui-alert dashboard-scope" role="status">
+                <span aria-hidden="true">i</span>
+                <span>
+                  Esta vista muestra únicamente la información correspondiente a tu
+                  oficina o unidad judicial.
+                </span>
+              </div>
+            )}
+
+            <section aria-label="Indicadores principales" className="dashboard-stats">
+              {metricas.map((metrica) => (
+                <MetricCard key={metrica.label} {...metrica} />
+              ))}
+            </section>
+
+            <div className="dashboard-grid">
+              <section className="dashboard-panel dashboard-panel--attention">
+                <div className="dashboard-panel-header">
+                  <div>
+                    <h2 className="dashboard-panel-title">
+                      {esVistaOficina
+                        ? "Insumos que requieren atención"
+                        : "Stock que requiere atención"}
+                    </h2>
+                    <p className="dashboard-panel-kicker">
+                      Prioridad operativa para reposición o seguimiento.
+                    </p>
+                  </div>
+                  <span
+                    className={`ui-badge ${
+                      detalleInsumosStockBajo.length > 0
+                        ? "ui-badge--danger"
+                        : "ui-badge--success"
+                    }`}
+                  >
+                    {detalleInsumosStockBajo.length > 0
+                      ? `${detalleInsumosStockBajo.length} pendientes`
+                      : "Sin alertas"}
+                  </span>
+                </div>
+
+                {detalleInsumosStockBajo.length === 0 ? (
+                  <EmptyState>
+                    {esVistaOficina
+                      ? "No hay insumos agotados en tu oficina."
+                      : "No hay insumos con stock por debajo del mínimo."}
+                  </EmptyState>
+                ) : (
+                  <ul className="dashboard-list">
+                    {detalleInsumosStockBajo.map((insumo) => (
+                      <li className="dashboard-list-item" key={insumo.id}>
+                        <div className="dashboard-list-main">
+                          <p className="dashboard-list-title">{insumo.nombre}</p>
+                          <p className="dashboard-list-meta">
+                            {insumo.categoria || "Sin categoría"}
+                            {!esVistaOficina &&
+                              ` · Mínimo ${formatearNumero(insumo.stock_minimo)}`}
+                          </p>
+                        </div>
+                        <div className="dashboard-list-side">
+                          <span className="dashboard-stock-value">
+                            {formatearNumero(insumo.stock_actual)} disponibles
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <section className="dashboard-panel">
+                <div className="dashboard-panel-header">
+                  <div>
+                    <h2 className="dashboard-panel-title">
+                      {esVistaOficina ? "Mis últimos pedidos" : "Últimos pedidos"}
+                    </h2>
+                    <p className="dashboard-panel-kicker">
+                      Estado de las solicitudes más recientes.
+                    </p>
+                  </div>
+                </div>
+
+                {ultimosPedidos.length === 0 ? (
+                  <EmptyState>No hay pedidos registrados.</EmptyState>
+                ) : (
+                  <ul className="dashboard-list">
+                    {ultimosPedidos.map((pedido) => {
+                      const usuarioPedido = pedido.Usuario
+                        ? `${pedido.Usuario.nombre || ""} ${
+                            pedido.Usuario.apellido || ""
+                          }`.trim()
+                        : "Sin usuario";
+
+                      return (
+                        <li className="dashboard-list-item" key={pedido.id}>
+                          <div className="dashboard-list-main">
+                            <p className="dashboard-list-title">
+                              Pedido #{pedido.id} · {pedido.mes}/{pedido.anio}
+                            </p>
+                            <p className="dashboard-list-meta">
+                              {pedido.Oficina?.nombre || "Sin oficina"} · {usuarioPedido}
+                            </p>
+                          </div>
+                          <div className="dashboard-list-side">
+                            <span className={`ui-badge ${badgeTone(pedido.estado)}`}>
+                              {pedido.estado || "Sin estado"}
+                            </span>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
             </div>
-          )}
 
-          <div style={styles.grid}>
-            <Card
-              titulo={esVistaOficina ? "Mis activos" : "Activos"}
-              valor={resumen.total_activos}
-              color="#dbeafe"
-              texto="#1d4ed8"
-            />
-
-            <Card
-              titulo={esVistaOficina ? "Insumos asignados" : "Insumos"}
-              valor={resumen.total_insumos}
-              color="#dcfce7"
-              texto="#166534"
-            />
-
-            <Card
-              titulo={
-                esVistaOficina
-                  ? "Usuarios de mi oficina"
-                  : "Usuarios activos"
-              }
-              valor={resumen.total_usuarios_activos}
-              color="#f3e8ff"
-              texto="#7e22ce"
-            />
-
-            <Card
-              titulo={
-                esVistaOficina
-                  ? "Mis solicitudes pendientes"
-                  : "Solicitudes pendientes"
-              }
-              valor={resumen.total_solicitudes_pendientes}
-              color="#fef3c7"
-              texto="#92400e"
-            />
-
-            <Card
-              titulo={esVistaOficina ? "Insumos agotados" : "Stock bajo"}
-              valor={resumen.insumos_stock_bajo}
-              color="#fee2e2"
-              texto="#991b1b"
-            />
-
-            <Card
-              titulo={
-                esVistaOficina ? "Mis pedidos enviados" : "Pedidos enviados"
-              }
-              valor={resumen.pedidos_enviados}
-              color="#eff6ff"
-              texto="#1d4ed8"
-            />
-
-            <Card
-              titulo={
-                esVistaOficina
-                  ? "Mis pedidos en revisión"
-                  : "Pedidos en revisión"
-              }
-              valor={resumen.pedidos_en_revision}
-              color="#fefce8"
-              texto="#92400e"
-            />
-
-            <Card
-              titulo={
-                esVistaOficina ? "Mis pedidos entregados" : "Pedidos entregados"
-              }
-              valor={resumen.pedidos_entregados}
-              color="#ecfdf5"
-              texto="#166534"
-            />
-          </div>
-
-          <div style={styles.sectionsGrid}>
-            <section style={styles.section}>
-              <h2 style={styles.subtitulo}>
-                {esVistaOficina
-                  ? "Mis pedidos por estado"
-                  : "Pedidos por estado"}
-              </h2>
-
-              {pedidosPorEstado.length === 0 ? (
-                <p style={styles.emptyText}>No hay datos para graficar.</p>
-              ) : (
-                <div style={styles.chartBox}>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={pedidosPorEstado}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="estado" />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip />
-                      <Bar
-                        dataKey="total"
-                        fill="#1f4f82"
-                        radius={[6, 6, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+            <div className="dashboard-grid">
+              <section className="dashboard-panel">
+                <div className="dashboard-panel-header">
+                  <div>
+                    <h2 className="dashboard-panel-title">
+                      {esVistaOficina ? "Mis pedidos por estado" : "Pedidos por estado"}
+                    </h2>
+                    <p className="dashboard-panel-kicker">
+                      Distribución actual de pedidos registrados.
+                    </p>
+                  </div>
                 </div>
-              )}
-            </section>
 
-            <section style={styles.section}>
-              <h2 style={styles.subtitulo}>
-                {esVistaOficina
-                  ? "Mis movimientos de stock por tipo"
-                  : "Movimientos de stock por tipo"}
-              </h2>
-
-              {movimientosStockPorTipo.length === 0 ? (
-                <p style={styles.emptyText}>No hay datos para graficar.</p>
-              ) : (
-                <div style={styles.chartBox}>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={movimientosStockPorTipo}
-                        dataKey="total"
-                        nameKey="tipo"
-                        outerRadius={100}
-                        label
-                      >
-                        {movimientosStockPorTipo.map((entry, index) => (
-                          <Cell
-                            key={`cell-${entry.tipo || index}`}
-                            fill={
-                              COLORS_MOVIMIENTOS[
-                                index % COLORS_MOVIMIENTOS.length
-                              ]
-                            }
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </section>
-          </div>
-
-          <div style={styles.sectionsGrid}>
-            <section style={styles.section}>
-              <h2 style={styles.subtitulo}>
-                {esVistaOficina
-                  ? "Insumos agotados en mi oficina"
-                  : "Insumos con stock bajo"}
-              </h2>
-
-              {detalleInsumosStockBajo.length === 0 ? (
-                <p style={styles.emptyText}>
-                  {esVistaOficina
-                    ? "No hay insumos agotados en tu oficina."
-                    : "No hay insumos con stock bajo."}
-                </p>
-              ) : (
-                <div style={styles.listado}>
-                  {detalleInsumosStockBajo.map((insumo) => (
-                    <div key={insumo.id} style={styles.alertItem}>
-                      <strong>
-                        {insumo.nombre}
-                        {insumo.categoria ? ` (${insumo.categoria})` : ""}
-                      </strong>
-
-                      <p style={styles.itemText}>
-                        {esVistaOficina ? (
-                          <>
-                            Stock actual en oficina:{" "}
-                            {formatearNumero(insumo.stock_actual)}
-                          </>
-                        ) : (
-                          <>
-                            Stock actual:{" "}
-                            {formatearNumero(insumo.stock_actual)} | Mínimo:{" "}
-                            {formatearNumero(insumo.stock_minimo)}
-                          </>
-                        )}
-                      </p>
+                {pedidosPorEstado.length === 0 ? (
+                  <EmptyState>No hay datos para graficar.</EmptyState>
+                ) : (
+                  <>
+                    <div
+                      className="dashboard-chart"
+                      role="img"
+                      aria-label="Gráfico de cantidad de pedidos por estado"
+                    >
+                      <ResponsiveContainer width="100%" height={286}>
+                        <BarChart data={pedidosPorEstado} margin={{ left: -16 }}>
+                          <CartesianGrid stroke="#e5eaf0" strokeDasharray="3 3" />
+                          <XAxis dataKey="estado" tick={{ fontSize: 11 }} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                          <Tooltip />
+                          <Bar dataKey="total" fill="#173b57" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
-                  ))}
+                    <ul className="dashboard-chart-legend" aria-label="Datos del gráfico">
+                      {pedidosPorEstado.map((item) => (
+                        <li key={item.estado}>
+                          {item.estado}: {formatearNumero(item.total)}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </section>
+
+              <section className="dashboard-panel">
+                <div className="dashboard-panel-header">
+                  <div>
+                    <h2 className="dashboard-panel-title">
+                      {esVistaOficina
+                        ? "Mis movimientos de stock"
+                        : "Movimientos de stock por tipo"}
+                    </h2>
+                    <p className="dashboard-panel-kicker">
+                      Composición de ingresos, egresos, ajustes y devoluciones.
+                    </p>
+                  </div>
                 </div>
-              )}
-            </section>
 
-            <section style={styles.section}>
-              <h2 style={styles.subtitulo}>
-                {esVistaOficina ? "Mis últimos pedidos" : "Últimos pedidos"}
-              </h2>
-
-              {ultimosPedidos.length === 0 ? (
-                <p style={styles.emptyText}>No hay pedidos registrados.</p>
-              ) : (
-                <div style={styles.listado}>
-                  {ultimosPedidos.map((pedido) => (
-                    <div key={pedido.id} style={styles.item}>
-                      <div style={styles.itemHeader}>
-                        <span
-                          style={{
-                            ...styles.badge,
-                            ...getPedidoStyle(pedido.estado),
-                          }}
-                        >
-                          {pedido.estado || "-"}
-                        </span>
-                      </div>
-
-                      <p>
-                        <strong>Pedido:</strong> #{pedido.id} — {pedido.mes}/
-                        {pedido.anio}
-                      </p>
-
-                      <p>
-                        <strong>Oficina:</strong>{" "}
-                        {pedido.Oficina?.nombre || "-"}
-                      </p>
-
-                      <p>
-                        <strong>Usuario:</strong>{" "}
-                        {pedido.Usuario
-                          ? `${pedido.Usuario.nombre || ""} ${
-                              pedido.Usuario.apellido || ""
-                            }`.trim()
-                          : "-"}
-                      </p>
+                {movimientosStockPorTipo.length === 0 ? (
+                  <EmptyState>No hay datos para graficar.</EmptyState>
+                ) : (
+                  <>
+                    <div
+                      className="dashboard-chart"
+                      role="img"
+                      aria-label="Gráfico de movimientos de stock por tipo"
+                    >
+                      <ResponsiveContainer width="100%" height={286}>
+                        <PieChart>
+                          <Pie
+                            data={movimientosStockPorTipo}
+                            dataKey="total"
+                            nameKey="tipo"
+                            innerRadius={58}
+                            outerRadius={96}
+                            paddingAngle={2}
+                          >
+                            {movimientosStockPorTipo.map((entry, index) => (
+                              <Cell
+                                key={`movimiento-${entry.tipo || index}`}
+                                fill={
+                                  COLORES_MOVIMIENTOS[
+                                    index % COLORES_MOVIMIENTOS.length
+                                  ]
+                                }
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
                     </div>
-                  ))}
+                    <ul className="dashboard-chart-legend" aria-label="Datos del gráfico">
+                      {movimientosStockPorTipo.map((item) => (
+                        <li key={item.tipo}>
+                          {item.tipo}: {formatearNumero(item.total)}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </section>
+            </div>
+
+            <div className="dashboard-grid">
+              <section className="dashboard-panel">
+                <div className="dashboard-panel-header">
+                  <div>
+                    <h2 className="dashboard-panel-title">
+                      {esVistaOficina
+                        ? "Movimientos recientes de stock"
+                        : "Últimos movimientos de stock"}
+                    </h2>
+                    <p className="dashboard-panel-kicker">Actividad operativa reciente.</p>
+                  </div>
                 </div>
-              )}
-            </section>
-          </div>
 
-          <div style={styles.sectionsGrid}>
-            <section style={styles.section}>
-              <h2 style={styles.subtitulo}>
-                {esVistaOficina
-                  ? "Últimos movimientos de stock de mi oficina"
-                  : "Últimos movimientos de stock"}
-              </h2>
+                {ultimosMovimientosStock.length === 0 ? (
+                  <EmptyState>No hay movimientos registrados.</EmptyState>
+                ) : (
+                  <ul className="dashboard-list">
+                    {ultimosMovimientosStock.map((mov) => (
+                      <li className="dashboard-list-item" key={mov.id}>
+                        <div className="dashboard-list-main">
+                          <p className="dashboard-list-title">
+                            {mov.Insumo?.nombre || "Sin insumo"} · {formatearNumero(mov.cantidad)}
+                          </p>
+                          <p className="dashboard-list-meta">
+                            {mov.Oficina?.nombre || "Sin oficina"} · {mov.motivo || "Sin motivo"}
+                            <br />
+                            {formatearFecha(mov.fecha)}
+                          </p>
+                        </div>
+                        <div className="dashboard-list-side">
+                          <span className={`ui-badge ${badgeTone(mov.tipo)}`}>
+                            {mov.tipo || "Sin tipo"}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
 
-              {ultimosMovimientosStock.length === 0 ? (
-                <p style={styles.emptyText}>No hay movimientos registrados.</p>
-              ) : (
-                <div style={styles.listado}>
-                  {ultimosMovimientosStock.map((mov) => (
-                    <div key={mov.id} style={styles.item}>
-                      <div style={styles.itemHeader}>
-                        <span
-                          style={{
-                            ...styles.badge,
-                            ...getMovimientoStockStyle(mov.tipo),
-                          }}
-                        >
-                          {mov.tipo || "-"}
-                        </span>
-                      </div>
-
-                      <p>
-                        <strong>Insumo:</strong>{" "}
-                        {mov.Insumo?.nombre || "Sin insumo"}
-                      </p>
-
-                      <p>
-                        <strong>Cantidad:</strong>{" "}
-                        {formatearNumero(mov.cantidad)}
-                      </p>
-
-                      <p>
-                        <strong>Oficina:</strong> {mov.Oficina?.nombre || "-"}
-                      </p>
-
-                      <p>
-                        <strong>Motivo:</strong> {mov.motivo || "-"}
-                      </p>
-
-                      <p>
-                        <strong>Fecha:</strong> {formatearFecha(mov.fecha)}
-                      </p>
-                    </div>
-                  ))}
+              <section className="dashboard-panel">
+                <div className="dashboard-panel-header">
+                  <div>
+                    <h2 className="dashboard-panel-title">
+                      {esVistaOficina
+                        ? "Movimientos recientes de activos"
+                        : "Últimos movimientos de activos"}
+                    </h2>
+                    <p className="dashboard-panel-kicker">Cambios registrados sobre bienes.</p>
+                  </div>
                 </div>
-              )}
-            </section>
 
-            <section style={styles.section}>
-              <h2 style={styles.subtitulo}>
-                {esVistaOficina
-                  ? "Últimos movimientos de activos de mi oficina"
-                  : "Últimos movimientos de activos"}
-              </h2>
+                {ultimosMovimientosActivos.length === 0 ? (
+                  <EmptyState>No hay movimientos registrados.</EmptyState>
+                ) : (
+                  <ul className="dashboard-list">
+                    {ultimosMovimientosActivos.map((mov) => {
+                      const usuarioMovimiento = mov.Usuario
+                        ? `${mov.Usuario.nombre || ""} ${
+                            mov.Usuario.apellido || ""
+                          }`.trim()
+                        : "Sin usuario";
 
-              {ultimosMovimientosActivos.length === 0 ? (
-                <p style={styles.emptyText}>No hay movimientos registrados.</p>
-              ) : (
-                <div style={styles.listado}>
-                  {ultimosMovimientosActivos.map((mov) => (
-                    <div key={mov.id} style={styles.item}>
-                      <div style={styles.itemHeader}>
-                        <span
-                          style={{
-                            ...styles.badge,
-                            ...getMovimientoActivoStyle(mov.tipo),
-                          }}
-                        >
-                          {mov.tipo || "-"}
-                        </span>
-                      </div>
-
-                      <p>
-                        <strong>Activo:</strong>{" "}
-                        {mov.Activo?.nombre || "Sin activo"}
-                      </p>
-
-                      <p>
-                        <strong>Descripción:</strong> {mov.descripcion || "-"}
-                      </p>
-
-                      <p>
-                        <strong>Usuario:</strong>{" "}
-                        {mov.Usuario
-                          ? `${mov.Usuario.nombre || ""} ${
-                              mov.Usuario.apellido || ""
-                            }`.trim()
-                          : "-"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
-        </>
-      )}
+                      return (
+                        <li className="dashboard-list-item" key={mov.id}>
+                          <div className="dashboard-list-main">
+                            <p className="dashboard-list-title">
+                              {mov.Activo?.nombre || "Sin activo"}
+                            </p>
+                            <p className="dashboard-list-meta">
+                              {mov.descripcion || "Sin descripción"} · {usuarioMovimiento}
+                            </p>
+                          </div>
+                          <div className="dashboard-list-side">
+                            <span className={`ui-badge ${badgeTone(mov.tipo)}`}>
+                              {mov.tipo || "Sin tipo"}
+                            </span>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            </div>
+          </>
+        )}
+      </div>
     </Layout>
   );
 }
-
-function Card({ titulo, valor, color, texto }) {
-  return (
-    <div style={{ ...styles.card, background: color }}>
-      <h3 style={styles.cardTitle}>{titulo}</h3>
-      <p style={{ ...styles.valor, color: texto }}>
-        {formatearNumero(valor)}
-      </p>
-    </div>
-  );
-}
-
-const getMovimientoStockStyle = (tipo) => {
-  switch (tipo) {
-    case "INGRESO":
-      return { background: "#d1fae5", color: "#065f46" };
-    case "EGRESO":
-      return { background: "#fee2e2", color: "#991b1b" };
-    case "AJUSTE":
-      return { background: "#fef3c7", color: "#92400e" };
-    case "DEVOLUCION":
-      return { background: "#dbeafe", color: "#1e40af" };
-    default:
-      return { background: "#f3f4f6", color: "#111827" };
-  }
-};
-
-const getMovimientoActivoStyle = (tipo) => {
-  switch (tipo) {
-    case "ALTA":
-      return { background: "#d1fae5", color: "#065f46" };
-    case "BAJA":
-      return { background: "#fee2e2", color: "#991b1b" };
-    case "TRASLADO":
-      return { background: "#dbeafe", color: "#1e40af" };
-    case "CAMBIO_ESTADO":
-      return { background: "#fef3c7", color: "#92400e" };
-    case "ACTUALIZACION":
-      return { background: "#e5e7eb", color: "#374151" };
-    default:
-      return { background: "#f3f4f6", color: "#111827" };
-  }
-};
-
-const getPedidoStyle = (estado) => {
-  switch (estado) {
-    case "ENVIADO":
-      return { background: "#dbeafe", color: "#1e40af" };
-    case "EN_REVISION":
-      return { background: "#fef3c7", color: "#92400e" };
-    case "APROBADO":
-      return { background: "#d1fae5", color: "#065f46" };
-    case "ENTREGADO":
-      return { background: "#dcfce7", color: "#166534" };
-    case "RECHAZADO":
-      return { background: "#fee2e2", color: "#991b1b" };
-    default:
-      return { background: "#f3f4f6", color: "#111827" };
-  }
-};
-
-const styles = {
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "1rem",
-    marginBottom: "1.5rem",
-    flexWrap: "wrap",
-  },
-
-  titulo: {
-    margin: 0,
-    marginBottom: "0.35rem",
-  },
-
-  descripcion: {
-    margin: 0,
-    color: "#6b7280",
-    fontSize: "0.95rem",
-  },
-
-  refreshButton: {
-    border: "none",
-    borderRadius: "10px",
-    background: "#1f4f82",
-    color: "#ffffff",
-    padding: "0.75rem 1rem",
-    fontWeight: "bold",
-    cursor: "pointer",
-  },
-
-  button: {
-    border: "none",
-    borderRadius: "10px",
-    background: "#1f4f82",
-    color: "#ffffff",
-    padding: "0.75rem 1rem",
-    fontWeight: "bold",
-    cursor: "pointer",
-  },
-
-  loading: {
-    color: "#4b5563",
-  },
-
-  emptyState: {
-    background: "#ffffff",
-    borderRadius: "14px",
-    padding: "1rem",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-  },
-
-  scopeBox: {
-    background: "#eff6ff",
-    color: "#1d4ed8",
-    border: "1px solid #bfdbfe",
-    borderRadius: "12px",
-    padding: "0.85rem 1rem",
-    marginBottom: "1rem",
-    fontWeight: "bold",
-  },
-
-  subtitulo: {
-    marginTop: 0,
-    marginBottom: "1rem",
-    fontSize: "1.1rem",
-  },
-
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "1rem",
-    marginBottom: "1.5rem",
-  },
-
-  card: {
-    borderRadius: "14px",
-    padding: "1rem",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-  },
-
-  cardTitle: {
-    margin: 0,
-    fontSize: "1rem",
-    color: "#374151",
-  },
-
-  valor: {
-    fontSize: "2rem",
-    fontWeight: "bold",
-    margin: "0.6rem 0 0 0",
-  },
-
-  sectionsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-    gap: "1rem",
-    marginBottom: "1rem",
-  },
-
-  section: {
-    background: "#fff",
-    borderRadius: "14px",
-    padding: "1rem",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-    minWidth: 0,
-  },
-
-  chartBox: {
-    width: "100%",
-    height: "300px",
-    minWidth: 0,
-  },
-
-  listado: {
-    display: "grid",
-    gap: "0.9rem",
-  },
-
-  item: {
-    border: "1px solid #e5e7eb",
-    borderRadius: "12px",
-    padding: "0.9rem",
-    background: "#fafafa",
-  },
-
-  alertItem: {
-    border: "1px solid #fecaca",
-    borderRadius: "12px",
-    padding: "0.9rem",
-    background: "#fef2f2",
-  },
-
-  itemHeader: {
-    marginBottom: "0.6rem",
-  },
-
-  badge: {
-    padding: "0.35rem 0.7rem",
-    borderRadius: "999px",
-    fontSize: "0.8rem",
-    fontWeight: "bold",
-    display: "inline-flex",
-    alignItems: "center",
-  },
-
-  itemText: {
-    margin: "0.3rem 0 0 0",
-    color: "#4b5563",
-  },
-
-  emptyText: {
-    color: "#6b7280",
-    margin: 0,
-  },
-
-  error: {
-    color: "crimson",
-    background: "#fee2e2",
-    border: "1px solid #fecaca",
-    borderRadius: "10px",
-    padding: "0.75rem 1rem",
-  },
-};
