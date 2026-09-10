@@ -187,6 +187,62 @@
   animation: ui-shimmer 1.25s linear infinite;
 }
 
+.ui-dialog {
+  width: min(92vw, 440px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 28px 70px rgba(16, 24, 40, 0.24);
+}
+
+.ui-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(3px);
+}
+
+.ui-dialog-content {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  padding: 22px 22px 18px;
+}
+
+.ui-dialog-mark {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-weight: 850;
+}
+
+.ui-dialog-title {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.ui-dialog-description {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.ui-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px 20px;
+  border-top: 1px solid var(--color-border);
+  background: #fbfcfe;
+}
+
 @keyframes ui-shimmer {
   to { background-position: -200% 0; }
 }
@@ -199,6 +255,14 @@
 
   .ui-section-header {
     flex-direction: column;
+  }
+
+  .ui-dialog-actions {
+    flex-direction: column-reverse;
+  }
+
+  .ui-dialog-actions .ui-button {
+    width: 100%;
   }
 }
 
