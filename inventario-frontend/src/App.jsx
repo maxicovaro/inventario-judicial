@@ -3,6 +3,7 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "@fontsource/inter";
 import "./styles/design-system.css";
+import "./styles/ui-kit.css";
 
 export default function App() {
   return (
