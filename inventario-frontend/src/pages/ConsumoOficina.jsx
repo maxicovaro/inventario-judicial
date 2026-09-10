@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import { esAdminGeneral } from "../utils/permisos";
 
 const meses = [
   { value: 1, label: "Enero" },
@@ -20,23 +21,11 @@ const meses = [
 
 const fechaActual = new Date();
 
-const normalizar = (texto = "") =>
-  texto
-    .toString()
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
 
 export default function ConsumoOficina() {
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
 
-  const oficinaNombre = normalizar(usuario.oficina_nombre || "");
-
-  const esDireccion =
-    usuario.role === "ADMIN" &&
-    oficinaNombre.includes("DIRECCION") &&
-    oficinaNombre.includes("POLICIA JUDICIAL");
+  const esDireccion = esAdminGeneral(usuario);
 
   const [oficinas, setOficinas] = useState([]);
   const [stock, setStock] = useState([]);

@@ -91,7 +91,7 @@ export default function AppRouter() {
         <Route
           path="/reportes-pedidos"
           element={
-            <PrivateRoute>
+            <PrivateRoute rolesPermitidos={["ADMIN"]}>
               <ReportePedidos />
             </PrivateRoute>
           }

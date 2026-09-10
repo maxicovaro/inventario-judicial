@@ -5,6 +5,7 @@ import api from "../api/axios";
 import Layout from "../components/Layout";
 import AdjuntosSolicitudPanel from "../components/AdjuntosSolicitudPanel";
 import { solicitudSchema } from "../schemas/solicitudSchema";
+import { esAdminGeneral } from "../utils/permisos";
 
 const defaultValues = {
   tipo: "REPOSICION",
@@ -14,13 +15,6 @@ const defaultValues = {
   oficina_id: "",
 };
 
-const normalizar = (texto = "") =>
-  texto
-    .toString()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .trim();
 
 const obtenerUsuarioLocal = () => {
   try {
@@ -32,21 +26,10 @@ const obtenerUsuarioLocal = () => {
   }
 };
 
-const esDireccionUsuario = (usuario) => {
-  const oficina = normalizar(
-    usuario?.oficina_nombre || usuario?.Oficina?.nombre || ""
-  );
-
-  return (
-    usuario?.role === "ADMIN" &&
-    oficina.includes("DIRECCION") &&
-    oficina.includes("POLICIA JUDICIAL")
-  );
-};
 
 export default function Solicitudes() {
   const usuario = obtenerUsuarioLocal();
-  const esDireccion = esDireccionUsuario(usuario);
+  const esDireccion = esAdminGeneral(usuario);
 
   const [solicitudes, setSolicitudes] = useState([]);
   const [activos, setActivos] = useState([]);

@@ -1,14 +1,8 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import { esAdminGeneral } from "../utils/permisos";
 
-const normalizar = (texto = "") =>
-  texto
-    .toString()
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
 
 export default function HistorialPedidos() {
   const [pedidos, setPedidos] = useState([]);
@@ -18,12 +12,7 @@ export default function HistorialPedidos() {
 
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
 
-  const oficinaNombre = normalizar(usuario.oficina_nombre || "");
-
-  const esDireccion =
-    usuario.role === "ADMIN" &&
-    oficinaNombre.includes("DIRECCION") &&
-    oficinaNombre.includes("POLICIA JUDICIAL");
+  const esDireccion = esAdminGeneral(usuario);
 
   const cargarPedidos = async () => {
     try {
