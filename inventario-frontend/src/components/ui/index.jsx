@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef } from "react";
+import { createElement, useEffect, useId, useRef } from "react";
 
-export const cn = (...classes) => classes.filter(Boolean).join(" ");
+const cn = (...classes) => classes.filter(Boolean).join(" ");
 
 export function Button({
   variant = "primary",
@@ -36,14 +36,14 @@ export function Badge({ tone = "info", className, children, ...props }) {
   );
 }
 
-export function Card({ as: Component = "section", className, children, padded = false, ...props }) {
-  return (
-    <Component
-      className={cn("ui-card", padded && "ui-card-pad", className)}
-      {...props}
-    >
-      {children}
-    </Component>
+export function Card({ as = "section", className, children, padded = false, ...props }) {
+  return createElement(
+    as,
+    {
+      className: cn("ui-card", padded && "ui-card-pad", className),
+      ...props,
+    },
+    children
   );
 }
 
