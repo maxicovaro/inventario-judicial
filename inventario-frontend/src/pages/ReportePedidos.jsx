@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import {
@@ -61,17 +61,10 @@ export default function ReportePedidos() {
   const pedidosPorOficina = data?.pedidosPorOficina || [];
   const insumosMasSolicitados = data?.insumosMasSolicitados || [];
   const insumosConProblemas = data?.insumosConProblemas || [];
-
-  const entregados = useMemo(
-    () => estados.find((item) => item.estado === "ENTREGADO")?.total || 0,
-    [estados],
-  );
-  const pendientes = useMemo(
-    () => estados
-      .filter((item) => ["ENVIADO", "EN_REVISION", "APROBADO"].includes(item.estado))
-      .reduce((acc, item) => acc + (Number(item.total) || 0), 0),
-    [estados],
-  );
+  const entregados = estados.find((item) => item.estado === "ENTREGADO")?.total || 0;
+  const pendientes = estados
+    .filter((item) => ["ENVIADO", "EN_REVISION", "APROBADO"].includes(item.estado))
+    .reduce((acc, item) => acc + (Number(item.total) || 0), 0);
 
   return (
     <Layout>
