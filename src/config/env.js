@@ -54,4 +54,10 @@ if (env.IS_PRODUCTION && !env.CORS_ORIGIN) {
   throw new Error("Falta la variable de entorno requerida en production: CORS_ORIGIN");
 }
 
+if (env.IS_PRODUCTION && Buffer.byteLength(env.JWT_SECRET, "utf8") < 32) {
+  throw new Error(
+    "JWT_SECRET debe tener al menos 32 bytes en production",
+  );
+}
+
 module.exports = Object.freeze(env);

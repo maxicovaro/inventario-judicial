@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const env = require("./config/env");
 const { requestContext } = require("./middlewares/requestContext");
+const { securityHeaders } = require("./middlewares/securityHeaders");
 const {
   safeErrorResponses,
   globalErrorHandler,
@@ -30,14 +31,16 @@ const bitacoraRoutes = require("./routes/bitacoraRoutes");
 
 const app = express();
 
+app.disable("x-powered-by");
 app.use(requestContext);
+app.use(securityHeaders);
 app.use(
   cors({
     origin: env.CORS_ORIGIN,
   }),
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "100kb" }));
+app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 app.use(safeErrorResponses);
 
 app.get("/", (req, res) => {
