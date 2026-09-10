@@ -38,6 +38,16 @@ const env = {
   CORS_ORIGIN:
     process.env.CORS_ORIGIN?.trim() ||
     (NODE_ENV === "development" ? "http://localhost:5173" : ""),
+  HEALTH_DB_TIMEOUT_MS: numeroPositivo(
+    "HEALTH_DB_TIMEOUT_MS",
+    process.env.HEALTH_DB_TIMEOUT_MS,
+    2000,
+  ),
+  SHUTDOWN_TIMEOUT_MS: numeroPositivo(
+    "SHUTDOWN_TIMEOUT_MS",
+    process.env.SHUTDOWN_TIMEOUT_MS,
+    10000,
+  ),
 };
 
 if (env.IS_PRODUCTION && !env.CORS_ORIGIN) {

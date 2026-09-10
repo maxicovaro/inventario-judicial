@@ -1,88 +1,84 @@
-const express = require("express");
-const cors = require("cors");
 const env = require("./src/config/env");
-
 const sequelize = require("./src/config/database");
 require("./src/models");
-const {
-  safeErrorResponses,
-  globalErrorHandler,
-} = require("./src/middlewares/safeErrorResponses");
+const app = require("./src/app");
+const logger = require("./src/utils/logger");
 
-const authRoutes = require("./src/routes/authRoutes");
-const activoRoutes = require("./src/routes/activoRoutes");
-const movimientoRoutes = require("./src/routes/movimientoRoutes");
-const usuarioRoutes = require("./src/routes/usuarioRoutes");
-const solicitudRoutes = require("./src/routes/solicitudRoutes");
-const adjuntoRoutes = require("./src/routes/adjuntoRoutes");
-const insumoRoutes = require("./src/routes/insumoRoutes");
-const movimientoStockRoutes = require("./src/routes/movimientoStockRoutes");
-const dashboardRoutes = require("./src/routes/dashboardRoutes");
-const oficinaRoutes = require("./src/routes/oficinaRoutes");
-const categoriaRoutes = require("./src/routes/categoriaRoutes");
-const notificacionRoutes = require("./src/routes/notificacionRoutes");
-const stockOficinaRoutes = require("./src/routes/stockOficinaRoutes");
-const consumoOficinaRoutes = require("./src/routes/consumoOficinaRoutes");
-const reporteConsumoOficinaRoutes = require("./src/routes/reporteConsumoOficinaRoutes");
-const pedidoInsumoRoutes = require("./src/routes/pedidoInsumoRoutes");
-const reportePedidoRoutes = require("./src/routes/reportePedidoRoutes");
-const roleRoutes = require("./src/routes/roleRoutes");
-const bitacoraRoutes = require("./src/routes/bitacoraRoutes");
+let server = null;
+let shuttingDown = false;
 
-const app = express();
+const closeHttpServer = () =>
+  new Promise((resolve, reject) => {
+    if (!server) return resolve();
 
-app.use(
-  cors({
-    origin: env.CORS_ORIGIN,
-  }),
-);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(safeErrorResponses);
-
-app.get("/", (req, res) => {
-  res.json({ mensaje: "Servidor del sistema de inventario funcionando ✓" });
-});
-
-app.use("/api/auth", authRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/usuarios", usuarioRoutes);
-app.use("/api/roles", roleRoutes);
-app.use("/api/oficinas", oficinaRoutes);
-app.use("/api/categorias", categoriaRoutes);
-app.use("/api/bitacora", bitacoraRoutes);
-app.use("/api/notificaciones", notificacionRoutes);
-app.use("/api/activos", activoRoutes);
-app.use("/api/movimientos", movimientoRoutes);
-app.use("/api/solicitudes", solicitudRoutes);
-app.use("/api/adjuntos", adjuntoRoutes);
-app.use("/api/insumos", insumoRoutes);
-app.use("/api/movimientos-stock", movimientoStockRoutes);
-app.use("/api/stock-oficina", stockOficinaRoutes);
-app.use("/api/consumo-oficina", consumoOficinaRoutes);
-app.use("/api/pedidos", pedidoInsumoRoutes);
-app.use("/api/pedidos-insumos", pedidoInsumoRoutes);
-app.use("/api/reportes", reporteConsumoOficinaRoutes);
-app.use("/api/reportes-pedidos", reportePedidoRoutes);
-
-app.use(globalErrorHandler);
-
-app.use((req, res) => {
-  return res.status(404).json({
-    mensaje: "Ruta no encontrada",
-    ruta: req.originalUrl,
-  });
-});
-
-sequelize
-  .authenticate()
-  .then(() => {
-    console.log("✓ Conectado a MySQL correctamente");
-    app.listen(env.PORT, () => {
-      console.log(`✓ Servidor iniciado en ambiente ${env.NODE_ENV}, puerto ${env.PORT}`);
+    server.close((error) => {
+      if (error) reject(error);
+      else resolve();
     });
-  })
-  .catch((error) => {
-    console.error("✗ Error al iniciar el servidor:", error);
+
+    server.closeIdleConnections?.();
+  });
+
+const shutdown = async (reason, exitCode = 0) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  logger.info("shutdown_started", { reason });
+
+  const forceExit = setTimeout(() => {
+    logger.error("shutdown_timeout", {
+      reason,
+      timeout_ms: env.SHUTDOWN_TIMEOUT_MS,
+    });
+    process.exit(1);
+  }, env.SHUTDOWN_TIMEOUT_MS);
+
+  try {
+    await closeHttpServer();
+    await sequelize.close();
+    clearTimeout(forceExit);
+    logger.info("shutdown_completed", { reason });
+    process.exit(exitCode);
+  } catch (error) {
+    clearTimeout(forceExit);
+    logger.error("shutdown_failed", { reason, error });
+    process.exit(1);
+  }
+};
+
+const registerProcessHandlers = () => {
+  process.once("SIGTERM", () => void shutdown("SIGTERM", 0));
+  process.once("SIGINT", () => void shutdown("SIGINT", 0));
+  process.once("uncaughtException", (error) => {
+    logger.error("uncaught_exception", { error });
+    void shutdown("uncaughtException", 1);
+  });
+  process.once("unhandledRejection", (error) => {
+    logger.error("unhandled_rejection", { error });
+    void shutdown("unhandledRejection", 1);
+  });
+};
+
+const start = async () => {
+  await sequelize.authenticate();
+  logger.info("database_connected", { database: env.DB_NAME });
+
+  server = app.listen(env.PORT, () => {
+    logger.info("server_started", {
+      environment: env.NODE_ENV,
+      port: env.PORT,
+    });
+  });
+
+  registerProcessHandlers();
+  return server;
+};
+
+if (require.main === module) {
+  start().catch((error) => {
+    logger.error("server_start_failed", { error });
     process.exitCode = 1;
   });
+}
+
+module.exports = { start, shutdown };

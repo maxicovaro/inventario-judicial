@@ -44,6 +44,8 @@ jobs:
       DB_PASSWORD: inventario_ci_password
       JWT_SECRET: ci_only_secret_not_for_real_environments_2026
       CORS_ORIGIN: http://localhost:5173
+      HEALTH_DB_TIMEOUT_MS: 2000
+      SHUTDOWN_TIMEOUT_MS: 10000
 
     steps:
       - name: Checkout
@@ -75,6 +77,9 @@ jobs:
 
       - name: Verify migration status
         run: npm run db:status
+
+      - name: Verify runtime health
+        run: npm run test:runtime-health
 
       - name: Ensure MySQL client tools
         run: |
