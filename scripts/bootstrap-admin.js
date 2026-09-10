@@ -36,22 +36,25 @@ const bootstrapAdmin = async () => {
 
   const adminRole = await Role.findOne({ where: { nombre: "ADMIN" } });
   const oficinaDireccion = await Oficina.findOne({
-    where: { nombre: "Dirección de Policía Judicial" },
+    where: { es_central: true },
   });
 
   if (!adminRole || !oficinaDireccion) {
     throw new Error(
-      "Faltan datos base. Iniciá la aplicación una vez para crear roles y oficinas antes del bootstrap",
+      "Faltan datos base o la oficina central no está marcada. Ejecutá db:migrate y db:seed antes del bootstrap",
     );
   }
 
   const adminExistente = await Usuario.findOne({
-    where: { role_id: adminRole.id },
+    where: {
+      role_id: adminRole.id,
+      oficina_id: oficinaDireccion.id,
+    },
   });
 
   if (adminExistente) {
     throw new Error(
-      "Ya existe un usuario ADMIN. Administrá altas y contraseñas desde el sistema",
+      "Ya existe un Administrador General. Administrá altas y contraseñas desde el sistema",
     );
   }
 
@@ -76,7 +79,7 @@ const bootstrapAdmin = async () => {
     oficina_id: oficinaDireccion.id,
   });
 
-  console.log(`✓ Administrador inicial creado para ${email}`);
+  console.log(`✓ Administrador General inicial creado para ${email}`);
 };
 
 bootstrapAdmin()

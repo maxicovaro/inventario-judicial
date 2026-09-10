@@ -1,18 +1,11 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
+import { esAdminGeneral } from "../utils/permisos";
 
 const SIDEBAR_EXPANDIDO = 282;
 const SIDEBAR_CONTRAIDO = 82;
 const MOBILE_BREAKPOINT = 900;
-
-const normalizar = (texto = "") =>
-  texto
-    .toString()
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
 
 const obtenerUsuarioLocal = () => {
   try {
@@ -205,14 +198,7 @@ export default function Layout({ children }) {
   const location = useLocation();
   const usuario = obtenerUsuarioLocal();
 
-  const oficinaNombre = normalizar(
-    usuario.oficina_nombre || usuario.Oficina?.nombre || ""
-  );
-
-  const esDireccion =
-    usuario.role === "ADMIN" &&
-    oficinaNombre.includes("DIRECCION") &&
-    oficinaNombre.includes("POLICIA JUDICIAL");
+  const esDireccion = esAdminGeneral(usuario);
 
   const esOficina = !esDireccion;
 

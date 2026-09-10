@@ -1,24 +1,33 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database');
+const { DataTypes } = require("sequelize");
+const sequelize = require("../config/database");
 
-const Oficina = sequelize.define('Oficina', {
-  id: {
-    type: DataTypes.INTEGER,
-    autoIncrement: true,
-    primaryKey: true,
+const Oficina = sequelize.define(
+  "Oficina",
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
+    nombre: {
+      type: DataTypes.STRING(150),
+      allowNull: false,
+      unique: true,
+    },
+    descripcion: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+    es_central: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
   },
-  nombre: {
-    type: DataTypes.STRING(150),
-    allowNull: false,
-    unique: true,
+  {
+    tableName: "oficinas",
+    timestamps: true,
   },
-  descripcion: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-  },
-}, {
-  tableName: 'oficinas',
-  timestamps: true,
-});
+);
 
 module.exports = Oficina;

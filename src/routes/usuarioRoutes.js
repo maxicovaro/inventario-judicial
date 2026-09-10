@@ -10,27 +10,30 @@ const {
   resetearPasswordUsuario,
 } = require("../controllers/usuarioController");
 
-const { verificarToken, verificarRol } = require("../middlewares/authMiddleware");
+const {
+  verificarToken,
+  verificarAdminGeneral,
+} = require("../middlewares/authMiddleware");
 
-router.get("/", verificarToken, verificarRol("ADMIN"), listarUsuarios);
-router.post("/", verificarToken, verificarRol("ADMIN"), crearUsuario);
-router.put("/:id", verificarToken, verificarRol("ADMIN"), actualizarUsuario);
+router.get("/", verificarToken, verificarAdminGeneral, listarUsuarios);
+router.post("/", verificarToken, verificarAdminGeneral, crearUsuario);
+router.put("/:id", verificarToken, verificarAdminGeneral, actualizarUsuario);
 router.patch(
   "/:id/estado",
   verificarToken,
-  verificarRol("ADMIN"),
+  verificarAdminGeneral,
   cambiarEstadoUsuario,
 );
 router.patch(
   "/:id/desbloquear",
   verificarToken,
-  verificarRol("ADMIN"),
+  verificarAdminGeneral,
   desbloquearUsuario,
 );
 router.patch(
   "/:id/reset-password",
   verificarToken,
-  verificarRol("ADMIN"),
+  verificarAdminGeneral,
   resetearPasswordUsuario,
 );
 

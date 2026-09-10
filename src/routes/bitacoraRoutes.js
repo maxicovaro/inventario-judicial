@@ -7,10 +7,13 @@ const {
   exportarBitacoraPDF,
 } = require("../controllers/bitacoraController");
 
-const { verificarToken, verificarRol } = require("../middlewares/authMiddleware");
+const {
+  verificarToken,
+  verificarAdminGeneral,
+} = require("../middlewares/authMiddleware");
 
-router.get("/", verificarToken, verificarRol("ADMIN"), listarBitacora);
-router.get("/excel", verificarToken, verificarRol("ADMIN"), exportarBitacoraExcel);
-router.get("/pdf", verificarToken, verificarRol("ADMIN"), exportarBitacoraPDF);
+router.get("/", verificarToken, verificarAdminGeneral, listarBitacora);
+router.get("/excel", verificarToken, verificarAdminGeneral, exportarBitacoraExcel);
+router.get("/pdf", verificarToken, verificarAdminGeneral, exportarBitacoraPDF);
 
 module.exports = router;

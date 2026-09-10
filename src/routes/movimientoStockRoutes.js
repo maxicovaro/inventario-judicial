@@ -6,20 +6,23 @@ const {
   crearMovimientoStock,
 } = require("../controllers/movimientoStockController");
 
-const { verificarToken, verificarRol } = require("../middlewares/authMiddleware");
+const {
+  verificarToken,
+  verificarAdminGeneral,
+} = require("../middlewares/authMiddleware");
 
 router.get(
   "/",
   verificarToken,
-  verificarRol("ADMIN"),
-  listarMovimientosStock
+  verificarAdminGeneral,
+  listarMovimientosStock,
 );
 
 router.post(
   "/",
   verificarToken,
-  verificarRol("ADMIN"),
-  crearMovimientoStock
+  verificarAdminGeneral,
+  crearMovimientoStock,
 );
 
 module.exports = router;

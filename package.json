@@ -20,8 +20,9 @@
     "test:db-lifecycle": "node scripts/test-db-lifecycle.js",
     "test:quality-baseline": "node scripts/test-quality-baseline.js",
     "test:dependencies": "node scripts/test-dependency-security.js",
+    "test:authorization-scope": "node scripts/test-authorization-scope.js",
     "test:ci-config": "node scripts/test-ci-config.js",
-    "test": "npm run test:pedido-rules && npm run test:security-rules && npm run test:env-config && npm run test:safe-errors && npm run test:db-lifecycle && npm run test:quality-baseline && npm run test:dependencies && npm run test:ci-config",
+    "test": "npm run test:pedido-rules && npm run test:security-rules && npm run test:env-config && npm run test:safe-errors && npm run test:db-lifecycle && npm run test:quality-baseline && npm run test:dependencies && npm run test:authorization-scope && npm run test:ci-config",
     "check": "npm run check:backend && npm test && npm run check:frontend"
   },
   "keywords": [],
