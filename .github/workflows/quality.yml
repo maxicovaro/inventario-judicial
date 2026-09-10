@@ -44,6 +44,8 @@ jobs:
       DB_PASSWORD: inventario_ci_password
       JWT_SECRET: ci_only_secret_not_for_real_environments_2026
       CORS_ORIGIN: http://localhost:5173
+      VITE_API_URL: http://localhost:3000/api
+      E2E_BASE_URL: http://localhost:5173
       HEALTH_DB_TIMEOUT_MS: 2000
       SHUTDOWN_TIMEOUT_MS: 10000
 
@@ -78,6 +80,9 @@ jobs:
       - name: Verify migration status
         run: npm run db:status
 
+      - name: Run MySQL integration flows
+        run: npm run test:integration
+
       - name: Verify runtime health
         run: npm run test:runtime-health
 
@@ -97,6 +102,84 @@ jobs:
           RESTORE_DB_USER: root
           RESTORE_DB_PASSWORD: root_ci_password
         run: npm run test:backup-restore
+
+      - name: Prepare isolated E2E fixtures
+        run: npm run test:integration:fixtures
+
+      - name: Install frontend dependencies for E2E
+        run: npm --prefix inventario-frontend ci
+
+      - name: Install and audit Playwright Chromium
+        run: |
+          rm -rf .e2e-runtime
+          mkdir -p .e2e-runtime
+          printf '{"private":true,"devDependencies":{}}\n' > .e2e-runtime/package.json
+          npm install --prefix .e2e-runtime --save-dev --package-lock=true @playwright/test@1.63.0
+          npm --prefix .e2e-runtime audit --audit-level=moderate
+          ./.e2e-runtime/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Run critical browser E2E
+        run: |
+          export E2E_TEST_PASSWORD="$(node -e 'process.stdout.write(require("./scripts/integration-fixtures").TEST_PASSWORD)' | tail -n 1)"
+          export E2E_ADMIN_EMAIL="$(node -e 'process.stdout.write(require("./scripts/integration-fixtures").TEST_USERS.admin)' | tail -n 1)"
+          export E2E_RESPONSABLE_EMAIL="$(node -e 'process.stdout.write(require("./scripts/integration-fixtures").TEST_USERS.responsable1)' | tail -n 1)"
+          export E2E_USUARIO_EMAIL="$(node -e 'process.stdout.write(require("./scripts/integration-fixtures").TEST_USERS.usuario1)' | tail -n 1)"
+          export NODE_PATH="$PWD/.e2e-runtime/node_modules"
+
+          node - <<'NODE'
+          const required = [
+            "E2E_TEST_PASSWORD",
+            "E2E_ADMIN_EMAIL",
+            "E2E_RESPONSABLE_EMAIL",
+            "E2E_USUARIO_EMAIL",
+          ];
+          for (const name of required) {
+            const value = process.env[name] || "";
+            if (!value || /[\r\n]/.test(value)) {
+              throw new Error(`Variable E2E inválida: ${name}`);
+            }
+          }
+          console.log("✓ Credenciales E2E cargadas sin contaminación de stdout.");
+          NODE
+
+          cleanup() {
+            if [ -f /tmp/inventario-backend.pid ]; then kill "$(cat /tmp/inventario-backend.pid)" 2>/dev/null || true; fi
+            if [ -f /tmp/inventario-frontend.pid ]; then kill "$(cat /tmp/inventario-frontend.pid)" 2>/dev/null || true; fi
+          }
+          trap cleanup EXIT
+
+          node server.js > /tmp/inventario-backend.log 2>&1 &
+          echo $! > /tmp/inventario-backend.pid
+
+          npm --prefix inventario-frontend run dev -- --host 0.0.0.0 --port 5173 > /tmp/inventario-frontend.log 2>&1 &
+          echo $! > /tmp/inventario-frontend.pid
+
+          for attempt in {1..45}; do
+            if curl --fail --silent http://localhost:3000/health/ready >/dev/null && curl --fail --silent http://localhost:5173/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl --fail --silent http://localhost:3000/health/ready >/dev/null
+          curl --fail --silent http://localhost:5173/ >/dev/null
+
+          if ! ./.e2e-runtime/node_modules/.bin/playwright test --config=e2e/playwright.config.cjs; then
+            echo "--- Backend log ---"
+            tail -200 /tmp/inventario-backend.log || true
+            echo "--- Frontend log ---"
+            tail -200 /tmp/inventario-frontend.log || true
+            exit 1
+          fi
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failures
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
   frontend:
     name: Frontend lint + build
