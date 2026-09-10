@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 export const cn = (...classes) => classes.filter(Boolean).join(" ");
 
 export function Button({
@@ -101,9 +103,7 @@ export function Alert({ tone = "info", className, role, children }) {
 export function EmptyState({ title, description, actions, className, children }) {
   return (
     <div className={cn("ui-empty-state", className)}>
-      <div className="ui-empty-state-mark" aria-hidden="true">
-        ·
-      </div>
+      <div className="ui-empty-state-mark" aria-hidden="true">·</div>
       {title && <p className="ui-empty-state-title">{title}</p>}
       {description && <p className="ui-empty-state-description">{description}</p>}
       {children}
@@ -136,7 +136,12 @@ export function SectionHeader({ title, description, aside, className }) {
 
 export function TableFrame({ children, className, label }) {
   return (
-    <div className={cn("ui-table-wrap", className)} role="region" aria-label={label} tabIndex={0}>
+    <div
+      className={cn("ui-table-wrap", className)}
+      role="region"
+      aria-label={label}
+      tabIndex={0}
+    >
       {children}
     </div>
   );
@@ -144,4 +149,51 @@ export function TableFrame({ children, className, label }) {
 
 export function Skeleton({ className, ...props }) {
   return <div className={cn("ui-skeleton", className)} aria-hidden="true" {...props} />;
+}
+
+export function ConfirmDialog({
+  open,
+  title,
+  description,
+  confirmLabel = "Confirmar",
+  cancelLabel = "Cancelar",
+  tone = "danger",
+  busy = false,
+  onConfirm,
+  onCancel,
+}) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+
+  const handleCancel = (event) => {
+    event.preventDefault();
+    onCancel?.();
+  };
+
+  return (
+    <dialog ref={ref} className="ui-dialog" onCancel={handleCancel}>
+      <div className="ui-dialog-content">
+        <div className="ui-dialog-mark" aria-hidden="true">!</div>
+        <div>
+          <h2 className="ui-dialog-title">{title}</h2>
+          {description && <p className="ui-dialog-description">{description}</p>}
+        </div>
+      </div>
+      <div className="ui-dialog-actions">
+        <Button variant="secondary" onClick={onCancel} disabled={busy}>
+          {cancelLabel}
+        </Button>
+        <Button variant={tone} onClick={onConfirm} disabled={busy} busy={busy}>
+          {busy ? "Procesando…" : confirmLabel}
+        </Button>
+      </div>
+    </dialog>
+  );
 }
