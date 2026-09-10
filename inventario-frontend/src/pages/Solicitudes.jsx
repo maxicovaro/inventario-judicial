@@ -4,8 +4,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import AdjuntosSolicitudPanel from "../components/AdjuntosSolicitudPanel";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  PageHeader,
+  StatCard,
+} from "../components/ui";
 import { solicitudSchema } from "../schemas/solicitudSchema";
 import { esAdminGeneral } from "../utils/permisos";
+import "../styles/admin-flows.css";
 
 const defaultValues = {
   tipo: "REPOSICION",
@@ -15,17 +26,29 @@ const defaultValues = {
   oficina_id: "",
 };
 
-
 const obtenerUsuarioLocal = () => {
   try {
     return JSON.parse(localStorage.getItem("usuario") || "{}");
-  } catch (error) {
+  } catch {
     localStorage.removeItem("usuario");
     localStorage.removeItem("token");
     return {};
   }
 };
 
+const estadoTone = (estado) => {
+  if (estado === "APROBADA" || estado === "FINALIZADA") return "success";
+  if (estado === "RECHAZADA") return "danger";
+  if (estado === "PENDIENTE") return "warning";
+  if (estado === "EN_PROCESO") return "info";
+  return "neutral";
+};
+
+const prioridadTone = (prioridad) => {
+  if (prioridad === "ALTA") return "danger";
+  if (prioridad === "MEDIA") return "warning";
+  return "info";
+};
 
 export default function Solicitudes() {
   const usuario = obtenerUsuarioLocal();
@@ -34,21 +57,17 @@ export default function Solicitudes() {
   const [solicitudes, setSolicitudes] = useState([]);
   const [activos, setActivos] = useState([]);
   const [oficinas, setOficinas] = useState([]);
-
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [actualizandoId, setActualizandoId] = useState(null);
   const [respuestas, setRespuestas] = useState({});
-
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroPrioridad, setFiltroPrioridad] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroOficina, setFiltroOficina] = useState("");
-
-  const [solicitudAdjuntosAbierta, setSolicitudAdjuntosAbierta] =
-    useState(null);
+  const [solicitudAdjuntosAbierta, setSolicitudAdjuntosAbierta] = useState(null);
 
   const {
     register,
@@ -70,35 +89,22 @@ export default function Solicitudes() {
   const cargarDatos = useCallback(async () => {
     try {
       setError("");
-
       const promesas = [api.get("/solicitudes"), api.get("/activos")];
-
-      if (esDireccion) {
-        promesas.push(api.get("/oficinas"));
-      }
+      if (esDireccion) promesas.push(api.get("/oficinas"));
 
       const respuestasApi = await Promise.all(promesas);
-
       const resSolicitudes = respuestasApi[0];
       const resActivos = respuestasApi[1];
       const resOficinas = respuestasApi[2];
 
       setSolicitudes(resSolicitudes.data || []);
       setActivos(resActivos.data || []);
-
-      if (esDireccion && resOficinas) {
-        setOficinas(resOficinas.data || []);
-      } else {
-        setOficinas([]);
-      }
+      setOficinas(esDireccion && resOficinas ? resOficinas.data || [] : []);
 
       const respuestasIniciales = {};
-
       (resSolicitudes.data || []).forEach((solicitud) => {
-        respuestasIniciales[solicitud.id] =
-          solicitud.respuesta_admin || "";
+        respuestasIniciales[solicitud.id] = solicitud.respuesta_admin || "";
       });
-
       setRespuestas(respuestasIniciales);
     } catch (err) {
       setError(err.response?.data?.mensaje || "Error al cargar solicitudes");
@@ -112,105 +118,52 @@ export default function Solicitudes() {
   useEffect(() => {
     if (!esDireccion) {
       setFiltroOficina("");
-      setValue("oficina_id", String(usuario.oficina_id || ""), {
-        shouldValidate: true,
-      });
+      setValue("oficina_id", String(usuario.oficina_id || ""), { shouldValidate: true });
     }
   }, [esDireccion, usuario.oficina_id, setValue]);
 
   const activosDisponibles = useMemo(() => {
-    if (!esDireccion) {
-      return activos;
-    }
-
-    if (!oficinaFormulario) {
-      return [];
-    }
-
+    if (!esDireccion) return activos;
+    if (!oficinaFormulario) return [];
     return activos.filter(
-      (activo) => String(activo.oficina_id) === String(oficinaFormulario)
+      (activo) => String(activo.oficina_id) === String(oficinaFormulario),
     );
   }, [activos, esDireccion, oficinaFormulario]);
 
-  const marcarComoUrgente = () => {
-    setValue("tipo", "REPOSICION", { shouldValidate: true });
-    setValue("prioridad", "ALTA", { shouldValidate: true });
-
-    setMensaje(
-      "Formulario preparado como solicitud urgente de reposición de insumos"
-    );
-    setError("");
-  };
-
-  const getEstadoBadgeStyle = (estado) => {
-    switch (estado) {
-      case "PENDIENTE":
-        return { background: "#fef3c7", color: "#92400e" };
-      case "APROBADA":
-        return { background: "#d1fae5", color: "#065f46" };
-      case "RECHAZADA":
-        return { background: "#fee2e2", color: "#991b1b" };
-      case "EN_PROCESO":
-        return { background: "#dbeafe", color: "#1e40af" };
-      case "FINALIZADA":
-        return { background: "#e5e7eb", color: "#374151" };
-      default:
-        return { background: "#f3f4f6", color: "#111827" };
-    }
-  };
-
-  const getPrioridadBadgeStyle = (prioridad) => {
-    switch (prioridad) {
-      case "ALTA":
-        return { background: "#fee2e2", color: "#991b1b" };
-      case "MEDIA":
-        return { background: "#fef3c7", color: "#92400e" };
-      case "BAJA":
-        return { background: "#dbeafe", color: "#1e40af" };
-      default:
-        return { background: "#f3f4f6", color: "#111827" };
-    }
-  };
+  const resumen = useMemo(() => ({
+    total: solicitudes.length,
+    pendientes: solicitudes.filter((item) => item.estado === "PENDIENTE").length,
+    urgentes: solicitudes.filter(
+      (item) => item.prioridad === "ALTA" && !["FINALIZADA", "RECHAZADA"].includes(item.estado),
+    ).length,
+    enProceso: solicitudes.filter((item) => item.estado === "EN_PROCESO").length,
+  }), [solicitudes]);
 
   const solicitudesFiltradas = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
     return solicitudes.filter((solicitud) => {
-      const texto = busqueda.toLowerCase();
-
       const coincideBusqueda =
+        !texto ||
         String(solicitud.id).includes(texto) ||
         solicitud.descripcion?.toLowerCase().includes(texto) ||
         solicitud.Usuario?.nombre?.toLowerCase().includes(texto) ||
         solicitud.Usuario?.apellido?.toLowerCase().includes(texto) ||
         solicitud.Oficina?.nombre?.toLowerCase().includes(texto) ||
         solicitud.Activo?.nombre?.toLowerCase().includes(texto);
-
       const coincideEstado = !filtroEstado || solicitud.estado === filtroEstado;
-
-      const coincidePrioridad =
-        !filtroPrioridad || solicitud.prioridad === filtroPrioridad;
-
+      const coincidePrioridad = !filtroPrioridad || solicitud.prioridad === filtroPrioridad;
       const coincideTipo = !filtroTipo || solicitud.tipo === filtroTipo;
-
-      const coincideOficina =
-        !filtroOficina ||
-        Number(solicitud.oficina_id) === Number(filtroOficina);
-
-      return (
-        coincideBusqueda &&
-        coincideEstado &&
-        coincidePrioridad &&
-        coincideTipo &&
-        coincideOficina
-      );
+      const coincideOficina = !filtroOficina || Number(solicitud.oficina_id) === Number(filtroOficina);
+      return coincideBusqueda && coincideEstado && coincidePrioridad && coincideTipo && coincideOficina;
     });
-  }, [
-    solicitudes,
-    busqueda,
-    filtroEstado,
-    filtroPrioridad,
-    filtroTipo,
-    filtroOficina,
-  ]);
+  }, [solicitudes, busqueda, filtroEstado, filtroPrioridad, filtroTipo, filtroOficina]);
+
+  const marcarComoUrgente = () => {
+    setValue("tipo", "REPOSICION", { shouldValidate: true });
+    setValue("prioridad", "ALTA", { shouldValidate: true });
+    setMensaje("Formulario preparado como solicitud urgente de reposición de insumos");
+    setError("");
+  };
 
   const onSubmit = async (data) => {
     setError("");
@@ -222,7 +175,6 @@ export default function Solicitudes() {
         setError("Tu usuario no tiene una oficina asignada");
         return;
       }
-
       if (esDireccion && !data.oficina_id) {
         setError("Seleccioná la oficina para la solicitud");
         return;
@@ -237,14 +189,11 @@ export default function Solicitudes() {
       };
 
       await api.post("/solicitudes", payload);
-
       setMensaje("Solicitud creada correctamente");
-
       reset({
         ...defaultValues,
         oficina_id: esDireccion ? "" : String(usuario.oficina_id || ""),
       });
-
       await cargarDatos();
     } catch (err) {
       setError(err.response?.data?.mensaje || "Error al crear solicitud");
@@ -263,620 +212,279 @@ export default function Solicitudes() {
         estado,
         respuesta_admin: respuestas[id] || "",
       });
-
       setMensaje(`Solicitud #${id} actualizada a ${estado}`);
       await cargarDatos();
     } catch (err) {
-      setError(
-        err.response?.data?.mensaje || "Error al actualizar la solicitud"
-      );
+      setError(err.response?.data?.mensaje || "Error al actualizar la solicitud");
     } finally {
       setActualizandoId(null);
     }
   };
 
-  const handleRespuestaChange = (id, value) => {
-    setRespuestas((prev) => ({
-      ...prev,
-      [id]: value,
-    }));
+  const limpiarFiltros = () => {
+    setBusqueda("");
+    setFiltroEstado("");
+    setFiltroPrioridad("");
+    setFiltroTipo("");
+    setFiltroOficina("");
   };
 
   return (
     <Layout>
-      <h1 style={styles.titulo}>Solicitudes</h1>
+      <div className="ui-page admin-page">
+        <PageHeader
+          eyebrow="Gestión administrativa"
+          title="Solicitudes"
+          description={
+            esDireccion
+              ? "Priorizá, respondé y seguí solicitudes de todas las dependencias desde una única bandeja."
+              : `Creá y seguí solicitudes de ${usuario.oficina_nombre || usuario.Oficina?.nombre || "tu oficina"}.`
+          }
+        />
 
-      <div style={styles.infoBox}>
-        <strong>Alcance:</strong>{" "}
-        {esDireccion
-          ? "Dirección de Policía Judicial - vista general"
-          : `Oficina: ${
-              usuario.oficina_nombre || usuario.Oficina?.nombre || "-"
-            }`}
-      </div>
+        <section className="admin-summary-grid" aria-label="Resumen de solicitudes">
+          <StatCard label="Total" value={resumen.total} detail="Solicitudes visibles" />
+          <StatCard label="Pendientes" value={resumen.pendientes} detail="Esperan una decisión" tone="warning" />
+          <StatCard label="Prioridad alta" value={resumen.urgentes} detail="Requieren atención" tone={resumen.urgentes ? "danger" : "success"} />
+          <StatCard label="En proceso" value={resumen.enProceso} detail="Con gestión iniciada" tone="info" />
+        </section>
 
-      <div style={styles.grid}>
-        <div style={styles.card}>
-          <h2 style={styles.subtitulo}>Nueva solicitud</h2>
+        <div className="admin-stack" aria-live="polite">
+          {mensaje && <Alert tone="success">{mensaje}</Alert>}
+          {error && <Alert tone="danger">{error}</Alert>}
+        </div>
 
-          <p style={styles.textoAyuda}>
-            Para una solicitud urgente de insumos, usá tipo{" "}
-            <strong>Reposición</strong> y prioridad <strong>Alta</strong>.
-          </p>
-
-          <button
-            type="button"
-            style={styles.buttonUrgente}
-            onClick={marcarComoUrgente}
-          >
-            Preparar solicitud urgente de insumos
-          </button>
-
-          <form onSubmit={handleSubmit(onSubmit)} style={styles.form}>
-            {esDireccion && (
+        <div className="admin-grid">
+          <Card className="admin-card" aria-labelledby="nueva-solicitud-title">
+            <div className="ui-section-header">
               <div>
-                <label style={styles.label}>Oficina solicitante</label>
+                <h2 className="ui-section-title" id="nueva-solicitud-title">Nueva solicitud</h2>
+                <p className="ui-section-description">Registrá el pedido con contexto suficiente para que pueda resolverse sin demoras.</p>
+              </div>
+            </div>
 
-                <select
-                  {...register("oficina_id")}
-                  style={styles.input}
-                  onChange={(e) => {
-                    setValue("oficina_id", e.target.value, {
-                      shouldValidate: true,
-                    });
-                    setValue("activo_id", "", {
-                      shouldValidate: true,
-                    });
-                  }}
-                >
-                  <option value="">Seleccionar oficina</option>
-                  {oficinas.map((oficina) => (
-                    <option key={oficina.id} value={String(oficina.id)}>
-                      {oficina.nombre}
+            <div className="admin-callout admin-callout--urgent">
+              <p className="admin-callout-title">¿Reposición urgente?</p>
+              <p className="admin-callout-text">Podés preparar automáticamente el formulario como reposición de prioridad alta.</p>
+              <div className="admin-request-actions">
+                <Button variant="danger" size="sm" onClick={marcarComoUrgente}>
+                  Preparar solicitud urgente de insumos
+                </Button>
+              </div>
+            </div>
+
+            <form className="admin-form" onSubmit={handleSubmit(onSubmit)} noValidate>
+              {esDireccion ? (
+                <Field label="Oficina solicitante" htmlFor="solicitud-oficina" error={errors.oficina_id} errorId="solicitud-oficina-error">
+                  <select
+                    id="solicitud-oficina"
+                    className="ui-control"
+                    {...register("oficina_id")}
+                    onChange={(e) => {
+                      setValue("oficina_id", e.target.value, { shouldValidate: true });
+                      setValue("activo_id", "", { shouldValidate: true });
+                    }}
+                    aria-invalid={Boolean(errors.oficina_id)}
+                    aria-describedby={errors.oficina_id ? "solicitud-oficina-error" : undefined}
+                  >
+                    <option value="">Seleccionar oficina</option>
+                    {oficinas.map((oficina) => (
+                      <option key={oficina.id} value={String(oficina.id)}>{oficina.nombre}</option>
+                    ))}
+                  </select>
+                </Field>
+              ) : (
+                <input type="hidden" {...register("oficina_id")} />
+              )}
+
+              <div className="admin-form-grid">
+                <Field label="Tipo de solicitud" htmlFor="solicitud-tipo" error={errors.tipo} errorId="solicitud-tipo-error">
+                  <select id="solicitud-tipo" className="ui-control" {...register("tipo")}>
+                    <option value="REPOSICION">Reposición</option>
+                    <option value="REPARACION">Reparación</option>
+                    <option value="BAJA">Baja</option>
+                    <option value="TRASLADO">Traslado</option>
+                    <option value="ADQUISICION">Adquisición</option>
+                  </select>
+                </Field>
+                <Field label="Prioridad" htmlFor="solicitud-prioridad" error={errors.prioridad} errorId="solicitud-prioridad-error">
+                  <select id="solicitud-prioridad" className="ui-control" {...register("prioridad")}>
+                    <option value="BAJA">Baja</option>
+                    <option value="MEDIA">Media</option>
+                    <option value="ALTA">Alta</option>
+                  </select>
+                </Field>
+              </div>
+
+              <Field
+                label="Activo asociado"
+                htmlFor="solicitud-activo"
+                hint={esDireccion && !oficinaFormulario ? "Primero seleccioná una oficina para ver sus activos." : undefined}
+                error={errors.activo_id}
+                errorId="solicitud-activo-error"
+              >
+                <select id="solicitud-activo" className="ui-control" {...register("activo_id")} disabled={esDireccion && !oficinaFormulario}>
+                  <option value="">Sin activo asociado</option>
+                  {activosDisponibles.map((activo) => (
+                    <option key={activo.id} value={String(activo.id)}>
+                      {activo.nombre} {activo.codigo_interno ? `- ${activo.codigo_interno}` : ""}
                     </option>
                   ))}
                 </select>
+              </Field>
 
-                {errors.oficina_id && (
-                  <p style={styles.errorText}>{errors.oficina_id.message}</p>
-                )}
+              <Field label="Descripción" htmlFor="solicitud-descripcion" error={errors.descripcion} errorId="solicitud-descripcion-error">
+                <textarea
+                  id="solicitud-descripcion"
+                  className="ui-control admin-textarea"
+                  {...register("descripcion")}
+                  placeholder="Ejemplo: Se solicita reposición urgente de resmas A4 porque la oficina quedó sin stock disponible."
+                  aria-invalid={Boolean(errors.descripcion)}
+                  aria-describedby={errors.descripcion ? "solicitud-descripcion-error" : undefined}
+                />
+              </Field>
+
+              <div className="admin-form-actions">
+                <Button type="submit" disabled={guardando} busy={guardando}>
+                  {guardando ? "Guardando..." : "Crear solicitud"}
+                </Button>
+              </div>
+            </form>
+          </Card>
+
+          <Card className="admin-card" aria-labelledby="bandeja-solicitudes-title">
+            <div className="ui-section-header">
+              <div>
+                <h2 className="ui-section-title" id="bandeja-solicitudes-title">Bandeja de solicitudes</h2>
+                <p className="ui-section-description">Filtrá por estado, prioridad, tipo y dependencia para encontrar rápidamente lo que requiere acción.</p>
+              </div>
+            </div>
+
+            <div className={`admin-toolbar${esDireccion ? " admin-toolbar--wide" : ""}`}>
+              <Field label="Buscar" htmlFor="buscar-solicitudes">
+                <input
+                  id="buscar-solicitudes"
+                  className="ui-control"
+                  type="search"
+                  placeholder="Buscar por ID, descripción, usuario, oficina o activo..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                />
+              </Field>
+              {esDireccion && (
+                <Field label="Oficina" htmlFor="filtro-oficina-solicitudes">
+                  <select id="filtro-oficina-solicitudes" className="ui-control" value={filtroOficina} onChange={(e) => setFiltroOficina(e.target.value)}>
+                    <option value="">Todas las oficinas</option>
+                    {oficinas.map((oficina) => <option key={oficina.id} value={String(oficina.id)}>{oficina.nombre}</option>)}
+                  </select>
+                </Field>
+              )}
+              <Field label="Estado" htmlFor="filtro-estado-solicitudes">
+                <select id="filtro-estado-solicitudes" className="ui-control" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+                  <option value="">Todos los estados</option>
+                  <option value="PENDIENTE">Pendiente</option>
+                  <option value="APROBADA">Aprobada</option>
+                  <option value="RECHAZADA">Rechazada</option>
+                  <option value="EN_PROCESO">En proceso</option>
+                  <option value="FINALIZADA">Finalizada</option>
+                </select>
+              </Field>
+              <Field label="Prioridad" htmlFor="filtro-prioridad-solicitudes">
+                <select id="filtro-prioridad-solicitudes" className="ui-control" value={filtroPrioridad} onChange={(e) => setFiltroPrioridad(e.target.value)}>
+                  <option value="">Todas las prioridades</option>
+                  <option value="BAJA">Baja</option>
+                  <option value="MEDIA">Media</option>
+                  <option value="ALTA">Alta</option>
+                </select>
+              </Field>
+              <Field label="Tipo" htmlFor="filtro-tipo-solicitudes">
+                <select id="filtro-tipo-solicitudes" className="ui-control" value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
+                  <option value="">Todos los tipos</option>
+                  <option value="REPOSICION">Reposición</option>
+                  <option value="REPARACION">Reparación</option>
+                  <option value="BAJA">Baja</option>
+                  <option value="TRASLADO">Traslado</option>
+                  <option value="ADQUISICION">Adquisición</option>
+                </select>
+              </Field>
+            </div>
+
+            <div className="admin-meta-row">
+              <span>{solicitudesFiltradas.length} de {solicitudes.length} solicitudes</span>
+              <Button variant="ghost" size="sm" onClick={limpiarFiltros}>Limpiar filtros</Button>
+            </div>
+
+            {solicitudesFiltradas.length === 0 ? (
+              <EmptyState title="No hay solicitudes para mostrar" description="Probá modificando los filtros o registrá una nueva solicitud." />
+            ) : (
+              <div className="admin-list">
+                {solicitudesFiltradas.map((solicitud) => {
+                  const adjuntosAbiertos = solicitudAdjuntosAbierta === solicitud.id;
+                  const procesando = actualizandoId === solicitud.id;
+                  return (
+                    <article key={solicitud.id} className={`admin-request${solicitud.prioridad === "ALTA" ? " admin-request--urgent" : ""}`}>
+                      <div className="admin-request-header">
+                        <div>
+                          <h3 className="admin-request-title"><span className="admin-request-id">#{solicitud.id}</span> · {solicitud.tipo}</h3>
+                        </div>
+                        <div className="admin-badges">
+                          <Badge tone={estadoTone(solicitud.estado)}>{solicitud.estado}</Badge>
+                          <Badge tone={prioridadTone(solicitud.prioridad)}>{solicitud.prioridad}</Badge>
+                        </div>
+                      </div>
+
+                      <div className="admin-request-grid">
+                        <div><span className="admin-data-label">Usuario</span><span className="admin-data-value">{solicitud.Usuario ? `${solicitud.Usuario.nombre} ${solicitud.Usuario.apellido}` : "-"}</span></div>
+                        <div><span className="admin-data-label">Oficina</span><span className="admin-data-value">{solicitud.Oficina?.nombre || "-"}</span></div>
+                        <div><span className="admin-data-label">Activo</span><span className="admin-data-value">{solicitud.Activo?.nombre || "Sin activo asociado"}</span></div>
+                      </div>
+
+                      <p className="admin-description">{solicitud.descripcion || "Sin descripción"}</p>
+
+                      {solicitud.respuesta_admin && (
+                        <div className="admin-response"><strong>Respuesta de Dirección:</strong> {solicitud.respuesta_admin}</div>
+                      )}
+
+                      <div className="admin-request-actions">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setSolicitudAdjuntosAbierta(adjuntosAbiertos ? null : solicitud.id)}
+                          aria-expanded={adjuntosAbiertos}
+                        >
+                          {adjuntosAbiertos ? "Ocultar adjuntos" : "Adjuntos"}
+                        </Button>
+                      </div>
+
+                      {adjuntosAbiertos && <AdjuntosSolicitudPanel solicitudId={solicitud.id} />}
+
+                      {esDireccion && (
+                        <div className="admin-decision-panel">
+                          <Field label="Respuesta administrativa" htmlFor={`respuesta-solicitud-${solicitud.id}`}>
+                            <textarea
+                              id={`respuesta-solicitud-${solicitud.id}`}
+                              className="ui-control admin-textarea--compact"
+                              placeholder="Respuesta administrativa de Dirección"
+                              value={respuestas[solicitud.id] || ""}
+                              onChange={(e) => setRespuestas((prev) => ({ ...prev, [solicitud.id]: e.target.value }))}
+                            />
+                          </Field>
+                          <div className="admin-decision-actions" aria-label={`Acciones para solicitud ${solicitud.id}`}>
+                            <Button size="sm" onClick={() => actualizarEstado(solicitud.id, "APROBADA")} disabled={procesando}>Aprobar</Button>
+                            <Button variant="danger" size="sm" onClick={() => actualizarEstado(solicitud.id, "RECHAZADA")} disabled={procesando}>Rechazar</Button>
+                            <Button variant="secondary" size="sm" onClick={() => actualizarEstado(solicitud.id, "EN_PROCESO")} disabled={procesando}>En proceso</Button>
+                            <Button variant="secondary" size="sm" onClick={() => actualizarEstado(solicitud.id, "FINALIZADA")} disabled={procesando}>Finalizar</Button>
+                          </div>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
             )}
-
-            {!esDireccion && (
-              <input type="hidden" {...register("oficina_id")} />
-            )}
-
-            <div>
-              <label style={styles.label}>Tipo de solicitud</label>
-              <select {...register("tipo")} style={styles.input}>
-                <option value="REPOSICION">Reposición</option>
-                <option value="REPARACION">Reparación</option>
-                <option value="BAJA">Baja</option>
-                <option value="TRASLADO">Traslado</option>
-                <option value="ADQUISICION">Adquisición</option>
-              </select>
-
-              {errors.tipo && (
-                <p style={styles.errorText}>{errors.tipo.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label style={styles.label}>Prioridad</label>
-              <select {...register("prioridad")} style={styles.input}>
-                <option value="BAJA">Baja</option>
-                <option value="MEDIA">Media</option>
-                <option value="ALTA">Alta</option>
-              </select>
-
-              {errors.prioridad && (
-                <p style={styles.errorText}>{errors.prioridad.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label style={styles.label}>Activo asociado</label>
-
-              <select {...register("activo_id")} style={styles.input}>
-                <option value="">Sin activo asociado</option>
-
-                {activosDisponibles.map((activo) => (
-                  <option key={activo.id} value={String(activo.id)}>
-                    {activo.nombre}{" "}
-                    {activo.codigo_interno ? `- ${activo.codigo_interno}` : ""}
-                  </option>
-                ))}
-              </select>
-
-              {esDireccion && !oficinaFormulario && (
-                <p style={styles.helpText}>
-                  Primero seleccioná una oficina para ver sus activos.
-                </p>
-              )}
-
-              {errors.activo_id && (
-                <p style={styles.errorText}>{errors.activo_id.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label style={styles.label}>Descripción</label>
-
-              <textarea
-                {...register("descripcion")}
-                placeholder="Ejemplo: Se solicita reposición urgente de resmas A4 porque la oficina quedó sin stock disponible."
-                style={styles.textarea}
-              />
-
-              {errors.descripcion && (
-                <p style={styles.errorText}>{errors.descripcion.message}</p>
-              )}
-            </div>
-
-            {mensaje && <p style={styles.ok}>{mensaje}</p>}
-            {error && <p style={styles.error}>{error}</p>}
-
-            <button type="submit" style={styles.button} disabled={guardando}>
-              {guardando ? "Guardando..." : "Crear solicitud"}
-            </button>
-          </form>
-        </div>
-
-        <div style={styles.card}>
-          <h2 style={styles.subtitulo}>Listado</h2>
-
-          <div style={styles.filters}>
-            <input
-              type="text"
-              placeholder="Buscar por ID, descripción, usuario, oficina o activo..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              style={styles.input}
-            />
-
-            {esDireccion && (
-              <select
-                value={filtroOficina}
-                onChange={(e) => setFiltroOficina(e.target.value)}
-                style={styles.input}
-              >
-                <option value="">Todas las oficinas</option>
-
-                {oficinas.map((oficina) => (
-                  <option key={oficina.id} value={String(oficina.id)}>
-                    {oficina.nombre}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <select
-              value={filtroEstado}
-              onChange={(e) => setFiltroEstado(e.target.value)}
-              style={styles.input}
-            >
-              <option value="">Todos los estados</option>
-              <option value="PENDIENTE">Pendiente</option>
-              <option value="APROBADA">Aprobada</option>
-              <option value="RECHAZADA">Rechazada</option>
-              <option value="EN_PROCESO">En proceso</option>
-              <option value="FINALIZADA">Finalizada</option>
-            </select>
-
-            <select
-              value={filtroPrioridad}
-              onChange={(e) => setFiltroPrioridad(e.target.value)}
-              style={styles.input}
-            >
-              <option value="">Todas las prioridades</option>
-              <option value="BAJA">Baja</option>
-              <option value="MEDIA">Media</option>
-              <option value="ALTA">Alta</option>
-            </select>
-
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              style={styles.input}
-            >
-              <option value="">Todos los tipos</option>
-              <option value="REPOSICION">Reposición</option>
-              <option value="REPARACION">Reparación</option>
-              <option value="BAJA">Baja</option>
-              <option value="TRASLADO">Traslado</option>
-              <option value="ADQUISICION">Adquisición</option>
-            </select>
-          </div>
-
-          {solicitudesFiltradas.length === 0 ? (
-            <p>No hay solicitudes que coincidan con la búsqueda.</p>
-          ) : (
-            <div style={styles.listado}>
-              {solicitudesFiltradas.map((solicitud) => (
-                <div key={solicitud.id} style={styles.item}>
-                  <div style={styles.headerRow}>
-                    <p style={styles.itemTitle}>
-                      <strong>#{solicitud.id}</strong> — {solicitud.tipo}
-                    </p>
-
-                    <div style={styles.badges}>
-                      <span
-                        style={{
-                          ...styles.badge,
-                          ...getEstadoBadgeStyle(solicitud.estado),
-                        }}
-                      >
-                        {solicitud.estado}
-                      </span>
-
-                      <span
-                        style={{
-                          ...styles.badge,
-                          ...getPrioridadBadgeStyle(solicitud.prioridad),
-                        }}
-                      >
-                        {solicitud.prioridad}
-                      </span>
-                    </div>
-                  </div>
-
-                  <p>
-                    <strong>Usuario:</strong>{" "}
-                    {solicitud.Usuario
-                      ? `${solicitud.Usuario.nombre} ${solicitud.Usuario.apellido}`
-                      : "-"}
-                  </p>
-
-                  <p>
-                    <strong>Oficina:</strong> {solicitud.Oficina?.nombre || "-"}
-                  </p>
-
-                  <p>
-                    <strong>Activo:</strong> {solicitud.Activo?.nombre || "-"}
-                  </p>
-
-                  <p>
-                    <strong>Descripción:</strong> {solicitud.descripcion || "-"}
-                  </p>
-
-                  {solicitud.respuesta_admin && (
-                    <p style={styles.respuestaBox}>
-                      <strong>Respuesta de Dirección:</strong>{" "}
-                      {solicitud.respuesta_admin}
-                    </p>
-                  )}
-
-                  <div style={styles.accionesSecundarias}>
-                    <button
-                      type="button"
-                      style={styles.smallButtonDark}
-                      onClick={() =>
-                        setSolicitudAdjuntosAbierta(
-                          solicitudAdjuntosAbierta === solicitud.id
-                            ? null
-                            : solicitud.id
-                        )
-                      }
-                    >
-                      {solicitudAdjuntosAbierta === solicitud.id
-                        ? "Ocultar adjuntos"
-                        : "Adjuntos"}
-                    </button>
-                  </div>
-
-                  {solicitudAdjuntosAbierta === solicitud.id && (
-                    <AdjuntosSolicitudPanel solicitudId={solicitud.id} />
-                  )}
-
-                  {esDireccion && (
-                    <div style={styles.adminBox}>
-                      <textarea
-                        placeholder="Respuesta administrativa de Dirección"
-                        value={respuestas[solicitud.id] || ""}
-                        onChange={(e) =>
-                          handleRespuestaChange(solicitud.id, e.target.value)
-                        }
-                        style={styles.textareaSmall}
-                      />
-
-                      <div style={styles.acciones}>
-                        <button
-                          type="button"
-                          style={styles.smallButton}
-                          onClick={() =>
-                            actualizarEstado(solicitud.id, "APROBADA")
-                          }
-                          disabled={actualizandoId === solicitud.id}
-                        >
-                          Aprobar
-                        </button>
-
-                        <button
-                          type="button"
-                          style={styles.smallButtonDanger}
-                          onClick={() =>
-                            actualizarEstado(solicitud.id, "RECHAZADA")
-                          }
-                          disabled={actualizandoId === solicitud.id}
-                        >
-                          Rechazar
-                        </button>
-
-                        <button
-                          type="button"
-                          style={styles.smallButtonSecondary}
-                          onClick={() =>
-                            actualizarEstado(solicitud.id, "EN_PROCESO")
-                          }
-                          disabled={actualizandoId === solicitud.id}
-                        >
-                          En proceso
-                        </button>
-
-                        <button
-                          type="button"
-                          style={styles.smallButtonSuccess}
-                          onClick={() =>
-                            actualizarEstado(solicitud.id, "FINALIZADA")
-                          }
-                          disabled={actualizandoId === solicitud.id}
-                        >
-                          Finalizar
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          </Card>
         </div>
       </div>
     </Layout>
   );
 }
-
-const styles = {
-  titulo: {
-    marginTop: 0,
-    marginBottom: "1rem",
-  },
-
-  subtitulo: {
-    marginTop: 0,
-  },
-
-  infoBox: {
-    background: "#eef2ff",
-    border: "1px solid #c7d2fe",
-    color: "#1e3a8a",
-    borderRadius: "12px",
-    padding: "0.8rem 1rem",
-    marginBottom: "1rem",
-  },
-
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-    gap: "1rem",
-    alignItems: "start",
-  },
-
-  card: {
-    background: "#fff",
-    borderRadius: "14px",
-    padding: "1rem",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-    overflowX: "auto",
-  },
-
-  form: {
-    display: "grid",
-    gap: "0.8rem",
-  },
-
-  filters: {
-    display: "grid",
-    gridTemplateColumns: "1fr",
-    gap: "0.8rem",
-    marginBottom: "1rem",
-  },
-
-  label: {
-    display: "block",
-    fontWeight: "bold",
-    marginBottom: "0.35rem",
-    color: "#374151",
-  },
-
-  input: {
-    padding: "0.8rem",
-    border: "1px solid #ccc",
-    borderRadius: "8px",
-    width: "100%",
-    boxSizing: "border-box",
-  },
-
-  textarea: {
-    padding: "0.8rem",
-    border: "1px solid #ccc",
-    borderRadius: "8px",
-    minHeight: "110px",
-    resize: "vertical",
-    width: "100%",
-    boxSizing: "border-box",
-  },
-
-  textareaSmall: {
-    padding: "0.7rem",
-    border: "1px solid #ccc",
-    borderRadius: "8px",
-    minHeight: "70px",
-    resize: "vertical",
-    width: "100%",
-    boxSizing: "border-box",
-  },
-
-  textoAyuda: {
-    color: "#4b5563",
-    fontSize: "0.95rem",
-    lineHeight: 1.5,
-  },
-
-  helpText: {
-    color: "#6b7280",
-    fontSize: "0.85rem",
-    margin: "0.35rem 0 0 0",
-  },
-
-  button: {
-    padding: "0.9rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#1f4f82",
-    color: "#fff",
-    cursor: "pointer",
-    fontWeight: "bold",
-  },
-
-  buttonUrgente: {
-    width: "100%",
-    padding: "0.8rem",
-    border: "1px solid #fecaca",
-    borderRadius: "8px",
-    background: "#fee2e2",
-    color: "#991b1b",
-    cursor: "pointer",
-    fontWeight: "bold",
-    marginBottom: "1rem",
-  },
-
-  smallButton: {
-    padding: "0.65rem 0.9rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#1f4f82",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  smallButtonDanger: {
-    padding: "0.65rem 0.9rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#b91c1c",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  smallButtonSecondary: {
-    padding: "0.65rem 0.9rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#2563eb",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  smallButtonSuccess: {
-    padding: "0.65rem 0.9rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#15803d",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  smallButtonDark: {
-    padding: "0.65rem 0.9rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#374151",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  listado: {
-    display: "grid",
-    gap: "1rem",
-  },
-
-  item: {
-    border: "1px solid #e5e7eb",
-    borderRadius: "12px",
-    padding: "1rem",
-  },
-
-  headerRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "1rem",
-    marginBottom: "0.8rem",
-    flexWrap: "wrap",
-  },
-
-  itemTitle: {
-    margin: 0,
-    fontSize: "1rem",
-  },
-
-  badges: {
-    display: "flex",
-    gap: "0.5rem",
-    flexWrap: "wrap",
-  },
-
-  badge: {
-    padding: "0.35rem 0.7rem",
-    borderRadius: "999px",
-    fontSize: "0.8rem",
-    fontWeight: "bold",
-  },
-
-  adminBox: {
-    marginTop: "1rem",
-    display: "grid",
-    gap: "0.8rem",
-    paddingTop: "1rem",
-    borderTop: "1px solid #e5e7eb",
-  },
-
-  acciones: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.6rem",
-  },
-
-  accionesSecundarias: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.6rem",
-    marginTop: "0.8rem",
-  },
-
-  respuestaBox: {
-    background: "#f9fafb",
-    border: "1px solid #e5e7eb",
-    borderRadius: "10px",
-    padding: "0.8rem",
-  },
-
-  ok: {
-    color: "green",
-    margin: 0,
-  },
-
-  error: {
-    color: "crimson",
-    margin: 0,
-  },
-
-  errorText: {
-    color: "crimson",
-    marginTop: "0.35rem",
-    marginBottom: 0,
-    fontSize: "0.9rem",
-  },
-};
