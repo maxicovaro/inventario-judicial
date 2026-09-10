@@ -83,6 +83,11 @@ jobs:
       - name: Run MySQL integration flows
         run: npm run test:integration
 
+      - name: Run authentication hardening flows
+        run: |
+          node scripts/test-auth-hardening.js
+          node scripts/test-login-concurrency.js
+
       - name: Run concurrency and idempotency flows
         run: node scripts/test-concurrency.js
 
