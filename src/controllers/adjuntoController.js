@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const sharp = require("sharp");
+const { Op } = require("sequelize");
 
 const { Adjunto, Activo, Solicitud } = require("../models");
 const { esAdminGeneral } = require("../utils/permisos");
@@ -40,7 +41,7 @@ const verificarPermisoActivo = async (activo_id, req, esDireccion) => {
 
   if (!esDireccion && !mismoId(activo.oficina_id, req.usuario.oficina_id)) {
     const error = new Error(
-      "No tenés permiso para acceder a adjuntos de este activo"
+      "No tenés permiso para acceder a adjuntos de este activo",
     );
     error.status = 403;
     throw error;
@@ -61,15 +62,14 @@ const verificarPermisoSolicitud = async (solicitud_id, req, esDireccion) => {
   }
 
   const perteneceAlUsuario = mismoId(solicitud.usuario_id, req.usuario.id);
-
   const perteneceALaOficina = mismoId(
     solicitud.oficina_id,
-    req.usuario.oficina_id
+    req.usuario.oficina_id,
   );
 
   if (!esDireccion && !perteneceAlUsuario && !perteneceALaOficina) {
     const error = new Error(
-      "No tenés permiso para acceder a adjuntos de esta solicitud"
+      "No tenés permiso para acceder a adjuntos de esta solicitud",
     );
     error.status = 403;
     throw error;
@@ -185,12 +185,6 @@ const listarAdjuntos = async (req, res) => {
     const esDireccion = esAdminGeneral(req.usuario);
     const { activo_id, solicitud_id } = req.query;
 
-    if (!activo_id && !solicitud_id) {
-      return res.status(400).json({
-        mensaje: "Debe indicar activo_id o solicitud_id",
-      });
-    }
-
     if (activo_id && solicitud_id) {
       return res.status(400).json({
         mensaje:
@@ -198,17 +192,25 @@ const listarAdjuntos = async (req, res) => {
       });
     }
 
-    await verificarPermisoActivo(activo_id, req, esDireccion);
-    await verificarPermisoSolicitud(solicitud_id, req, esDireccion);
-
     const where = {};
 
     if (activo_id) {
+      await verificarPermisoActivo(activo_id, req, esDireccion);
       where.activo_id = activo_id;
-    }
-
-    if (solicitud_id) {
+    } else if (solicitud_id) {
+      await verificarPermisoSolicitud(solicitud_id, req, esDireccion);
       where.solicitud_id = solicitud_id;
+    } else if (!esDireccion) {
+      const alcance = [{ "$Solicitud.usuario_id$": req.usuario.id }];
+
+      if (req.usuario.oficina_id) {
+        alcance.push(
+          { "$Activo.oficina_id$": req.usuario.oficina_id },
+          { "$Solicitud.oficina_id$": req.usuario.oficina_id },
+        );
+      }
+
+      where[Op.or] = alcance;
     }
 
     const adjuntos = await Adjunto.findAll({
@@ -217,10 +219,12 @@ const listarAdjuntos = async (req, res) => {
         {
           model: Activo,
           attributes: ["id", "nombre", "oficina_id"],
+          required: false,
         },
         {
           model: Solicitud,
           attributes: ["id", "tipo", "usuario_id", "oficina_id"],
+          required: false,
         },
       ],
       order: [["id", "DESC"]],

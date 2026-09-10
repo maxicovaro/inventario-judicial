@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import { esAdminGeneral } from "../utils/permisos";
 
 const formInicial = {
   insumo_id: "",
@@ -10,23 +11,11 @@ const formInicial = {
   motivo: "",
 };
 
-const normalizar = (texto = "") =>
-  texto
-    .toString()
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
 
 export default function StockOficina() {
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
 
-  const oficinaNombre = normalizar(usuario.oficina_nombre || "");
-
-  const esDireccion =
-    usuario.role === "ADMIN" &&
-    oficinaNombre.includes("DIRECCION") &&
-    oficinaNombre.includes("POLICIA JUDICIAL");
+  const esDireccion = esAdminGeneral(usuario);
 
   const [stock, setStock] = useState([]);
   const [oficinas, setOficinas] = useState([]);

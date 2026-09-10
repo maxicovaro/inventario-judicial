@@ -55,6 +55,14 @@ const activosFrontend = fs.readFileSync(
   "inventario-frontend/src/pages/Activos.jsx",
   "utf8",
 );
+const solicitudesFrontend = fs.readFileSync(
+  "inventario-frontend/src/pages/Solicitudes.jsx",
+  "utf8",
+);
+const historialPedidosFrontend = fs.readFileSync(
+  "inventario-frontend/src/pages/HistorialPedidos.jsx",
+  "utf8",
+);
 const migration = fs.readFileSync(
   "src/db/migrations/20260909_002_oficina_central.js",
   "utf8",
@@ -84,13 +92,33 @@ assert.match(
 );
 
 assert.match(privateRoute, /esAdminGeneral/);
-assert.doesNotMatch(privateRoute, /includes\("DIRECCION"\)/);
-assert.doesNotMatch(privateRoute, /includes\("POLICIA JUDICIAL"\)/);
 assert.match(layout, /esAdminGeneral/);
-assert.doesNotMatch(layout, /includes\("DIRECCION"\)/);
-assert.doesNotMatch(layout, /includes\("POLICIA JUDICIAL"\)/);
 assert.match(activosFrontend, /puedeGestionarOficina/);
 assert.match(activosFrontend, /const puedeGestionar = puedeGestionarOficina\(usuario\)/);
+assert.match(solicitudesFrontend, /esAdminGeneral/);
+assert.match(solicitudesFrontend, /const esDireccion = esAdminGeneral\(usuario\)/);
+assert.match(historialPedidosFrontend, /esAdminGeneral/);
+assert.match(historialPedidosFrontend, /const esDireccion = esAdminGeneral\(usuario\)/);
+
+const collectFrontendSources = (directory) =>
+  fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return collectFrontendSources(fullPath);
+    return /\.(js|jsx)$/.test(entry.name) ? [fullPath] : [];
+  });
+
+const frontendRoot = path.resolve("inventario-frontend/src");
+const forbiddenFrontendPermission =
+  /includes\(\s*["'](?:DIRECCION|POLICIA JUDICIAL)["']\s*\)/;
+const frontendConPermisosPorNombre = collectFrontendSources(frontendRoot)
+  .filter((file) => forbiddenFrontendPermission.test(fs.readFileSync(file, "utf8")))
+  .map((file) => path.relative(process.cwd(), file));
+
+assert.deepStrictEqual(
+  frontendConPermisosPorNombre,
+  [],
+  `Frontend con permisos basados en nombre visible: ${frontendConPermisosPorNombre.join(", ")}`,
+);
 
 const routesDir = path.resolve("src/routes");
 const routeFiles = fs
