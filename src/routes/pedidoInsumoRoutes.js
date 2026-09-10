@@ -5,9 +5,11 @@ const {
   crearPedido,
   listarPedidos,
   actualizarProvision,
-  actualizarEstadoPedido,
   exportarPedidoPDF,
 } = require("../controllers/pedidoInsumoController");
+const {
+  actualizarEstadoPedidoSeguro,
+} = require("../controllers/pedidoEstadoController");
 
 const {
   verificarToken,
@@ -27,7 +29,7 @@ router.put(
   "/:id/estado",
   verificarToken,
   verificarAdminGeneral,
-  actualizarEstadoPedido,
+  actualizarEstadoPedidoSeguro,
 );
 
 module.exports = router;

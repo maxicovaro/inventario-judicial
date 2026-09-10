@@ -10,6 +10,11 @@ const {
 
 const { registrarBitacora } = require("../utils/bitacora");
 const { esAdminGeneral } = require("../utils/permisos");
+const {
+  iniciarTransaccionIdempotente,
+  completarIdempotencia,
+  responderReplay,
+} = require("../utils/idempotencia");
 
 const crearError = (mensaje, status = 400) => {
   const error = new Error(mensaje);
@@ -42,6 +47,7 @@ const validarMesAnio = (mes, anio) => {
 
 const registrarConsumoOficina = async (req, res) => {
   let transaction;
+  let operacionIdempotente;
 
   try {
     const {
@@ -53,7 +59,7 @@ const registrarConsumoOficina = async (req, res) => {
       observaciones,
     } = req.body;
 
-    if (!oficina_id || !insumo_id || !mes || !anio || !cantidad_consumida) {
+    if (!oficina_id || !insumo_id || !mes || !anio || cantidad_consumida === undefined || cantidad_consumida === null) {
       return res.status(400).json({
         mensaje:
           "Oficina, insumo, mes, año y cantidad consumida son obligatorios",
@@ -90,7 +96,19 @@ const registrarConsumoOficina = async (req, res) => {
       });
     }
 
-    transaction = await sequelize.transaction();
+    const inicio = await iniciarTransaccionIdempotente({
+      sequelize,
+      req,
+      scope: "consumo-oficina:create",
+    });
+
+    if (inicio.replay) {
+      responderReplay(res, inicio.replay);
+      return;
+    }
+
+    transaction = inicio.transaction;
+    operacionIdempotente = inicio.operacion;
 
     const oficina = await Oficina.findByPk(oficinaPermitida, {
       transaction,
@@ -124,7 +142,7 @@ const registrarConsumoOficina = async (req, res) => {
     if (!stockOficina) {
       throw crearError(
         `La oficina "${oficina.nombre}" no tiene stock asignado de "${insumo.nombre}"`,
-        400
+        400,
       );
     }
 
@@ -133,7 +151,7 @@ const registrarConsumoOficina = async (req, res) => {
     if (stockDisponible < cantidadNum) {
       throw crearError(
         `Stock insuficiente en la oficina. Disponible: ${stockDisponible}, requerido: ${cantidadNum}`,
-        400
+        400,
       );
     }
 
@@ -143,7 +161,7 @@ const registrarConsumoOficina = async (req, res) => {
       {
         cantidad: nuevoStockOficina,
       },
-      { transaction }
+      { transaction },
     );
 
     const consumo = await ConsumoOficina.create(
@@ -156,22 +174,8 @@ const registrarConsumoOficina = async (req, res) => {
         cantidad_consumida: cantidadNum,
         observaciones: observaciones?.trim() || null,
       },
-      { transaction }
+      { transaction },
     );
-
-    await transaction.commit();
-    transaction = null;
-
-    try {
-      await registrarBitacora({
-        usuario_id: req.usuario.id,
-        accion: "REGISTRAR_CONSUMO",
-        modulo: "CONSUMO_OFICINA",
-        descripcion: `Registró consumo de ${cantidadNum} unidad(es) de "${insumo.nombre}" en ${oficina.nombre} correspondiente a ${mes}/${anio}. Stock restante oficina: ${nuevoStockOficina}`,
-      });
-    } catch (errorBitacora) {
-      console.error("Error al registrar bitácora:", errorBitacora);
-    }
 
     const consumoCreado = await ConsumoOficina.findByPk(consumo.id, {
       include: [
@@ -188,13 +192,37 @@ const registrarConsumoOficina = async (req, res) => {
           attributes: ["id", "nombre", "apellido", "email"],
         },
       ],
+      transaction,
     });
 
-    return res.status(201).json({
+    const respuesta = {
       mensaje: "Consumo registrado correctamente",
       consumo: consumoCreado,
       stock_oficina: nuevoStockOficina,
+    };
+
+    await completarIdempotencia({
+      operacion: operacionIdempotente,
+      transaction,
+      status: 201,
+      body: respuesta,
     });
+
+    await transaction.commit();
+    transaction = null;
+
+    try {
+      await registrarBitacora({
+        usuario_id: req.usuario.id,
+        accion: "REGISTRAR_CONSUMO",
+        modulo: "CONSUMO_OFICINA",
+        descripcion: `Registró consumo de ${cantidadNum} unidad(es) de "${insumo.nombre}" en ${oficina.nombre} correspondiente a ${mes}/${anio}. Stock restante oficina: ${nuevoStockOficina}`,
+      });
+    } catch (errorBitacora) {
+      console.error("Error al registrar bitácora:", errorBitacora);
+    }
+
+    return res.status(201).json(respuesta);
   } catch (error) {
     if (transaction) {
       await transaction.rollback();
@@ -202,11 +230,14 @@ const registrarConsumoOficina = async (req, res) => {
 
     console.error("ERROR registrarConsumoOficina:", error);
 
-    return res.status(error.status || 500).json({
-      mensaje: error.status
-        ? error.message
-        : "Error al registrar consumo de oficina",
-      error: error.message,
+    if (error.status) {
+      return res.status(error.status).json({
+        mensaje: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      mensaje: "Error al registrar consumo de oficina",
     });
   }
 };
@@ -282,7 +313,6 @@ const listarConsumosOficina = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       mensaje: "Error al listar consumos de oficina",
-      error: error.message,
     });
   }
 };
@@ -363,29 +393,13 @@ const obtenerResumenConsumoPorOficina = async (req, res) => {
       order: [["id", "DESC"]],
     });
 
-    const resumen = consumos.reduce((acc, item) => {
-      const insumoId = item.insumo_id;
-
-      if (!acc[insumoId]) {
-        acc[insumoId] = {
-          insumo_id: insumoId,
-          nombre: item.Insumo?.nombre || "-",
-          categoria: item.Insumo?.categoria || "-",
-          unidad_medida: item.Insumo?.unidad_medida || "-",
-          total_consumido: 0,
-        };
-      }
-
-      acc[insumoId].total_consumido += Number(item.cantidad_consumida) || 0;
-
-      return acc;
-    }, {});
-
-    return res.status(200).json(Object.values(resumen));
+    return res.status(200).json({
+      oficina,
+      consumos,
+    });
   } catch (error) {
     return res.status(500).json({
       mensaje: "Error al obtener resumen de consumo",
-      error: error.message,
     });
   }
 };

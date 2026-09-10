@@ -6,6 +6,11 @@ const {
   esAdminGeneral,
   puedeGestionarOficina,
 } = require("../utils/permisos");
+const {
+  iniciarTransaccionIdempotente,
+  completarIdempotencia,
+  responderReplay,
+} = require("../utils/idempotencia");
 
 const registrarBitacoraSegura = async (datos) => {
   try {
@@ -13,6 +18,11 @@ const registrarBitacoraSegura = async (datos) => {
   } catch (error) {
     console.error("Error al registrar bitácora de activos:", error);
   }
+};
+
+const rollbackYResponder = async (transaction, res, status, body) => {
+  await transaction.rollback();
+  res.status(status).json(body);
 };
 
 const listarActivos = async (req, res) => {
@@ -49,6 +59,7 @@ const listarActivos = async (req, res) => {
 
 const crearActivo = async (req, res) => {
   let transaction;
+  let operacionIdempotente;
 
   try {
     if (!puedeGestionarOficina(req.usuario)) {
@@ -96,32 +107,55 @@ const crearActivo = async (req, res) => {
 
     const codigoFinal = codigo_interno ? codigo_interno.trim() : null;
 
+    const inicio = await iniciarTransaccionIdempotente({
+      sequelize,
+      req,
+      scope: "activo:create",
+    });
+
+    if (inicio.replay) {
+      responderReplay(res, inicio.replay);
+      return;
+    }
+
+    transaction = inicio.transaction;
+    operacionIdempotente = inicio.operacion;
+
     if (codigoFinal) {
       const existente = await Activo.findOne({
         where: { codigo_interno: codigoFinal },
+        transaction,
       });
 
       if (existente) {
-        return res.status(400).json({
+        await rollbackYResponder(transaction, res, 409, {
           mensaje: "Ya existe un activo con ese código interno",
         });
+        transaction = null;
+        return;
       }
     }
 
     const [categoria, oficina] = await Promise.all([
-      Categoria.findByPk(categoria_id),
-      Oficina.findByPk(oficinaFinal),
+      Categoria.findByPk(categoria_id, { transaction }),
+      Oficina.findByPk(oficinaFinal, { transaction }),
     ]);
 
     if (!categoria) {
-      return res.status(404).json({ mensaje: "Categoría no encontrada" });
+      await rollbackYResponder(transaction, res, 404, {
+        mensaje: "Categoría no encontrada",
+      });
+      transaction = null;
+      return;
     }
 
     if (!oficina) {
-      return res.status(404).json({ mensaje: "Oficina no encontrada" });
+      await rollbackYResponder(transaction, res, 404, {
+        mensaje: "Oficina no encontrada",
+      });
+      transaction = null;
+      return;
     }
-
-    transaction = await sequelize.transaction();
 
     const nuevoActivo = await Activo.create(
       {
@@ -153,6 +187,18 @@ const crearActivo = async (req, res) => {
       { transaction },
     );
 
+    const respuesta = {
+      mensaje: "Activo creado correctamente",
+      activo: nuevoActivo,
+    };
+
+    await completarIdempotencia({
+      operacion: operacionIdempotente,
+      transaction,
+      status: 201,
+      body: respuesta,
+    });
+
     await transaction.commit();
     transaction = null;
 
@@ -165,12 +211,23 @@ const crearActivo = async (req, res) => {
       }`,
     });
 
-    return res.status(201).json({
-      mensaje: "Activo creado correctamente",
-      activo: nuevoActivo,
-    });
+    return res.status(201).json(respuesta);
   } catch (error) {
     if (transaction) await transaction.rollback();
+
+    if (
+      error.name === "SequelizeUniqueConstraintError" ||
+      error.original?.code === "ER_DUP_ENTRY"
+    ) {
+      return res.status(409).json({
+        mensaje: "Ya existe un activo con ese código interno",
+      });
+    }
+
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.message });
+    }
+
     console.error("Error al crear activo:", error);
     return res.status(500).json({ mensaje: "Error al crear activo" });
   }
@@ -178,6 +235,7 @@ const crearActivo = async (req, res) => {
 
 const actualizarActivo = async (req, res) => {
   let transaction;
+  let operacionIdempotente;
 
   try {
     if (!puedeGestionarOficina(req.usuario)) {
@@ -210,31 +268,56 @@ const actualizarActivo = async (req, res) => {
       });
     }
 
-    const activoDb = await Activo.findByPk(id);
+    if (estado === "Dado de baja") {
+      return res.status(400).json({
+        mensaje: "La baja debe realizarse con la acción formal Dar de baja",
+      });
+    }
+
+    const inicio = await iniciarTransaccionIdempotente({
+      sequelize,
+      req,
+      scope: "activo:update",
+    });
+
+    if (inicio.replay) {
+      responderReplay(res, inicio.replay);
+      return;
+    }
+
+    transaction = inicio.transaction;
+    operacionIdempotente = inicio.operacion;
+
+    const activoDb = await Activo.findByPk(id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
 
     if (!activoDb) {
-      return res.status(404).json({ mensaje: "Activo no encontrado" });
+      await rollbackYResponder(transaction, res, 404, {
+        mensaje: "Activo no encontrado",
+      });
+      transaction = null;
+      return;
     }
 
     if (activoDb.activo === false || activoDb.estado === "Dado de baja") {
-      return res.status(409).json({
+      await rollbackYResponder(transaction, res, 409, {
         mensaje: "El activo está dado de baja y no puede modificarse",
       });
+      transaction = null;
+      return;
     }
 
     if (
       !direccion &&
       String(activoDb.oficina_id) !== String(req.usuario.oficina_id)
     ) {
-      return res.status(403).json({
+      await rollbackYResponder(transaction, res, 403, {
         mensaje: "No tenés permisos para modificar activos de otra oficina",
       });
-    }
-
-    if (estado === "Dado de baja") {
-      return res.status(400).json({
-        mensaje: "La baja debe realizarse con la acción formal Dar de baja",
-      });
+      transaction = null;
+      return;
     }
 
     const codigoFinal =
@@ -250,12 +333,15 @@ const actualizarActivo = async (req, res) => {
           codigo_interno: codigoFinal,
           id: { [Op.ne]: id },
         },
+        transaction,
       });
 
       if (existente) {
-        return res.status(400).json({
+        await rollbackYResponder(transaction, res, 409, {
           mensaje: "Ya existe un activo con ese código interno",
         });
+        transaction = null;
+        return;
       }
     }
 
@@ -267,23 +353,29 @@ const actualizarActivo = async (req, res) => {
       : req.usuario.oficina_id;
 
     const [categoria, oficina] = await Promise.all([
-      Categoria.findByPk(categoriaFinal),
-      Oficina.findByPk(oficinaFinal),
+      Categoria.findByPk(categoriaFinal, { transaction }),
+      Oficina.findByPk(oficinaFinal, { transaction }),
     ]);
 
     if (!categoria) {
-      return res.status(404).json({ mensaje: "Categoría no encontrada" });
+      await rollbackYResponder(transaction, res, 404, {
+        mensaje: "Categoría no encontrada",
+      });
+      transaction = null;
+      return;
     }
 
     if (!oficina) {
-      return res.status(404).json({ mensaje: "Oficina no encontrada" });
+      await rollbackYResponder(transaction, res, 404, {
+        mensaje: "Oficina no encontrada",
+      });
+      transaction = null;
+      return;
     }
 
     const nuevoEstado = estado !== undefined ? estado : activoDb.estado;
     const traslado = String(oficinaAnterior) !== String(oficinaFinal);
     const cambioEstado = estadoAnterior !== nuevoEstado;
-
-    transaction = await sequelize.transaction();
 
     await activoDb.update(
       {
@@ -346,6 +438,18 @@ const actualizarActivo = async (req, res) => {
       { transaction },
     );
 
+    const respuesta = {
+      mensaje: "Activo actualizado correctamente",
+      activo: activoDb,
+    };
+
+    await completarIdempotencia({
+      operacion: operacionIdempotente,
+      transaction,
+      status: 200,
+      body: respuesta,
+    });
+
     await transaction.commit();
     transaction = null;
 
@@ -358,12 +462,23 @@ const actualizarActivo = async (req, res) => {
       }`,
     });
 
-    return res.status(200).json({
-      mensaje: "Activo actualizado correctamente",
-      activo: activoDb,
-    });
+    return res.status(200).json(respuesta);
   } catch (error) {
     if (transaction) await transaction.rollback();
+
+    if (
+      error.name === "SequelizeUniqueConstraintError" ||
+      error.original?.code === "ER_DUP_ENTRY"
+    ) {
+      return res.status(409).json({
+        mensaje: "Ya existe un activo con ese código interno",
+      });
+    }
+
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.message });
+    }
+
     console.error("Error al actualizar activo:", error);
     return res.status(500).json({ mensaje: "Error al actualizar activo" });
   }
@@ -371,26 +486,51 @@ const actualizarActivo = async (req, res) => {
 
 const darDeBajaActivo = async (req, res) => {
   let transaction;
+  let operacionIdempotente;
 
   try {
-    const direccion = esAdminGeneral(req.usuario);
-
-    if (!direccion) {
-      return res.status(403).json({ mensaje: "Solo Dirección puede dar de baja activos" });
+    if (!esAdminGeneral(req.usuario)) {
+      return res.status(403).json({
+        mensaje: "Solo Dirección puede dar de baja activos",
+      });
     }
 
     const { id } = req.params;
-    const activoDb = await Activo.findByPk(id);
+
+    const inicio = await iniciarTransaccionIdempotente({
+      sequelize,
+      req,
+      scope: "activo:baja",
+    });
+
+    if (inicio.replay) {
+      responderReplay(res, inicio.replay);
+      return;
+    }
+
+    transaction = inicio.transaction;
+    operacionIdempotente = inicio.operacion;
+
+    const activoDb = await Activo.findByPk(id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
 
     if (!activoDb) {
-      return res.status(404).json({ mensaje: "Activo no encontrado" });
+      await rollbackYResponder(transaction, res, 404, {
+        mensaje: "Activo no encontrado",
+      });
+      transaction = null;
+      return;
     }
 
     if (activoDb.activo === false || activoDb.estado === "Dado de baja") {
-      return res.status(409).json({ mensaje: "El activo ya está dado de baja" });
+      await rollbackYResponder(transaction, res, 409, {
+        mensaje: "El activo ya está dado de baja",
+      });
+      transaction = null;
+      return;
     }
-
-    transaction = await sequelize.transaction();
 
     await activoDb.update(
       {
@@ -411,6 +551,18 @@ const darDeBajaActivo = async (req, res) => {
       { transaction },
     );
 
+    const respuesta = {
+      mensaje: "Activo dado de baja correctamente",
+      activo: activoDb,
+    };
+
+    await completarIdempotencia({
+      operacion: operacionIdempotente,
+      transaction,
+      status: 200,
+      body: respuesta,
+    });
+
     await transaction.commit();
     transaction = null;
 
@@ -423,12 +575,14 @@ const darDeBajaActivo = async (req, res) => {
       }`,
     });
 
-    return res.status(200).json({
-      mensaje: "Activo dado de baja correctamente",
-      activo: activoDb,
-    });
+    return res.status(200).json(respuesta);
   } catch (error) {
     if (transaction) await transaction.rollback();
+
+    if (error.status) {
+      return res.status(error.status).json({ mensaje: error.message });
+    }
+
     console.error("Error al dar de baja activo:", error);
     return res.status(500).json({ mensaje: "Error al dar de baja activo" });
   }
