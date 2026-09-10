@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import api from "../api/axios";
 import { loginSchema } from "../schemas/loginSchema";
+import { Alert, Button, Field } from "../components/ui";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -31,26 +32,21 @@ export default function Login() {
 
       localStorage.removeItem("token");
       localStorage.removeItem("usuario");
-
       localStorage.setItem("token", response.data.token);
 
       const usuarioBackend = response.data.usuario || {};
-
       const usuarioNormalizado = {
         ...usuarioBackend,
-
         role:
           usuarioBackend.role ||
           usuarioBackend.rol ||
           usuarioBackend.Role?.nombre ||
           "",
-
         oficina_id:
           usuarioBackend.oficina_id ||
           usuarioBackend.Oficina?.id ||
           usuarioBackend.oficina?.id ||
           null,
-
         oficina_nombre:
           usuarioBackend.oficina_nombre ||
           usuarioBackend.Oficina?.nombre ||
@@ -59,7 +55,6 @@ export default function Login() {
       };
 
       localStorage.setItem("usuario", JSON.stringify(usuarioNormalizado));
-
       navigate("/dashboard");
     } catch (err) {
       setErrorGeneral(
@@ -96,9 +91,7 @@ export default function Login() {
           </p>
         </div>
 
-        <p className="login-hero-footer">
-          Acceso exclusivo para personal autorizado.
-        </p>
+        <p className="login-hero-footer">Acceso exclusivo para personal autorizado.</p>
       </section>
 
       <section className="login-panel" aria-labelledby="login-title">
@@ -112,15 +105,13 @@ export default function Login() {
             </p>
           </header>
 
-          <form
-            onSubmit={handleSubmit(onSubmit)}
-            className="login-form"
-            noValidate
-          >
-            <div className="ui-field">
-              <label className="ui-label" htmlFor="email">
-                Correo electrónico
-              </label>
+          <form onSubmit={handleSubmit(onSubmit)} className="login-form" noValidate>
+            <Field
+              label="Correo electrónico"
+              htmlFor="email"
+              error={errors.email}
+              errorId="email-error"
+            >
               <input
                 id="email"
                 type="email"
@@ -131,17 +122,14 @@ export default function Login() {
                 {...register("email")}
                 className="ui-control"
               />
-              {errors.email && (
-                <p className="ui-field-error" id="email-error" role="alert">
-                  {errors.email.message}
-                </p>
-              )}
-            </div>
+            </Field>
 
-            <div className="ui-field">
-              <label className="ui-label" htmlFor="password">
-                Contraseña
-              </label>
+            <Field
+              label="Contraseña"
+              htmlFor="password"
+              error={errors.password}
+              errorId="password-error"
+            >
               <input
                 id="password"
                 type="password"
@@ -152,28 +140,23 @@ export default function Login() {
                 {...register("password")}
                 className="ui-control"
               />
-              {errors.password && (
-                <p className="ui-field-error" id="password-error" role="alert">
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
+            </Field>
 
             {errorGeneral && (
-              <div className="ui-alert ui-alert--danger" role="alert">
+              <Alert tone="danger">
                 <span aria-hidden="true">!</span>
                 <span>{errorGeneral}</span>
-              </div>
+              </Alert>
             )}
 
-            <button
+            <Button
               type="submit"
-              className="ui-button ui-button--primary login-submit"
+              className="login-submit"
               disabled={cargando}
-              aria-busy={cargando}
+              busy={cargando}
             >
               {cargando ? "Ingresando..." : "Ingresar"}
-            </button>
+            </Button>
           </form>
 
           <div className="login-security-note">
