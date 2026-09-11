@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 11/09/2026 para registrar el cierre definitivo de P6.1 después de su integración a `main` y del Quality Gate post-merge #151 en verde.
+> Actualizada al 11/09/2026 para registrar el cierre definitivo de P6.1 y la apertura formal de P7 — staging y despliegue controlado.
 
 Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión completa, Quality Gate y validación local cuando involucra base de datos o entorno de ejecución. Los PR documentan la evidencia de cada cambio, pero este archivo define **el estado consolidado y el próximo punto de continuidad**.
 
@@ -18,8 +18,8 @@ Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión compl
 | E2E/regresiones P5 | ✅ Completo | Se ejecuta en CI |
 | Concurrencia/idempotencia P6 | ✅ Completo | Se ejecuta en CI |
 | Frontend Bloques A–E | ✅ Integrado a `main` | Merge `0cb1f528...` |
-| P6.1 seguridad pre-staging | ✅ Integrado y cerrado | PR #13; merge `3ec6492...`; Gate #151 verde |
-| P7 staging/despliegue | ⏳ Siguiente | Condiciones de apertura cumplidas; iniciar desde `main` |
+| P6.1 seguridad pre-staging | ✅ Integrado y cerrado | PR #13; merge `3ec6492...`; Gate #151/#153 verde |
+| P7 staging/despliegue | 🟡 En curso | P7.1 en `ops/p7-staging-deploy`; falta staging real P7.2 |
 | P8 rendimiento/escalabilidad | ⏳ Pendiente | Después de staging estable |
 | P9 piloto | ⏳ Pendiente | Después de P7/P8 |
 
@@ -67,7 +67,7 @@ Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión compl
 ### P6 — Consistencia, concurrencia e idempotencia ✅
 - Operaciones simultáneas de stock/pedidos protegidas.
 - Suite de concurrencia/idempotencia incluida en Quality Gate.
-- Migración 003 validada en base descartable antes de integración.
+- Migración 003 validada de forma idempotente.
 - Operaciones sensibles preparadas para claves de idempotencia donde corresponde.
 
 ### P6.1 — Cierre de seguridad pre-staging ✅
@@ -97,6 +97,8 @@ Evidencia de cierre definitivo:
 - Quality Gate pre-merge #150: **verde**;
 - PR #13 mergeado mediante merge commit `3ec6492a9a1c257c232fafef1e64d1ae5920dc9a`;
 - Quality Gate post-merge #151 sobre `main`: **verde**, incluido Chromium E2E;
+- cierre documental PR #19 integrado en `0cbfcd0e83f9cae95e5a6a8e3859202ac366d6b9`;
+- Quality Gate post-cierre #153 sobre ese `main`: **verde**, incluido Chromium E2E;
 - PR #16 fue únicamente evidencia de integración temporal y quedó **cerrado sin merge**.
 
 El detalle contractual queda en `docs/backend-security-architecture.md` y `docs/frontend-design-system.md`.
@@ -149,25 +151,49 @@ Integración UX final:
 
 Detalles de frontend: `docs/frontend-design-system.md`.
 
-## Próximos bloques
+## Bloque activo
 
-### P7 — Staging y despliegue controlado ⏳
+### P7 — Staging y despliegue controlado 🟡
 
-**Próximo bloque. Las condiciones de apertura quedaron cumplidas el 11/09/2026: PR #13 integrado, `main` en `3ec6492a9a1c257c232fafef1e64d1ae5920dc9a` y Quality Gate post-merge #151 verde.**
+**Rama activa:** `ops/p7-staging-deploy`.
 
-Antes de comenzar implementación de P7, partir del `main` vigente y conservar como criterio de entrada que P6.1 permanece verde e integrado.
+Condiciones de apertura verificadas el 11/09/2026:
+- P6.1 integrado y documentado;
+- `main` de apertura: `0cbfcd0e83f9cae95e5a6a8e3859202ac366d6b9`;
+- Quality Gate #153 sobre ese `main`: **verde**, incluido Chromium E2E;
+- `ROADMAP.md` releído antes de iniciar P7.
 
-Alcance previsto:
-- entorno de staging físicamente/lógicamente separado;
-- MySQL de staging separado de datos reales;
-- variables y secretos por ambiente;
-- política de cookies/orígenes adecuada al dominio real de staging;
-- `trust proxy` definido según la infraestructura real;
-- migraciones controladas con preflight y backup;
-- procedimiento reproducible de deploy y rollback;
-- smoke tests post-deploy;
-- verificación `/health/live` y `/health/ready`;
-- observabilidad mínima del entorno.
+#### P7.1 — contrato y guardas reproducibles
+
+Objetivo de la primera entrega:
+- staging mantiene `NODE_ENV=production` y usa `DEPLOY_ENV=staging` como etiqueta operativa;
+- plantillas de variables separadas para backend/frontend;
+- secretos y MySQL exclusivos por ambiente;
+- preflight que rechaza configuraciones inseguras o ambiguas;
+- `TRUST_PROXY_HOPS` explícito;
+- identidad `environment`/`revision` en health;
+- migraciones protegidas por backup verificado y asociado a la DB correcta;
+- smoke post-deploy para frontend, health, sesión sin autenticar y CORS;
+- runbook reproducible y rollback documentado;
+- pruebas automáticas de los contratos de staging.
+
+P7.1 **no cierra P7** por sí solo.
+
+#### P7.2 — staging real
+
+Para cerrar P7 todavía se deberá:
+- aprovisionar un entorno de staging físicamente/lógicamente separado;
+- crear/configurar MySQL de staging sin datos reales de producción;
+- definir dominios/orígenes HTTPS reales;
+- cargar secretos exclusivos del entorno;
+- verificar `TRUST_PROXY_HOPS` contra la topología efectiva;
+- ejecutar preflight, backup, migración y deploy desde un commit identificado;
+- ejecutar `/health/live`, `/health/ready` y smoke post-deploy sobre el host real;
+- comprobar acceso a logs/observabilidad mínima;
+- probar o simular rollback de forma controlada;
+- registrar evidencia en `docs/STAGING.md`, `docs/OPERATIONS.md` y este `ROADMAP.md` antes del cierre.
+
+No iniciar P8 mientras P7 permanezca en curso.
 
 ### P8 — Escalabilidad y rendimiento ⏳
 - Medición de consultas y endpoints críticos.
@@ -201,6 +227,7 @@ No abrir estos puntos como bloques paralelos mientras P7 esté en curso, salvo q
 - **Frontend / UX / Design System / contrato auth cliente:** `docs/frontend-design-system.md`.
 - **Backend / autenticación / autorización / P6.1:** `docs/backend-security-architecture.md`.
 - **Operación, backup, restore e incidentes:** `docs/OPERATIONS.md`.
+- **Staging, preflight, deploy, smoke y rollback:** `docs/STAGING.md`.
 - **Evidencia de implementación:** commits, PRs y Quality Gates.
 
 Si existe contradicción entre un PR histórico y esta hoja de ruta, debe verificarse el estado real de `main` y actualizarse este documento en el siguiente PR de continuidad.
