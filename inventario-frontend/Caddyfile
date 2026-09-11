@@ -23,7 +23,11 @@
     reverse_proxy {$BACKEND_INTERNAL_URL}
   }
 
-  handle /health {
+  handle /health/* {
+    reverse_proxy {$BACKEND_INTERNAL_URL}
+  }
+
+  handle /frontend-health {
     respond "ok" 200
   }
 
