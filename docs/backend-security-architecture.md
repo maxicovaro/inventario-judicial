@@ -2,7 +2,7 @@
 
 Este documento resume la arquitectura de backend, autenticación, autorización, consistencia y seguridad del Sistema de Inventario Judicial y deja consolidado el contrato de P6.1 antes de staging.
 
-Estado de referencia: 11/09/2026. P6.1 validado en PR #13 con Quality Gate #148 verde.
+Estado de referencia: 11/09/2026. P6.1 integrado mediante PR #13, merge commit `3ec6492a9a1c257c232fafef1e64d1ae5920dc9a`, con Quality Gate post-merge #151 verde.
 
 ## 1. Alcance
 
@@ -81,9 +81,13 @@ La adopción desde el frontend no debe hacerse como cambio aislado: debe coordin
 
 PR de cierre: #13, rama `security/prestaging-hardening`.
 
-La implementación fue reconciliada con el `main` vigente `45ae8ad48d050390aa87ea9ad646bb79410f6ceb` y con el frontend A–E final. El HEAD de implementación previo al cierre documental fue `b2e8d935d135a1966078b75faeeae435aedd0cb6`.
+La implementación fue reconciliada con el `main` vigente `45ae8ad48d050390aa87ea9ad646bb79410f6ceb` y con el frontend A–E final. El HEAD final del PR fue `541c44c122ded5926f32810bcb95c3e3e4317fcd`.
 
-Quality Gate #148: **verde**, incluyendo frontend lint/build, audit backend, sintaxis/tests, migraciones 001–005 y rerun, integración MySQL, auth hardening, MFA ADMIN, P6 concurrencia/idempotencia, health, backup/restore y Chromium E2E.
+Evidencia final:
+- Quality Gate de implementación #148: **verde**;
+- Quality Gate pre-merge final #150: **verde**;
+- PR #13 integrado mediante merge commit `3ec6492a9a1c257c232fafef1e64d1ae5920dc9a`;
+- Quality Gate post-merge #151 sobre `main`: **verde**, incluyendo frontend lint/build, audit backend, sintaxis/tests, migraciones 001–005 y rerun, integración MySQL, auth hardening, MFA ADMIN, P6 concurrencia/idempotencia, health, backup/restore y Chromium E2E.
 
 ### 6.1 Transporte de sesión
 
@@ -212,7 +216,7 @@ Antes de mergear un cambio de autenticación/autorización deben pasar:
 - backup/restore;
 - E2E Chromium.
 
-P6.1 cumplió esta matriz en Quality Gate #148. No considerar suficiente un lint/build frontend para futuros cambios de seguridad.
+P6.1 cumplió esta matriz antes del merge y volvió a cumplirla en `main` mediante Quality Gate post-merge #151. No considerar suficiente un lint/build frontend para futuros cambios de seguridad.
 
 ## 13. Integración final con frontend
 
@@ -234,11 +238,11 @@ La capa agregada incorpora:
 - setup/verificación MFA y códigos de recuperación;
 - E2E específicos de cookie, MFA y navegación.
 
-PR #16 fue un frente temporal de validación y **NO debe mergearse**.
+PR #16 fue un frente temporal de validación y quedó **cerrado sin merge** después de la integración definitiva de PR #13.
 
 ## 14. Continuidad hacia P7
 
-P7 es el próximo bloque y solo se abre desde `main` después de integrar PR #13 y confirmar que Git/CI quedaron alineados.
+P7 es el próximo bloque. Sus condiciones de entrada quedaron satisfechas el 11/09/2026: PR #13 está integrado a `main`, el merge commit es `3ec6492a9a1c257c232fafef1e64d1ae5920dc9a` y el Quality Gate post-merge #151 terminó verde.
 
 Antes de staging deben definirse con la infraestructura real:
 - dominio/origin de staging;
