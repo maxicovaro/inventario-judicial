@@ -146,8 +146,11 @@ assert.match(stagingExample, /REQUIRE_ADMIN_MFA=true/);
 assert.match(stagingExample, /PRODUCTION_DB_NAME=/);
 assert.match(frontendStagingExample, /VITE_API_URL=\/api/);
 
-assert.match(backendDockerfile, /FROM node:22-alpine/);
-assert.match(backendDockerfile, /mariadb-client/);
+assert.match(backendDockerfile, /FROM node:22-bookworm-slim/);
+assert.match(backendDockerfile, /repo\.mysql\.com\/apt\/debian/);
+assert.match(backendDockerfile, /mysql-8\.0/);
+assert.match(backendDockerfile, /mysql-community-client/);
+assert.doesNotMatch(backendDockerfile, /mariadb-client/);
 assert.match(backendDockerfile, /CMD \["npm", "start"\]/);
 assert.doesNotMatch(backendDockerfile, /db:migrate/);
 assert.match(dockerignore, /^storage\/uploads$/m);
