@@ -62,6 +62,20 @@ Contiene:
 - recuperación y rollback;
 - checklist previo a migración/deploy.
 
+### 5. Staging y despliegue
+
+`STAGING.md`
+
+Contiene:
+- contrato production-like de staging;
+- separación de MySQL y secretos;
+- HTTPS/CORS/cookie y topología de proxy;
+- preflight bloqueante;
+- migración protegida por backup verificado;
+- smoke tests post-deploy;
+- procedimiento de rollback;
+- evidencia requerida para cerrar P7.
+
 ## Evidencia técnica
 
 La documentación anterior define el estado consolidado. La evidencia detallada de que un cambio fue implementado/validado vive en:
@@ -80,7 +94,8 @@ Para retomar el proyecto después de una pausa:
 2. Revisar el PR activo indicado allí.
 3. Leer el documento técnico del frente afectado.
 4. Consultar `OPERATIONS.md` si hay base de datos, despliegue o incidente involucrado.
-5. Verificar último Quality Gate antes de modificar/integrar.
+5. Para P7/staging, consultar además `STAGING.md`.
+6. Verificar último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
 
