@@ -6,6 +6,7 @@ import "./styles/design-system.css";
 import "./styles/ui-kit.css";
 import "./styles/admina-refresh.css";
 import "./styles/admina-modules.css";
+import "./styles/admina-premerge-fixes.css";
 
 export default function App() {
   return (
