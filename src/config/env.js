@@ -25,6 +25,26 @@ const numeroPositivo = (nombre, valor, fallback) => {
   return candidato;
 };
 
+const numeroNoNegativo = (nombre, valor, fallback) => {
+  const candidato = valor === undefined || valor === "" ? fallback : Number(valor);
+  if (!Number.isInteger(candidato) || candidato < 0) {
+    throw new Error(`${nombre} debe ser un entero mayor o igual a cero`);
+  }
+  return candidato;
+};
+
+const transportesAuthPermitidos = new Set(["hybrid", "cookie"]);
+const authTokenTransport = String(
+  process.env.AUTH_TOKEN_TRANSPORT ||
+    (NODE_ENV === "production" ? "cookie" : "hybrid"),
+)
+  .trim()
+  .toLowerCase();
+
+if (!transportesAuthPermitidos.has(authTokenTransport)) {
+  throw new Error("AUTH_TOKEN_TRANSPORT debe ser hybrid o cookie");
+}
+
 const env = {
   NODE_ENV,
   IS_PRODUCTION: NODE_ENV === "production",
@@ -38,6 +58,22 @@ const env = {
   CORS_ORIGIN:
     process.env.CORS_ORIGIN?.trim() ||
     (NODE_ENV === "development" ? "http://localhost:5173" : ""),
+  AUTH_TOKEN_TRANSPORT: authTokenTransport,
+  TRUST_PROXY_HOPS: numeroNoNegativo(
+    "TRUST_PROXY_HOPS",
+    process.env.TRUST_PROXY_HOPS,
+    0,
+  ),
+  LOGIN_RATE_LIMIT_WINDOW_MS: numeroPositivo(
+    "LOGIN_RATE_LIMIT_WINDOW_MS",
+    process.env.LOGIN_RATE_LIMIT_WINDOW_MS,
+    10 * 60 * 1000,
+  ),
+  LOGIN_RATE_LIMIT_MAX: numeroPositivo(
+    "LOGIN_RATE_LIMIT_MAX",
+    process.env.LOGIN_RATE_LIMIT_MAX,
+    20,
+  ),
   HEALTH_DB_TIMEOUT_MS: numeroPositivo(
     "HEALTH_DB_TIMEOUT_MS",
     process.env.HEALTH_DB_TIMEOUT_MS,
@@ -57,6 +93,12 @@ if (env.IS_PRODUCTION && !env.CORS_ORIGIN) {
 if (env.IS_PRODUCTION && Buffer.byteLength(env.JWT_SECRET, "utf8") < 32) {
   throw new Error(
     "JWT_SECRET debe tener al menos 32 bytes en production",
+  );
+}
+
+if (env.IS_PRODUCTION && env.AUTH_TOKEN_TRANSPORT !== "cookie") {
+  throw new Error(
+    "AUTH_TOKEN_TRANSPORT debe ser cookie en production para evitar exponer JWT al navegador",
   );
 }
 

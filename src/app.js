@@ -3,6 +3,8 @@ const cors = require("cors");
 const env = require("./config/env");
 const { requestContext } = require("./middlewares/requestContext");
 const { securityHeaders } = require("./middlewares/securityHeaders");
+const { authCookieBridge } = require("./middlewares/authCookieBridge");
+const { trustedOrigin } = require("./middlewares/trustedOrigin");
 const {
   safeErrorResponses,
   globalErrorHandler,
@@ -32,13 +34,19 @@ const bitacoraRoutes = require("./routes/bitacoraRoutes");
 const app = express();
 
 app.disable("x-powered-by");
+if (env.TRUST_PROXY_HOPS > 0) {
+  app.set("trust proxy", env.TRUST_PROXY_HOPS);
+}
 app.use(requestContext);
 app.use(securityHeaders);
 app.use(
   cors({
     origin: env.CORS_ORIGIN,
+    credentials: true,
   }),
 );
+app.use(authCookieBridge);
+app.use(trustedOrigin);
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 app.use(safeErrorResponses);
