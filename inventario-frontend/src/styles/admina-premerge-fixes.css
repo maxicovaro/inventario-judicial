@@ -77,6 +77,65 @@
   white-space: normal;
 }
 
+/*
+ * Contraste AA.
+ * Admina usa grises muy suaves; en este sistema institucional el texto pequeño
+ * debe conservar una relación >= 4.5:1 sobre las superficies claras.
+ */
+.app-shell {
+  --color-text-muted: #646b7c;
+  --color-text-soft: #687082;
+}
+
+.app-shell .app-brand-subtitle,
+.app-shell .app-sidebar-section-title,
+.app-shell .app-sidebar-user-role,
+.app-shell .app-topbar-context,
+.app-shell .ui-page-description,
+.app-shell .ui-stat-card-label,
+.app-shell .ui-stat-card-detail,
+.app-shell .ui-section-description,
+.app-shell .ui-table th,
+.app-shell .dashboard-page .dashboard-list-meta,
+.app-shell .dashboard-page .dashboard-chart-legend li,
+.app-shell .assets-page .assets-stat-label,
+.app-shell .assets-page .assets-stat-detail,
+.app-shell .assets-page .assets-primary-code,
+.app-shell .assets-page .assets-muted,
+.app-shell .ops-card__description,
+.app-shell .ops-meta__scope,
+.app-shell .ops-muted,
+.app-shell .ops-primary__meta,
+.app-shell .admin-request-id,
+.app-shell .admin-data-label,
+.app-shell .order-history-meta,
+.app-shell .notification-message,
+.app-shell .notification-date,
+.app-shell .report-row-label,
+.app-shell .admin-scope-note,
+.app-shell .admin-primary-subtitle,
+.app-shell .admin-muted,
+.app-shell .admin-security-detail,
+.app-shell .admin-date-cell,
+.app-shell .admin-pagination-copy,
+.app-shell .attachment-panel__subtitle,
+.app-shell .attachment-panel__meta {
+  color: var(--color-text-muted);
+}
+
+/* Los límites de inputs/selects deben ser perceptibles incluso sin foco. */
+.app-shell .ui-control {
+  border-color: #858d9f;
+}
+
+.app-shell .ui-control:hover:not(:disabled) {
+  border-color: #747d90;
+}
+
+.app-shell .ui-control:focus {
+  border-color: var(--admina-primary);
+}
+
 @media (max-width: 1220px) {
   .app-shell .admin-summary ~ .admin-card .admin-toolbar,
   .app-shell .admin-summary ~ .admin-card .admin-toolbar--audit {
