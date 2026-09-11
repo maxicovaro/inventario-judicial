@@ -1,23 +1,43 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  PageHeader,
+  StatCard,
+  TableFrame,
+} from "../components/ui";
 import { esAdminGeneral } from "../utils/permisos";
+import "../styles/admin-flows.css";
 
+const estadoTone = (estado) => {
+  if (estado === "APROBADO" || estado === "ENTREGADO") return "success";
+  if (estado === "RECHAZADO") return "danger";
+  if (estado === "EN_REVISION") return "warning";
+  if (estado === "ENVIADO") return "info";
+  return "neutral";
+};
 
 export default function HistorialPedidos() {
   const [pedidos, setPedidos] = useState([]);
   const [error, setError] = useState("");
   const [pedidoAbierto, setPedidoAbierto] = useState(null);
   const [provisiones, setProvisiones] = useState({});
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
+  const [filtroOficina, setFiltroOficina] = useState("");
 
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-
   const esDireccion = esAdminGeneral(usuario);
 
   const cargarPedidos = async () => {
     try {
       setError("");
-
       const response = await api.get("/pedidos-insumos");
       setPedidos(response.data || []);
     } catch (err) {
@@ -33,30 +53,37 @@ export default function HistorialPedidos() {
     cargarPedidos();
   }, []);
 
-  const getEstadoStyle = (estado) => {
-    switch (estado) {
-      case "BORRADOR":
-        return { background: "#f3f4f6", color: "#374151" };
-      case "ENVIADO":
-        return { background: "#dbeafe", color: "#1e40af" };
-      case "EN_REVISION":
-        return { background: "#fef3c7", color: "#92400e" };
-      case "APROBADO":
-        return { background: "#d1fae5", color: "#065f46" };
-      case "ENTREGADO":
-        return { background: "#dcfce7", color: "#166534" };
-      case "RECHAZADO":
-        return { background: "#fee2e2", color: "#991b1b" };
-      default:
-        return { background: "#f3f4f6", color: "#111827" };
-    }
-  };
+  const oficinas = useMemo(
+    () => [...new Set(pedidos.map((pedido) => pedido.Oficina?.nombre).filter(Boolean))].sort(),
+    [pedidos],
+  );
+
+  const resumen = useMemo(() => ({
+    total: pedidos.length,
+    enviados: pedidos.filter((p) => p.estado === "ENVIADO").length,
+    revision: pedidos.filter((p) => p.estado === "EN_REVISION").length,
+    entregados: pedidos.filter((p) => p.estado === "ENTREGADO").length,
+  }), [pedidos]);
+
+  const pedidosFiltrados = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
+    return pedidos.filter((pedido) => {
+      const coincideBusqueda =
+        !texto ||
+        String(pedido.id).includes(texto) ||
+        pedido.Oficina?.nombre?.toLowerCase().includes(texto) ||
+        pedido.Usuario?.nombre?.toLowerCase().includes(texto) ||
+        pedido.Usuario?.apellido?.toLowerCase().includes(texto) ||
+        String(pedido.mes).includes(texto) ||
+        String(pedido.anio).includes(texto);
+      const coincideEstado = !filtroEstado || pedido.estado === filtroEstado;
+      const coincideOficina = !filtroOficina || pedido.Oficina?.nombre === filtroOficina;
+      return coincideBusqueda && coincideEstado && coincideOficina;
+    });
+  }, [pedidos, busqueda, filtroEstado, filtroOficina]);
 
   const handleProvisionChange = (detalleId, valor) => {
-    setProvisiones((prev) => ({
-      ...prev,
-      [detalleId]: valor,
-    }));
+    setProvisiones((prev) => ({ ...prev, [detalleId]: valor }));
   };
 
   const cambiarEstado = async (pedidoId, estado) => {
@@ -96,7 +123,6 @@ export default function HistorialPedidos() {
       };
 
       await api.put(`/pedidos-insumos/${pedidoId}/proveer`, payload);
-
       alert("Provisión guardada correctamente");
       await cargarPedidos();
       setProvisiones({});
@@ -114,7 +140,6 @@ export default function HistorialPedidos() {
       const response = await api.get(`/pedidos-insumos/${pedidoId}/pdf`, {
         responseType: "blob",
       });
-
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
@@ -122,377 +147,179 @@ export default function HistorialPedidos() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-    } catch (err) {
+      window.URL.revokeObjectURL(url);
+    } catch {
       alert("Error al descargar PDF");
     }
   };
 
   return (
     <Layout>
-      <h1 style={styles.titulo}>Historial de pedidos mensuales</h1>
+      <div className="ui-page admin-page">
+        <PageHeader
+          eyebrow="Abastecimiento"
+          title="Historial de pedidos mensuales"
+          description={
+            esDireccion
+              ? "Revisá pedidos, tomá decisiones, registrá la provisión y conservá trazabilidad de cada entrega."
+              : "Consultá el estado, detalle y documentación de los pedidos enviados por tu dependencia."
+          }
+        />
 
-      {error && <p style={styles.error}>{error}</p>}
+        <section className="admin-summary-grid" aria-label="Resumen de pedidos">
+          <StatCard label="Pedidos" value={resumen.total} detail="Total visible" />
+          <StatCard label="Enviados" value={resumen.enviados} detail="Esperan revisión" tone="info" />
+          <StatCard label="En revisión" value={resumen.revision} detail="Gestión administrativa" tone="warning" />
+          <StatCard label="Entregados" value={resumen.entregados} detail="Ciclo completado" tone="success" />
+        </section>
 
-      {pedidos.length === 0 ? (
-        <div style={styles.card}>
-          <p>No hay pedidos registrados.</p>
-        </div>
-      ) : (
-        <div style={styles.listado}>
-          {pedidos.map((pedido) => {
-            const detalles = pedido.PedidoInsumoDetalles || [];
+        {error && <Alert tone="danger">{error}</Alert>}
 
-            return (
-              <div key={pedido.id} style={styles.card}>
-                <div style={styles.headerRow}>
-                  <div>
-                    <h3 style={styles.cardTitle}>
-                      Pedido #{pedido.id} — {pedido.mes}/{pedido.anio}
-                    </h3>
+        <Card className="admin-card">
+          <div className="order-history-toolbar">
+            <Field label="Buscar" htmlFor="buscar-historial-pedidos">
+              <input
+                id="buscar-historial-pedidos"
+                type="search"
+                className="ui-control"
+                placeholder="Buscar por ID, oficina, usuario o período..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+              />
+            </Field>
+            <Field label="Estado" htmlFor="filtro-estado-pedidos">
+              <select id="filtro-estado-pedidos" className="ui-control" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+                <option value="">Todos los estados</option>
+                <option value="BORRADOR">Borrador</option>
+                <option value="ENVIADO">Enviado</option>
+                <option value="EN_REVISION">En revisión</option>
+                <option value="APROBADO">Aprobado</option>
+                <option value="ENTREGADO">Entregado</option>
+                <option value="RECHAZADO">Rechazado</option>
+              </select>
+            </Field>
+            <Field label="Oficina" htmlFor="filtro-oficina-pedidos">
+              <select id="filtro-oficina-pedidos" className="ui-control" value={filtroOficina} onChange={(e) => setFiltroOficina(e.target.value)}>
+                <option value="">Todas las oficinas</option>
+                {oficinas.map((oficina) => <option key={oficina} value={oficina}>{oficina}</option>)}
+              </select>
+            </Field>
+          </div>
+        </Card>
 
-                    <p style={styles.meta}>
-                      Oficina: {pedido.Oficina?.nombre || "-"}
-                    </p>
+        {pedidosFiltrados.length === 0 ? (
+          <EmptyState title="No hay pedidos para mostrar" description="No encontramos pedidos que coincidan con los filtros seleccionados." />
+        ) : (
+          <div className="admin-stack">
+            {pedidosFiltrados.map((pedido) => {
+              const detalles = pedido.PedidoInsumoDetalles || [];
+              const abierto = pedidoAbierto === pedido.id;
+              const totalSolicitado = detalles.reduce((acc, item) => acc + (Number(item.cantidad_solicitada) || 0), 0);
+              const totalProvisto = detalles.reduce((acc, item) => acc + (Number(item.cantidad_provista) || 0), 0);
 
-                    <p style={styles.meta}>
-                      Usuario:{" "}
-                      {pedido.Usuario
-                        ? `${pedido.Usuario.nombre} ${pedido.Usuario.apellido}`
-                        : "-"}
-                    </p>
+              return (
+                <Card key={pedido.id} className="order-history-card">
+                  <div className="order-history-header">
+                    <div>
+                      <h2 className="order-history-title">Pedido #{pedido.id} · {pedido.mes}/{pedido.anio}</h2>
+                      <p className="order-history-meta">
+                        {pedido.Oficina?.nombre || "Oficina sin identificar"} · {pedido.Usuario ? `${pedido.Usuario.nombre} ${pedido.Usuario.apellido}` : "Usuario sin identificar"}
+                      </p>
+                    </div>
+                    <Badge tone={estadoTone(pedido.estado)}>{pedido.estado}</Badge>
                   </div>
 
-                  <span
-                    style={{
-                      ...styles.badge,
-                      ...getEstadoStyle(pedido.estado),
-                    }}
-                  >
-                    {pedido.estado}
-                  </span>
-                </div>
-
-                <div style={styles.resumenGrid}>
-                  <div style={styles.infoBox}>
-                    <strong>Hechos delictivos:</strong>{" "}
-                    {pedido.cantidad_hechos_delictivos || 0}
+                  <div className="order-history-summary">
+                    <div className="order-history-stat"><span className="admin-data-label">Solicitado</span><strong>{totalSolicitado}</strong></div>
+                    <div className="order-history-stat"><span className="admin-data-label">Provisto</span><strong>{totalProvisto}</strong></div>
+                    <div className="order-history-stat"><span className="admin-data-label">Contexto</span><strong>{pedido.cantidad_hechos_delictivos || 0} hechos · {pedido.cantidad_autopsias || 0} autopsias</strong></div>
                   </div>
 
-                  <div style={styles.infoBox}>
-                    <strong>Autopsias:</strong>{" "}
-                    {pedido.cantidad_autopsias || 0}
+                  {pedido.observaciones && <p className="admin-description">{pedido.observaciones}</p>}
+
+                  {esDireccion && (
+                    <div className="order-state-actions" aria-label={`Cambiar estado del pedido ${pedido.id}`}>
+                      <Button variant="secondary" size="sm" onClick={() => cambiarEstado(pedido.id, "EN_REVISION")}>En revisión</Button>
+                      <Button size="sm" onClick={() => cambiarEstado(pedido.id, "APROBADO")}>Aprobar</Button>
+                      <Button variant="danger" size="sm" onClick={() => cambiarEstado(pedido.id, "RECHAZADO")}>Rechazar</Button>
+                    </div>
+                  )}
+
+                  <div className="order-history-actions">
+                    <Button variant="secondary" size="sm" onClick={() => setPedidoAbierto(abierto ? null : pedido.id)} aria-expanded={abierto}>
+                      {abierto ? "Ocultar detalle" : "Ver detalle"}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => descargarPDF(pedido.id)}>Descargar PDF</Button>
                   </div>
-                </div>
 
-                {pedido.observaciones && (
-                  <div style={styles.obsBox}>
-                    <strong>Observaciones:</strong> {pedido.observaciones}
-                  </div>
-                )}
+                  {abierto && (
+                    <div className="order-detail">
+                      <div>
+                        <h3 className="ui-section-title">Detalle solicitado</h3>
+                        <p className="ui-section-description">Compará lo solicitado con lo ya provisto y registrá la entrega cuando corresponda.</p>
+                      </div>
 
-                {esDireccion && (
-                  <div style={styles.estadosBox}>
-                    <button
-                      type="button"
-                      style={styles.revisionButton}
-                      onClick={() =>
-                        cambiarEstado(pedido.id, "EN_REVISION")
-                      }
-                    >
-                      En revisión
-                    </button>
+                      {detalles.length === 0 ? (
+                        <EmptyState title="Sin detalle" description="Este pedido no contiene artículos detallados." />
+                      ) : (
+                        <>
+                          <TableFrame label={`Detalle del pedido ${pedido.id}`}>
+                            <table className="ui-table order-detail-table">
+                              <caption className="sr-only">Detalle del pedido #{pedido.id}</caption>
+                              <thead>
+                                <tr>
+                                  <th scope="col">Artículo</th>
+                                  <th scope="col">Solicitado</th>
+                                  <th scope="col">Problema</th>
+                                  <th scope="col">Detalle</th>
+                                  <th scope="col">Provisto actual</th>
+                                  {esDireccion && <th scope="col">Nueva provisión</th>}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {detalles.map((item) => (
+                                  <tr key={item.id}>
+                                    <td><strong>{item.Insumo?.nombre || item.articulo_manual || "-"}</strong></td>
+                                    <td>{item.cantidad_solicitada || 0}</td>
+                                    <td>{item.tuvo_problema ? "Sí" : "No"}</td>
+                                    <td>{item.detalle_problema || "-"}</td>
+                                    <td>{item.cantidad_provista || 0}</td>
+                                    {esDireccion && (
+                                      <td>
+                                        <label className="sr-only" htmlFor={`provision-${item.id}`}>Nueva provisión</label>
+                                        <input
+                                          id={`provision-${item.id}`}
+                                          className="ui-control order-provision-input"
+                                          type="number"
+                                          min="0"
+                                          defaultValue={item.cantidad_provista || 0}
+                                          onChange={(e) => handleProvisionChange(item.id, e.target.value)}
+                                        />
+                                      </td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </TableFrame>
 
-                    <button
-                      type="button"
-                      style={styles.aprobarButton}
-                      onClick={() => cambiarEstado(pedido.id, "APROBADO")}
-                    >
-                      Aprobar
-                    </button>
-
-                    <button
-                      type="button"
-                      style={styles.rechazarButton}
-                      onClick={() => cambiarEstado(pedido.id, "RECHAZADO")}
-                    >
-                      Rechazar
-                    </button>
-                  </div>
-                )}
-
-                <div style={styles.accionesTop}>
-                  <button
-                    type="button"
-                    style={styles.button}
-                    onClick={() =>
-                      setPedidoAbierto(
-                        pedidoAbierto === pedido.id ? null : pedido.id,
-                      )
-                    }
-                  >
-                    {pedidoAbierto === pedido.id
-                      ? "Ocultar detalle"
-                      : "Ver detalle"}
-                  </button>
-
-                  <button
-                    type="button"
-                    style={styles.pdfButton}
-                    onClick={() => descargarPDF(pedido.id)}
-                  >
-                    Descargar PDF
-                  </button>
-                </div>
-
-                {pedidoAbierto === pedido.id && (
-                  <div style={styles.detalleBox}>
-                    <h4 style={styles.subtitulo}>Detalle solicitado</h4>
-
-                    {detalles.length === 0 ? (
-                      <p>Sin detalle.</p>
-                    ) : (
-                      <>
-                        <div style={styles.detalleListado}>
-                          {detalles.map((item) => (
-                            <div key={item.id} style={styles.detalleItem}>
-                              <p>
-                                <strong>Artículo:</strong>{" "}
-                                {item.Insumo?.nombre ||
-                                  item.articulo_manual ||
-                                  "-"}
-                              </p>
-
-                              <p>
-                                <strong>Cantidad solicitada:</strong>{" "}
-                                {item.cantidad_solicitada || 0}
-                              </p>
-
-                              {esDireccion && (
-                                <p>
-                                  <strong>Cantidad provista:</strong>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    defaultValue={
-                                      item.cantidad_provista || 0
-                                    }
-                                    onChange={(e) =>
-                                      handleProvisionChange(
-                                        item.id,
-                                        e.target.value,
-                                      )
-                                    }
-                                    style={styles.provisionInput}
-                                  />
-                                </p>
-                              )}
-
-                              <p>
-                                <strong>Problema:</strong>{" "}
-                                {item.tuvo_problema ? "Sí" : "No"}
-                              </p>
-
-                              <p>
-                                <strong>Detalle problema:</strong>{" "}
-                                {item.detalle_problema || "-"}
-                              </p>
-
-                              <p>
-                                <strong>Cantidad provista actual:</strong>{" "}
-                                {item.cantidad_provista || 0}
-                              </p>
+                          {esDireccion && (
+                            <div className="admin-form-actions">
+                              <Button onClick={() => guardarProvision(pedido.id, detalles)}>
+                                Guardar provisión y marcar entregado
+                              </Button>
                             </div>
-                          ))}
-                        </div>
-
-                        {esDireccion && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              guardarProvision(pedido.id, detalles)
-                            }
-                            style={styles.saveButton}
-                          >
-                            Guardar provisión y marcar entregado
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </Layout>
   );
 }
-
-const styles = {
-  titulo: {
-    marginTop: 0,
-    marginBottom: "1rem",
-  },
-
-  subtitulo: {
-    marginTop: 0,
-    marginBottom: "0.8rem",
-  },
-
-  listado: {
-    display: "grid",
-    gap: "1rem",
-  },
-
-  card: {
-    background: "#fff",
-    borderRadius: "14px",
-    padding: "1rem",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-  },
-
-  headerRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "1rem",
-    flexWrap: "wrap",
-  },
-
-  cardTitle: {
-    margin: 0,
-  },
-
-  meta: {
-    margin: "0.25rem 0",
-    color: "#6b7280",
-  },
-
-  badge: {
-    padding: "0.35rem 0.7rem",
-    borderRadius: "999px",
-    fontSize: "0.8rem",
-    fontWeight: "bold",
-  },
-
-  resumenGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: "0.8rem",
-    marginTop: "1rem",
-  },
-
-  infoBox: {
-    background: "#f9fafb",
-    border: "1px solid #e5e7eb",
-    borderRadius: "10px",
-    padding: "0.8rem",
-  },
-
-  obsBox: {
-    marginTop: "0.8rem",
-    background: "#f9fafb",
-    border: "1px solid #e5e7eb",
-    borderRadius: "10px",
-    padding: "0.8rem",
-  },
-
-  estadosBox: {
-    display: "flex",
-    gap: "0.6rem",
-    flexWrap: "wrap",
-    marginTop: "1rem",
-  },
-
-  accionesTop: {
-    display: "flex",
-    gap: "0.6rem",
-    flexWrap: "wrap",
-    marginTop: "1rem",
-  },
-
-  button: {
-    padding: "0.75rem 1rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#1f4f82",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  pdfButton: {
-    padding: "0.75rem 1rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#374151",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  revisionButton: {
-    padding: "0.65rem 0.9rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#f59e0b",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  aprobarButton: {
-    padding: "0.65rem 0.9rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#15803d",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  rechazarButton: {
-    padding: "0.65rem 0.9rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#b91c1c",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  detalleBox: {
-    marginTop: "1rem",
-    paddingTop: "1rem",
-    borderTop: "1px solid #e5e7eb",
-  },
-
-  detalleListado: {
-    display: "grid",
-    gap: "0.8rem",
-  },
-
-  detalleItem: {
-    border: "1px solid #e5e7eb",
-    borderRadius: "10px",
-    padding: "0.8rem",
-    background: "#fafafa",
-  },
-
-  provisionInput: {
-    marginLeft: "10px",
-    padding: "4px",
-    width: "80px",
-  },
-
-  saveButton: {
-    marginTop: "12px",
-    padding: "10px 14px",
-    background: "#15803d",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "bold",
-  },
-
-  error: {
-    color: "crimson",
-  },
-};

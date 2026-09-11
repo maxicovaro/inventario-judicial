@@ -1,11 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import AdjuntosPanel from "../components/AdjuntosPanel";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  Field,
+  PageHeader,
+  StatCard,
+  TableFrame,
+} from "../components/ui";
 import { activoSchema } from "../schemas/activoSchema";
 import { esAdminGeneral, puedeGestionarOficina } from "../utils/permisos";
+import "../styles/assets.css";
+import "../styles/assets-table-responsive.css";
 
 const defaultValues = {
   codigo_interno: "",
@@ -22,6 +36,14 @@ const defaultValues = {
   oficina_id: "",
 };
 
+const ESTADOS = [
+  "Excelente estado",
+  "Buen estado",
+  "Regular estado",
+  "Mal estado",
+  "Sin funcionar",
+];
+
 const obtenerUsuarioLocal = () => {
   try {
     return JSON.parse(localStorage.getItem("usuario") || "{}");
@@ -34,19 +56,35 @@ const obtenerUsuarioLocal = () => {
 
 const formatearFechaInput = (fecha) => {
   if (!fecha) return "";
-
   const fechaString = String(fecha);
+  return fechaString.includes("T")
+    ? fechaString.split("T")[0]
+    : fechaString.slice(0, 10);
+};
 
-  if (fechaString.includes("T")) {
-    return fechaString.split("T")[0];
+const formatearNumero = (valor) =>
+  new Intl.NumberFormat("es-AR").format(Number(valor) || 0);
+
+const getEstadoVariant = (estado) => {
+  switch (estado) {
+    case "Excelente estado":
+      return "success";
+    case "Buen estado":
+      return "info";
+    case "Regular estado":
+      return "warning";
+    case "Mal estado":
+    case "Sin funcionar":
+      return "danger";
+    case "Dado de baja":
+      return "neutral";
+    default:
+      return "info";
   }
-
-  return fechaString.slice(0, 10);
 };
 
 export default function Activos() {
   const usuario = obtenerUsuarioLocal();
-
   const esDireccion = esAdminGeneral(usuario);
   const puedeGestionar = puedeGestionarOficina(usuario);
 
@@ -62,11 +100,13 @@ export default function Activos() {
   const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
-
+  const [formularioAbierto, setFormularioAbierto] = useState(puedeGestionar);
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroOficina, setFiltroOficina] = useState("");
   const [activoAdjuntosAbierto, setActivoAdjuntosAbierto] = useState(null);
+  const [bajaPendiente, setBajaPendiente] = useState(null);
+  const [bajando, setBajando] = useState(false);
 
   const {
     register,
@@ -110,44 +150,50 @@ export default function Activos() {
     }
   }, [esDireccion, usuario.oficina_id, setValue]);
 
-  const getEstadoBadgeStyle = (estado) => {
-    switch (estado) {
-      case "Excelente estado":
-        return { background: "#dcfce7", color: "#166534" };
-      case "Buen estado":
-        return { background: "#dbeafe", color: "#1d4ed8" };
-      case "Regular estado":
-        return { background: "#fef3c7", color: "#92400e" };
-      case "Mal estado":
-        return { background: "#fee2e2", color: "#991b1b" };
-      case "Sin funcionar":
-        return { background: "#f3f4f6", color: "#374151" };
-      case "Dado de baja":
-        return { background: "#e5e7eb", color: "#111827" };
-      default:
-        return { background: "#f3f4f6", color: "#111827" };
-    }
-  };
+  const activosDeAlcance = useMemo(
+    () =>
+      esDireccion
+        ? activos
+        : activos.filter(
+            (activo) => String(activo.oficina_id) === String(usuario.oficina_id)
+          ),
+    [activos, esDireccion, usuario.oficina_id]
+  );
+
+  const resumen = useMemo(() => {
+    const vigentes = activosDeAlcance.filter(
+      (activo) => activo.activo !== false && activo.estado !== "Dado de baja"
+    );
+    const requierenAtencion = vigentes.filter((activo) =>
+      ["Mal estado", "Sin funcionar"].includes(activo.estado)
+    );
+    const categoriasUnicas = new Set(
+      vigentes.map((activo) => activo.categoria_id).filter(Boolean)
+    );
+    const oficinasUnicas = new Set(
+      vigentes.map((activo) => activo.oficina_id).filter(Boolean)
+    );
+
+    return {
+      total: activosDeAlcance.length,
+      vigentes: vigentes.length,
+      atencion: requierenAtencion.length,
+      diversidad: esDireccion ? oficinasUnicas.size : categoriasUnicas.size,
+    };
+  }, [activosDeAlcance, esDireccion]);
 
   const activosFiltrados = useMemo(() => {
-    const activosBase = esDireccion
-      ? activos
-      : activos.filter(
-          (activo) => String(activo.oficina_id) === String(usuario.oficina_id)
-        );
+    const texto = busqueda.trim().toLowerCase();
 
-    return activosBase.filter((activo) => {
-      const texto = busqueda.toLowerCase();
-
+    return activosDeAlcance.filter((activo) => {
       const coincideBusqueda =
+        !texto ||
         activo.nombre?.toLowerCase().includes(texto) ||
         activo.codigo_interno?.toLowerCase().includes(texto) ||
         activo.marca?.toLowerCase().includes(texto) ||
         activo.modelo?.toLowerCase().includes(texto) ||
         activo.numero_serie?.toLowerCase().includes(texto);
-
       const coincideEstado = !filtroEstado || activo.estado === filtroEstado;
-
       const coincideOficina =
         !esDireccion ||
         !filtroOficina ||
@@ -155,14 +201,37 @@ export default function Activos() {
 
       return coincideBusqueda && coincideEstado && coincideOficina;
     });
-  }, [
-    activos,
-    busqueda,
-    filtroEstado,
-    filtroOficina,
-    esDireccion,
-    usuario.oficina_id,
-  ]);
+  }, [activosDeAlcance, busqueda, filtroEstado, filtroOficina, esDireccion]);
+
+  const hayFiltros = Boolean(busqueda || filtroEstado || filtroOficina);
+
+  const limpiarFiltros = () => {
+    setBusqueda("");
+    setFiltroEstado("");
+    setFiltroOficina("");
+  };
+
+  const limpiarFormulario = () => {
+    reset({
+      ...defaultValues,
+      oficina_id: esDireccion ? "" : String(usuario.oficina_id || ""),
+    });
+    setEditandoId(null);
+  };
+
+  const abrirNuevoActivo = () => {
+    setError("");
+    setMensaje("");
+    limpiarFormulario();
+    setFormularioAbierto(true);
+  };
+
+  const cerrarFormulario = () => {
+    limpiarFormulario();
+    setError("");
+    setMensaje("");
+    setFormularioAbierto(false);
+  };
 
   const onSubmit = async (data) => {
     setError("");
@@ -201,18 +270,13 @@ export default function Activos() {
         setMensaje("Activo creado correctamente");
       }
 
-      reset({
-        ...defaultValues,
-        oficina_id: esDireccion ? "" : String(usuario.oficina_id || ""),
-      });
-
-      setEditandoId(null);
+      limpiarFormulario();
       setActivoAdjuntosAbierto(null);
       await cargarDatos();
     } catch (err) {
       const detalle = err.response?.data?.detalle;
 
-      if (detalle && detalle.length > 0) {
+      if (detalle?.length) {
         setError(detalle.map((d) => `${d.campo}: ${d.mensaje}`).join(" | "));
       } else {
         setError(
@@ -226,27 +290,32 @@ export default function Activos() {
     }
   };
 
-  const darDeBaja = async (id) => {
+  const solicitarBaja = (activo) => {
     if (!esDireccion) {
       setError("Solo Dirección puede dar de baja activos");
       return;
     }
 
-    const confirmar = window.confirm(
-      "¿Seguro que querés dar de baja este activo?"
-    );
+    setBajaPendiente(activo);
+  };
 
-    if (!confirmar) return;
+  const confirmarBaja = async () => {
+    if (!bajaPendiente) return;
 
     setError("");
     setMensaje("");
+    setBajando(true);
 
     try {
-      await api.patch(`/activos/${id}/baja`);
+      await api.patch(`/activos/${bajaPendiente.id}/baja`);
       setMensaje("Activo dado de baja correctamente");
+      setActivoAdjuntosAbierto(null);
+      setBajaPendiente(null);
       await cargarDatos();
     } catch (err) {
       setError(err.response?.data?.mensaje || "Error al dar de baja el activo");
+    } finally {
+      setBajando(false);
     }
   };
 
@@ -285,551 +354,692 @@ export default function Activos() {
     });
 
     setEditandoId(activo.id);
+    setFormularioAbierto(true);
   };
 
   const cancelarEdicion = () => {
-    reset({
-      ...defaultValues,
-      oficina_id: esDireccion ? "" : String(usuario.oficina_id || ""),
-    });
-
-    setEditandoId(null);
+    limpiarFormulario();
     setError("");
     setMensaje("");
   };
 
+  const renderAcciones = (activo) => {
+    const perteneceAMiOficina =
+      String(activo.oficina_id) === String(usuario.oficina_id);
+    const puedeVerAdjuntos = esDireccion || perteneceAMiOficina;
+    const estaDadoDeBaja =
+      activo.activo === false || activo.estado === "Dado de baja";
+    const puedeEditar = puedeGestionar && puedeVerAdjuntos && !estaDadoDeBaja;
+    const adjuntosAbiertos = activoAdjuntosAbierto === activo.id;
+
+    return (
+      <div className="assets-row-actions">
+        {puedeEditar && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="assets-action-button"
+            onClick={() => editarActivo(activo)}
+            aria-label={`Editar ${activo.nombre}`}
+          >
+            Editar
+          </Button>
+        )}
+
+        {puedeVerAdjuntos && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="assets-action-button"
+            onClick={() =>
+              setActivoAdjuntosAbierto(adjuntosAbiertos ? null : activo.id)
+            }
+            aria-expanded={adjuntosAbiertos}
+            aria-controls={`adjuntos-activo-${activo.id}`}
+          >
+            {adjuntosAbiertos ? "Ocultar adjuntos" : "Adjuntos"}
+          </Button>
+        )}
+
+        {esDireccion && !estaDadoDeBaja && (
+          <Button
+            variant="danger"
+            size="sm"
+            className="assets-action-button"
+            onClick={() => solicitarBaja(activo)}
+            aria-label={`Dar de baja ${activo.nombre}`}
+          >
+            Dar de baja
+          </Button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <Layout>
-      <h1 style={styles.titulo}>Activos</h1>
+      <div className="ui-page assets-page">
+        <PageHeader
+          className="assets-page-header"
+          title="Activos"
+          description={
+            esDireccion
+              ? "Consultá, registrá y administrá los bienes patrimoniales de todas las dependencias."
+              : "Consultá los bienes asignados a tu oficina y mantené su información actualizada según tus permisos."
+          }
+          actions={
+            puedeGestionar ? (
+              <Button onClick={abrirNuevoActivo}>+ Nuevo activo</Button>
+            ) : null
+          }
+        />
 
-      <div style={styles.grid}>
-        <div style={{ ...styles.card, display: puedeGestionar ? undefined : "none" }}>
-          <h2 style={styles.subtitulo}>
-            {editandoId ? "Editar activo" : "Nuevo activo"}
-          </h2>
+        <section className="assets-summary" aria-label="Resumen de activos">
+          <StatCard
+            label="Registrados"
+            value={formatearNumero(resumen.total)}
+            detail="Dentro de tu alcance actual"
+          />
+          <StatCard
+            label="Vigentes"
+            value={formatearNumero(resumen.vigentes)}
+            detail="Bienes actualmente operativos"
+            tone="success"
+          />
+          <StatCard
+            label="Requieren atención"
+            value={formatearNumero(resumen.atencion)}
+            detail="Mal estado o sin funcionamiento"
+            tone={resumen.atencion > 0 ? "danger" : "success"}
+          />
+          <StatCard
+            label={esDireccion ? "Oficinas con activos" : "Categorías"}
+            value={formatearNumero(resumen.diversidad)}
+            detail={
+              esDireccion
+                ? "Dependencias con bienes vigentes"
+                : "Tipos de bienes vigentes"
+            }
+            tone="accent"
+          />
+        </section>
 
-          <form onSubmit={handleSubmit(onSubmit)} style={styles.form}>
-            <div>
-              <input
-                {...register("codigo_interno")}
-                placeholder="Código interno"
-                style={styles.input}
-              />
-              {errors.codigo_interno && (
-                <p style={styles.errorText}>{errors.codigo_interno.message}</p>
-              )}
-            </div>
-
-            <div>
-              <input
-                {...register("nombre")}
-                placeholder="Nombre"
-                style={styles.input}
-              />
-              {errors.nombre && (
-                <p style={styles.errorText}>{errors.nombre.message}</p>
-              )}
-            </div>
-
-            <div>
-              <input
-                {...register("marca")}
-                placeholder="Marca"
-                style={styles.input}
-              />
-              {errors.marca && (
-                <p style={styles.errorText}>{errors.marca.message}</p>
-              )}
-            </div>
-
-            <div>
-              <input
-                {...register("modelo")}
-                placeholder="Modelo"
-                style={styles.input}
-              />
-              {errors.modelo && (
-                <p style={styles.errorText}>{errors.modelo.message}</p>
-              )}
-            </div>
-
-            <div>
-              <input
-                {...register("numero_serie")}
-                placeholder="Número de serie"
-                style={styles.input}
-              />
-              {errors.numero_serie && (
-                <p style={styles.errorText}>{errors.numero_serie.message}</p>
-              )}
-            </div>
-
-            <div>
-              <input
-                {...register("cantidad")}
-                type="number"
-                min="1"
-                style={styles.input}
-              />
-              {errors.cantidad && (
-                <p style={styles.errorText}>{errors.cantidad.message}</p>
-              )}
-            </div>
-
-            <div>
-              <select {...register("estado")} style={styles.input}>
-                <option value="Excelente estado">Excelente estado</option>
-                <option value="Buen estado">Buen estado</option>
-                <option value="Regular estado">Regular estado</option>
-                <option value="Mal estado">Mal estado</option>
-                <option value="Sin funcionar">Sin funcionar</option>
-              </select>
-              {errors.estado && (
-                <p style={styles.errorText}>{errors.estado.message}</p>
-              )}
-            </div>
-
-            <div>
-              <input
-                {...register("fecha_alta")}
-                type="date"
-                style={styles.input}
-              />
-              {errors.fecha_alta && (
-                <p style={styles.errorText}>{errors.fecha_alta.message}</p>
-              )}
-            </div>
-
-            <div>
-              <select {...register("categoria_id")} style={styles.input}>
-                <option value="">Seleccionar categoría</option>
-                {categorias.map((categoria) => (
-                  <option key={categoria.id} value={String(categoria.id)}>
-                    {categoria.nombre}
-                  </option>
-                ))}
-              </select>
-              {errors.categoria_id && (
-                <p style={styles.errorText}>{errors.categoria_id.message}</p>
-              )}
-            </div>
-
-            <div>
-              {esDireccion ? (
-                <select {...register("oficina_id")} style={styles.input}>
-                  <option value="">Seleccionar oficina</option>
-                  {oficinas.map((oficina) => (
-                    <option key={oficina.id} value={String(oficina.id)}>
-                      {oficina.nombre}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <>
-                  <input
-                    value={
-                      usuario.oficina_nombre ||
-                      usuario.Oficina?.nombre ||
-                      "Mi oficina"
-                    }
-                    style={styles.input}
-                    disabled
-                    readOnly
-                  />
-                  <input type="hidden" {...register("oficina_id")} />
-                </>
-              )}
-
-              {errors.oficina_id && (
-                <p style={styles.errorText}>{errors.oficina_id.message}</p>
-              )}
-            </div>
-
-            <div>
-              <textarea
-                {...register("descripcion")}
-                placeholder="Descripción"
-                style={styles.textarea}
-              />
-              {errors.descripcion && (
-                <p style={styles.errorText}>{errors.descripcion.message}</p>
-              )}
-            </div>
-
-            <div>
-              <textarea
-                {...register("observaciones")}
-                placeholder="Observaciones"
-                style={styles.textarea}
-              />
-              {errors.observaciones && (
-                <p style={styles.errorText}>{errors.observaciones.message}</p>
-              )}
-            </div>
-
-            {mensaje && <p style={styles.ok}>{mensaje}</p>}
-            {error && <p style={styles.error}>{error}</p>}
-
-            <div style={styles.buttonGroup}>
-              <button type="submit" style={styles.button} disabled={guardando}>
-                {guardando
-                  ? "Guardando..."
-                  : editandoId
-                    ? "Actualizar activo"
-                    : "Crear activo"}
-              </button>
-
-              {editandoId && (
-                <button
-                  type="button"
-                  style={styles.cancelButton}
-                  onClick={cancelarEdicion}
-                >
-                  Cancelar
-                </button>
-              )}
-            </div>
-          </form>
+        <div className="assets-message-stack" aria-live="polite">
+          {mensaje && <Alert tone="success">{mensaje}</Alert>}
+          {error && <Alert tone="danger">{error}</Alert>}
         </div>
 
-        <div style={styles.card}>
-          <h2 style={styles.subtitulo}>Listado</h2>
-
-          <div style={styles.filters}>
-            <input
-              type="text"
-              placeholder="Buscar por nombre, código, marca, modelo..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              style={styles.input}
-            />
-
-            <select
-              value={filtroEstado}
-              onChange={(e) => setFiltroEstado(e.target.value)}
-              style={styles.input}
+        <div
+          className={`assets-workspace${
+            formularioAbierto && puedeGestionar ? " assets-workspace--editing" : ""
+          }`}
+        >
+          <Card className="assets-list-card" aria-labelledby="activos-listado-title">
+            <div
+              className={
+                esDireccion
+                  ? "assets-toolbar"
+                  : "assets-toolbar assets-toolbar--office"
+              }
             >
-              <option value="">Todos los estados</option>
-              <option value="Excelente estado">Excelente estado</option>
-              <option value="Buen estado">Buen estado</option>
-              <option value="Regular estado">Regular estado</option>
-              <option value="Mal estado">Mal estado</option>
-              <option value="Sin funcionar">Sin funcionar</option>
-              {esDireccion && <option value="Dado de baja">Dado de baja</option>}
-            </select>
-
-            {esDireccion && (
-              <select
-                value={filtroOficina}
-                onChange={(e) => setFiltroOficina(e.target.value)}
-                style={styles.input}
+              <Field
+                label="Buscar"
+                htmlFor="buscar-activos"
+                className="assets-search-field"
               >
-                <option value="">Todas las oficinas</option>
-                {oficinas.map((oficina) => (
-                  <option key={oficina.id} value={String(oficina.id)}>
-                    {oficina.nombre}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+                <div className="assets-search-wrap">
+                  <input
+                    id="buscar-activos"
+                    type="search"
+                    className="ui-control assets-search"
+                    placeholder="Buscar por nombre, código, marca, modelo..."
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                  />
+                </div>
+              </Field>
 
-          {activosFiltrados.length === 0 ? (
-            <p>No hay activos que coincidan con la búsqueda.</p>
-          ) : (
-            <div style={styles.listado}>
-              {activosFiltrados.map((activo) => {
-                const perteneceAMiOficina =
-                  String(activo.oficina_id) === String(usuario.oficina_id);
+              <Field label="Estado" htmlFor="filtro-estado-activos">
+                <select
+                  id="filtro-estado-activos"
+                  className="ui-control"
+                  value={filtroEstado}
+                  onChange={(e) => setFiltroEstado(e.target.value)}
+                >
+                  <option value="">Todos los estados</option>
+                  {ESTADOS.map((estado) => (
+                    <option key={estado} value={estado}>
+                      {estado}
+                    </option>
+                  ))}
+                  {esDireccion && <option value="Dado de baja">Dado de baja</option>}
+                </select>
+              </Field>
 
-                const puedeVerAdjuntos = esDireccion || perteneceAMiOficina;
-                const estaDadoDeBaja =
-                  activo.activo === false || activo.estado === "Dado de baja";
-                const puedeEditar =
-                  puedeGestionar && puedeVerAdjuntos && !estaDadoDeBaja;
+              {esDireccion && (
+                <Field label="Oficina" htmlFor="filtro-oficina-activos">
+                  <select
+                    id="filtro-oficina-activos"
+                    className="ui-control"
+                    value={filtroOficina}
+                    onChange={(e) => setFiltroOficina(e.target.value)}
+                  >
+                    <option value="">Todas las oficinas</option>
+                    {oficinas.map((oficina) => (
+                      <option key={oficina.id} value={String(oficina.id)}>
+                        {oficina.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
 
-                return (
-                  <div key={activo.id} style={styles.item}>
-                    <div style={styles.headerRow}>
-                      <p style={styles.itemTitle}>
-                        <strong>#{activo.id}</strong> — {activo.nombre}
-                      </p>
+              <Button
+                variant="ghost"
+                className="assets-filter-reset"
+                onClick={limpiarFiltros}
+                disabled={!hayFiltros}
+              >
+                Limpiar filtros
+              </Button>
+            </div>
 
-                      <span
-                        style={{
-                          ...styles.badge,
-                          ...getEstadoBadgeStyle(activo.estado),
-                        }}
-                      >
-                        {activo.estado}
-                      </span>
-                    </div>
+            <div className="assets-list-meta">
+              <p className="assets-result-count" id="activos-listado-title">
+                {formatearNumero(activosFiltrados.length)} de{" "}
+                {formatearNumero(activosDeAlcance.length)} activos
+              </p>
+              <p className="assets-scope-note">
+                {esDireccion
+                  ? "Vista general de Dirección"
+                  : usuario.oficina_nombre ||
+                    usuario.Oficina?.nombre ||
+                    "Mi oficina"}
+              </p>
+            </div>
 
-                    <p>
-                      <strong>Código:</strong> {activo.codigo_interno || "-"}
-                    </p>
+            {activosFiltrados.length === 0 ? (
+              <EmptyState
+                className="assets-empty"
+                title="No encontramos activos"
+                description={
+                  hayFiltros
+                    ? "Probá cambiando los términos de búsqueda o eliminando alguno de los filtros."
+                    : "Todavía no hay bienes registrados dentro de este alcance."
+                }
+                actions={
+                  hayFiltros ? (
+                    <Button variant="secondary" onClick={limpiarFiltros}>
+                      Ver todos
+                    </Button>
+                  ) : null
+                }
+              />
+            ) : (
+              <TableFrame
+                className="assets-table-wrap"
+                label="Listado de activos patrimoniales"
+              >
+                <table className="ui-table assets-table">
+                  <caption className="sr-only">
+                    Listado de activos patrimoniales
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Activo</th>
+                      <th scope="col">Categoría</th>
+                      <th scope="col">Oficina</th>
+                      <th scope="col">Marca / modelo</th>
+                      <th scope="col">Estado</th>
+                      <th scope="col">Cantidad</th>
+                      <th scope="col">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activosFiltrados.map((activo) => {
+                      const perteneceAMiOficina =
+                        String(activo.oficina_id) === String(usuario.oficina_id);
+                      const puedeVerAdjuntos = esDireccion || perteneceAMiOficina;
+                      const estaDadoDeBaja =
+                        activo.activo === false ||
+                        activo.estado === "Dado de baja";
+                      const adjuntosAbiertos =
+                        activoAdjuntosAbierto === activo.id;
 
-                    <p>
-                      <strong>Marca:</strong> {activo.marca || "-"}
-                    </p>
-
-                    <p>
-                      <strong>Modelo:</strong> {activo.modelo || "-"}
-                    </p>
-
-                    <p>
-                      <strong>N° Serie:</strong> {activo.numero_serie || "-"}
-                    </p>
-
-                    <p>
-                      <strong>Categoría:</strong>{" "}
-                      {activo.Categoria?.nombre || "-"}
-                    </p>
-
-                    <p>
-                      <strong>Oficina:</strong> {activo.Oficina?.nombre || "-"}
-                    </p>
-
-                    <p>
-                      <strong>Cantidad:</strong> {activo.cantidad}
-                    </p>
-
-                    {activo.descripcion && (
-                      <p>
-                        <strong>Descripción:</strong> {activo.descripcion}
-                      </p>
-                    )}
-
-                    {activo.observaciones && (
-                      <p style={styles.infoBox}>
-                        <strong>Observaciones:</strong> {activo.observaciones}
-                      </p>
-                    )}
-
-                    {puedeVerAdjuntos && (
-                      <div style={styles.actionButtons}>
-                        {puedeEditar && (
-                          <button
-                            type="button"
-                            style={styles.editButton}
-                            onClick={() => editarActivo(activo)}
+                      return (
+                        <Fragment key={activo.id}>
+                          <tr
+                            className={
+                              estaDadoDeBaja ? "assets-row--inactive" : ""
+                            }
                           >
-                            Editar
-                          </button>
-                        )}
+                            <td>
+                              <div className="assets-primary-cell">
+                                <span className="assets-primary-name">
+                                  {activo.nombre}
+                                </span>
+                                <span className="assets-primary-code">
+                                  {activo.codigo_interno || `ID #${activo.id}`}
+                                  {activo.numero_serie
+                                    ? ` · Serie ${activo.numero_serie}`
+                                    : ""}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="assets-muted">
+                              {activo.Categoria?.nombre || "-"}
+                            </td>
+                            <td className="assets-muted">
+                              {activo.Oficina?.nombre || "-"}
+                            </td>
+                            <td className="assets-muted">
+                              {[activo.marca, activo.modelo]
+                                .filter(Boolean)
+                                .join(" · ") || "-"}
+                            </td>
+                            <td>
+                              <Badge tone={getEstadoVariant(activo.estado)}>
+                                {activo.estado || "Sin estado"}
+                              </Badge>
+                            </td>
+                            <td className="assets-muted">
+                              {formatearNumero(activo.cantidad)}
+                            </td>
+                            <td>{renderAcciones(activo)}</td>
+                          </tr>
 
-                        <button
-                          type="button"
-                          style={styles.secondaryButton}
-                          onClick={() =>
-                            setActivoAdjuntosAbierto(
-                              activoAdjuntosAbierto === activo.id
-                                ? null
-                                : activo.id
-                            )
+                          {adjuntosAbiertos && puedeVerAdjuntos && (
+                            <tr>
+                              <td colSpan="7" className="assets-inline-detail">
+                                <div
+                                  className="assets-detail-shell"
+                                  id={`adjuntos-activo-${activo.id}`}
+                                >
+                                  <div className="assets-detail-header">
+                                    <p className="assets-detail-title">
+                                      Adjuntos · {activo.nombre}
+                                    </p>
+                                  </div>
+                                  <AdjuntosPanel activoId={activo.id} />
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </TableFrame>
+            )}
+          </Card>
+
+          {formularioAbierto && puedeGestionar && (
+            <Card
+              as="aside"
+              className="assets-form-panel"
+              aria-labelledby="activo-form-title"
+            >
+              <div className="assets-form-header">
+                <div className="assets-form-heading">
+                  <p className="assets-form-eyebrow">
+                    {editandoId ? "Edición" : "Alta patrimonial"}
+                  </p>
+                  <h2 className="assets-form-title" id="activo-form-title">
+                    {editandoId ? "Editar activo" : "Nuevo activo"}
+                  </h2>
+                  <p className="assets-form-subtitle">
+                    {editandoId
+                      ? "Actualizá los datos del bien seleccionado."
+                      : "Registrá un nuevo bien dentro del inventario."}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="assets-form-close"
+                  onClick={cerrarFormulario}
+                  aria-label="Cerrar formulario de activo"
+                  title="Cerrar"
+                >
+                  ×
+                </button>
+              </div>
+
+              <form
+                className="assets-form"
+                onSubmit={handleSubmit(onSubmit)}
+                noValidate
+              >
+                <section
+                  className="assets-form-section"
+                  aria-labelledby="datos-identificacion-title"
+                >
+                  <h3
+                    className="assets-form-section-title"
+                    id="datos-identificacion-title"
+                  >
+                    Identificación
+                  </h3>
+
+                  <div className="assets-form-grid">
+                    <Field
+                      label="Código interno"
+                      htmlFor="activo-codigo"
+                      error={errors.codigo_interno}
+                      errorId="error-codigo"
+                    >
+                      <input
+                        id="activo-codigo"
+                        className="ui-control"
+                        placeholder="Código interno"
+                        {...register("codigo_interno")}
+                        aria-invalid={Boolean(errors.codigo_interno)}
+                        aria-describedby={
+                          errors.codigo_interno ? "error-codigo" : undefined
+                        }
+                      />
+                    </Field>
+
+                    <Field
+                      label="Nombre"
+                      htmlFor="activo-nombre"
+                      error={errors.nombre}
+                      errorId="error-nombre"
+                    >
+                      <input
+                        id="activo-nombre"
+                        className="ui-control"
+                        placeholder="Nombre"
+                        {...register("nombre")}
+                        aria-invalid={Boolean(errors.nombre)}
+                        aria-describedby={errors.nombre ? "error-nombre" : undefined}
+                      />
+                    </Field>
+
+                    <Field
+                      label="Marca"
+                      htmlFor="activo-marca"
+                      error={errors.marca}
+                      errorId="error-marca"
+                    >
+                      <input
+                        id="activo-marca"
+                        className="ui-control"
+                        placeholder="Marca"
+                        {...register("marca")}
+                        aria-invalid={Boolean(errors.marca)}
+                        aria-describedby={errors.marca ? "error-marca" : undefined}
+                      />
+                    </Field>
+
+                    <Field
+                      label="Modelo"
+                      htmlFor="activo-modelo"
+                      error={errors.modelo}
+                      errorId="error-modelo"
+                    >
+                      <input
+                        id="activo-modelo"
+                        className="ui-control"
+                        placeholder="Modelo"
+                        {...register("modelo")}
+                        aria-invalid={Boolean(errors.modelo)}
+                        aria-describedby={errors.modelo ? "error-modelo" : undefined}
+                      />
+                    </Field>
+
+                    <Field
+                      className="assets-field--full"
+                      label="Número de serie"
+                      htmlFor="activo-serie"
+                      error={errors.numero_serie}
+                      errorId="error-serie"
+                    >
+                      <input
+                        id="activo-serie"
+                        className="ui-control"
+                        placeholder="Número de serie"
+                        {...register("numero_serie")}
+                        aria-invalid={Boolean(errors.numero_serie)}
+                        aria-describedby={
+                          errors.numero_serie ? "error-serie" : undefined
+                        }
+                      />
+                    </Field>
+                  </div>
+                </section>
+
+                <section
+                  className="assets-form-section"
+                  aria-labelledby="datos-clasificacion-title"
+                >
+                  <h3
+                    className="assets-form-section-title"
+                    id="datos-clasificacion-title"
+                  >
+                    Clasificación y ubicación
+                  </h3>
+
+                  <div className="assets-form-grid">
+                    <Field
+                      label="Categoría"
+                      htmlFor="activo-categoria"
+                      error={errors.categoria_id}
+                      errorId="error-categoria"
+                    >
+                      <select
+                        id="activo-categoria"
+                        className="ui-control"
+                        {...register("categoria_id")}
+                        aria-invalid={Boolean(errors.categoria_id)}
+                        aria-describedby={
+                          errors.categoria_id ? "error-categoria" : undefined
+                        }
+                      >
+                        <option value="">Seleccionar categoría</option>
+                        {categorias.map((categoria) => (
+                          <option
+                            key={categoria.id}
+                            value={String(categoria.id)}
+                          >
+                            {categoria.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    <Field
+                      label="Estado"
+                      htmlFor="activo-estado"
+                      error={errors.estado}
+                      errorId="error-estado"
+                    >
+                      <select
+                        id="activo-estado"
+                        className="ui-control"
+                        {...register("estado")}
+                        aria-invalid={Boolean(errors.estado)}
+                        aria-describedby={errors.estado ? "error-estado" : undefined}
+                      >
+                        {ESTADOS.map((estado) => (
+                          <option key={estado} value={estado}>
+                            {estado}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    <Field
+                      label="Cantidad"
+                      htmlFor="activo-cantidad"
+                      error={errors.cantidad}
+                      errorId="error-cantidad"
+                    >
+                      <input
+                        id="activo-cantidad"
+                        className="ui-control"
+                        type="number"
+                        min="1"
+                        {...register("cantidad")}
+                        aria-invalid={Boolean(errors.cantidad)}
+                        aria-describedby={
+                          errors.cantidad ? "error-cantidad" : undefined
+                        }
+                      />
+                    </Field>
+
+                    <Field
+                      label="Fecha de alta"
+                      htmlFor="activo-fecha-alta"
+                      error={errors.fecha_alta}
+                      errorId="error-fecha"
+                    >
+                      <input
+                        id="activo-fecha-alta"
+                        className="ui-control"
+                        type="date"
+                        {...register("fecha_alta")}
+                        aria-invalid={Boolean(errors.fecha_alta)}
+                        aria-describedby={
+                          errors.fecha_alta ? "error-fecha" : undefined
+                        }
+                      />
+                    </Field>
+
+                    <Field
+                      className="assets-field--full"
+                      label="Oficina"
+                      htmlFor="activo-oficina"
+                      error={errors.oficina_id}
+                      errorId="error-oficina"
+                    >
+                      {esDireccion ? (
+                        <select
+                          id="activo-oficina"
+                          className="ui-control"
+                          {...register("oficina_id")}
+                          aria-invalid={Boolean(errors.oficina_id)}
+                          aria-describedby={
+                            errors.oficina_id ? "error-oficina" : undefined
                           }
                         >
-                          {activoAdjuntosAbierto === activo.id
-                            ? "Ocultar adjuntos"
-                            : "Adjuntos"}
-                        </button>
-
-                        {esDireccion && !estaDadoDeBaja && (
-                          <button
-                            type="button"
-                            style={styles.deleteButton}
-                            onClick={() => darDeBaja(activo.id)}
-                          >
-                            Dar de baja
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {activoAdjuntosAbierto === activo.id && puedeVerAdjuntos && (
-                      <AdjuntosPanel activoId={activo.id} />
-                    )}
+                          <option value="">Seleccionar oficina</option>
+                          {oficinas.map((oficina) => (
+                            <option
+                              key={oficina.id}
+                              value={String(oficina.id)}
+                            >
+                              {oficina.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <>
+                          <input
+                            id="activo-oficina"
+                            className="ui-control"
+                            value={
+                              usuario.oficina_nombre ||
+                              usuario.Oficina?.nombre ||
+                              "Mi oficina"
+                            }
+                            disabled
+                            readOnly
+                          />
+                          <input type="hidden" {...register("oficina_id")} />
+                        </>
+                      )}
+                    </Field>
                   </div>
-                );
-              })}
-            </div>
+                </section>
+
+                <section
+                  className="assets-form-section"
+                  aria-labelledby="datos-adicionales-title"
+                >
+                  <h3
+                    className="assets-form-section-title"
+                    id="datos-adicionales-title"
+                  >
+                    Información adicional
+                  </h3>
+
+                  <div className="assets-form-grid">
+                    <Field
+                      className="assets-field--full"
+                      label="Descripción"
+                      htmlFor="activo-descripcion"
+                      error={errors.descripcion}
+                      errorId="error-descripcion"
+                    >
+                      <textarea
+                        id="activo-descripcion"
+                        className="ui-control assets-textarea"
+                        placeholder="Descripción"
+                        {...register("descripcion")}
+                        aria-invalid={Boolean(errors.descripcion)}
+                        aria-describedby={
+                          errors.descripcion ? "error-descripcion" : undefined
+                        }
+                      />
+                    </Field>
+
+                    <Field
+                      className="assets-field--full"
+                      label="Observaciones"
+                      htmlFor="activo-observaciones"
+                      error={errors.observaciones}
+                      errorId="error-observaciones"
+                    >
+                      <textarea
+                        id="activo-observaciones"
+                        className="ui-control assets-textarea"
+                        placeholder="Observaciones"
+                        {...register("observaciones")}
+                        aria-invalid={Boolean(errors.observaciones)}
+                        aria-describedby={
+                          errors.observaciones ? "error-observaciones" : undefined
+                        }
+                      />
+                    </Field>
+                  </div>
+                </section>
+
+                <div className="assets-form-actions">
+                  <Button
+                    variant="secondary"
+                    onClick={editandoId ? cancelarEdicion : cerrarFormulario}
+                  >
+                    {editandoId ? "Cancelar edición" : "Cancelar"}
+                  </Button>
+                  <Button type="submit" disabled={guardando} busy={guardando}>
+                    {guardando
+                      ? "Guardando..."
+                      : editandoId
+                        ? "Actualizar activo"
+                        : "Crear activo"}
+                  </Button>
+                </div>
+              </form>
+            </Card>
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(bajaPendiente)}
+        title="Dar de baja el activo"
+        description={
+          bajaPendiente
+            ? `Vas a dar de baja “${bajaPendiente.nombre}”. Esta acción quedará registrada en la trazabilidad del sistema.`
+            : ""
+        }
+        confirmLabel="Dar de baja"
+        busy={bajando}
+        onCancel={() => !bajando && setBajaPendiente(null)}
+        onConfirm={confirmarBaja}
+      />
     </Layout>
   );
 }
-
-const styles = {
-  titulo: {
-    marginTop: 0,
-    marginBottom: "1rem",
-  },
-
-  subtitulo: {
-    marginTop: 0,
-  },
-
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-    gap: "1rem",
-  },
-
-  card: {
-    background: "#fff",
-    borderRadius: "14px",
-    padding: "1rem",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-    overflowX: "auto",
-    maxHeight: "80vh",
-    overflowY: "auto",
-  },
-
-  form: {
-    display: "grid",
-    gap: "0.8rem",
-  },
-
-  filters: {
-    display: "grid",
-    gap: "0.8rem",
-    marginBottom: "1rem",
-  },
-
-  input: {
-    padding: "0.8rem",
-    border: "1px solid #ccc",
-    borderRadius: "8px",
-    width: "100%",
-    boxSizing: "border-box",
-  },
-
-  textarea: {
-    padding: "0.8rem",
-    border: "1px solid #ccc",
-    borderRadius: "8px",
-    minHeight: "90px",
-    resize: "vertical",
-    width: "100%",
-    boxSizing: "border-box",
-  },
-
-  button: {
-    padding: "0.9rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#1f4f82",
-    color: "#fff",
-    cursor: "pointer",
-    fontWeight: "bold",
-    marginTop: "0.5rem",
-  },
-
-  buttonGroup: {
-    display: "flex",
-    gap: "0.7rem",
-    marginTop: "0.5rem",
-    flexWrap: "wrap",
-  },
-
-  cancelButton: {
-    padding: "0.9rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#6b7280",
-    color: "#fff",
-    cursor: "pointer",
-    fontWeight: "bold",
-  },
-
-  listado: {
-    display: "grid",
-    gap: "1rem",
-  },
-
-  item: {
-    border: "1px solid #e5e7eb",
-    borderRadius: "12px",
-    padding: "1rem",
-  },
-
-  headerRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "1rem",
-    marginBottom: "0.8rem",
-    flexWrap: "wrap",
-  },
-
-  itemTitle: {
-    margin: 0,
-    fontSize: "1rem",
-  },
-
-  badge: {
-    padding: "0.35rem 0.7rem",
-    borderRadius: "999px",
-    fontSize: "0.8rem",
-    fontWeight: "bold",
-  },
-
-  infoBox: {
-    background: "#f9fafb",
-    border: "1px solid #e5e7eb",
-    borderRadius: "10px",
-    padding: "0.8rem",
-  },
-
-  actionButtons: {
-    display: "flex",
-    gap: "0.5rem",
-    flexWrap: "wrap",
-    marginTop: "1rem",
-  },
-
-  editButton: {
-    padding: "0.55rem 0.8rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#1f4f82",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  deleteButton: {
-    padding: "0.55rem 0.8rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#b91c1c",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  secondaryButton: {
-    padding: "0.55rem 0.8rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#374151",
-    color: "#fff",
-    cursor: "pointer",
-  },
-
-  ok: {
-    color: "green",
-    margin: 0,
-  },
-
-  error: {
-    color: "crimson",
-    margin: 0,
-  },
-
-  errorText: {
-    color: "crimson",
-    marginTop: "0.35rem",
-    marginBottom: 0,
-    fontSize: "0.9rem",
-  },
-};

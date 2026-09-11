@@ -1,20 +1,33 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import {
+  Alert,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+  SectionHeader,
+  StatCard,
+  TableFrame,
+} from "../components/ui";
+import "../styles/admin-flows.css";
 
 export default function ReportePedidos() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+  const [descargando, setDescargando] = useState(false);
 
   const cargarReporte = async () => {
     try {
+      setError("");
       const response = await api.get("/reportes-pedidos/resumen");
       setData(response.data);
     } catch (err) {
       setError(
         err.response?.data?.error ||
           err.response?.data?.mensaje ||
-          "Error al cargar reporte"
+          "Error al cargar reporte",
       );
     }
   };
@@ -24,11 +37,11 @@ export default function ReportePedidos() {
   }, []);
 
   const descargarPDF = async () => {
+    setDescargando(true);
     try {
       const response = await api.get("/reportes-pedidos/resumen/pdf", {
         responseType: "blob",
       });
-
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
@@ -36,173 +49,124 @@ export default function ReportePedidos() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-    } catch (err) {
+      window.URL.revokeObjectURL(url);
+    } catch {
       alert("Error al descargar PDF");
+    } finally {
+      setDescargando(false);
     }
   };
 
+  const estados = data?.porEstado || [];
+  const pedidosPorOficina = data?.pedidosPorOficina || [];
+  const insumosMasSolicitados = data?.insumosMasSolicitados || [];
+  const insumosConProblemas = data?.insumosConProblemas || [];
+  const entregados = estados.find((item) => item.estado === "ENTREGADO")?.total || 0;
+  const pendientes = estados
+    .filter((item) => ["ENVIADO", "EN_REVISION", "APROBADO"].includes(item.estado))
+    .reduce((acc, item) => acc + (Number(item.total) || 0), 0);
+
   return (
     <Layout>
-      <div style={styles.headerRow}>
-        <h1 style={styles.titulo}>Reporte de pedidos</h1>
+      <div className="ui-page admin-page">
+        <PageHeader
+          eyebrow="Reportes"
+          title="Reporte de pedidos"
+          description="Panorama consolidado de demanda, estado de pedidos, dependencias e insumos con incidencias."
+          actions={
+            <Button variant="secondary" onClick={descargarPDF} disabled={descargando} busy={descargando}>
+              {descargando ? "Preparando PDF..." : "Descargar PDF"}
+            </Button>
+          }
+        />
 
-        <button type="button" style={styles.pdfButton} onClick={descargarPDF}>
-          Descargar PDF
-        </button>
+        {error && <Alert tone="danger">{error}</Alert>}
+
+        {!data ? (
+          <Card className="report-card"><p className="ui-help">Cargando reporte...</p></Card>
+        ) : (
+          <>
+            <section className="admin-summary-grid" aria-label="Resumen de pedidos">
+              <StatCard label="Total de pedidos" value={data.totalPedidos || 0} detail="Pedidos registrados" />
+              <StatCard label="Entregados" value={entregados} detail="Ciclo completado" tone="success" />
+              <StatCard label="En gestión" value={pendientes} detail="Enviados, revisión o aprobados" tone={pendientes ? "warning" : "success"} />
+              <StatCard label="Oficinas" value={pedidosPorOficina.length} detail="Dependencias con pedidos" tone="accent" />
+            </section>
+
+            <div className="report-grid">
+              <Card className="report-card">
+                <SectionHeader title="Pedidos por estado" description="Distribución del flujo administrativo actual." />
+                {estados.length === 0 ? (
+                  <EmptyState title="Sin datos" description="Todavía no hay estados para resumir." />
+                ) : (
+                  <div className="report-list">
+                    {estados.map((item) => (
+                      <div className="report-row" key={item.estado}>
+                        <span className="report-row-label">{item.estado}</span>
+                        <strong className="report-row-value">{item.estado}: {item.total}</strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+
+              <Card className="report-card">
+                <SectionHeader title="Pedidos por oficina" description="Dependencias con mayor volumen de pedidos." />
+                {pedidosPorOficina.length === 0 ? (
+                  <EmptyState title="Sin datos" description="No hay pedidos agrupados por oficina." />
+                ) : (
+                  <TableFrame label="Pedidos por oficina">
+                    <table className="ui-table">
+                      <thead><tr><th scope="col">Oficina</th><th scope="col">Pedidos</th></tr></thead>
+                      <tbody>
+                        {pedidosPorOficina.map((item, idx) => (
+                          <tr key={`${item.oficina || "oficina"}-${idx}`}><td><strong>{item.oficina || "-"}</strong></td><td>{item.total}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </TableFrame>
+                )}
+              </Card>
+
+              <Card className="report-card">
+                <SectionHeader title="Insumos más solicitados" description="Artículos con mayor cantidad acumulada solicitada." />
+                {insumosMasSolicitados.length === 0 ? (
+                  <EmptyState title="Sin datos" description="No hay cantidades solicitadas para analizar." />
+                ) : (
+                  <TableFrame label="Insumos más solicitados">
+                    <table className="ui-table">
+                      <thead><tr><th scope="col">Insumo</th><th scope="col">Total solicitado</th></tr></thead>
+                      <tbody>
+                        {insumosMasSolicitados.map((item, idx) => (
+                          <tr key={`${item.nombre || "insumo"}-${idx}`}><td><strong>{item.nombre || "-"}</strong></td><td>{item.total_solicitado}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </TableFrame>
+                )}
+              </Card>
+
+              <Card className="report-card">
+                <SectionHeader title="Insumos con más problemas" description="Artículos que concentran más incidencias reportadas." />
+                {insumosConProblemas.length === 0 ? (
+                  <EmptyState title="Sin incidencias" description="No hay problemas registrados en los pedidos analizados." />
+                ) : (
+                  <TableFrame label="Insumos con problemas">
+                    <table className="ui-table">
+                      <thead><tr><th scope="col">Insumo</th><th scope="col">Problemas</th></tr></thead>
+                      <tbody>
+                        {insumosConProblemas.map((item, idx) => (
+                          <tr key={`${item.nombre || "problema"}-${idx}`}><td><strong>{item.nombre || "-"}</strong></td><td>{item.total_problemas}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </TableFrame>
+                )}
+              </Card>
+            </div>
+          </>
+        )}
       </div>
-
-      {error && <p style={styles.error}>{error}</p>}
-
-      {!data ? (
-        <p>Cargando reporte...</p>
-      ) : (
-        <>
-          <div style={styles.topGrid}>
-            <div style={styles.cardResumen}>
-              <h3 style={styles.cardTitle}>Total de pedidos</h3>
-              <p style={styles.cardValue}>{data.totalPedidos}</p>
-            </div>
-          </div>
-
-          <div style={styles.grid}>
-            <div style={styles.card}>
-              <h3 style={styles.subtitulo}>Pedidos por estado</h3>
-              {data.porEstado.length === 0 ? (
-                <p>Sin datos.</p>
-              ) : (
-                <div style={styles.listado}>
-                  {data.porEstado.map((item, idx) => (
-                    <div key={idx} style={styles.item}>
-                      <strong>{item.estado}</strong>: {item.total}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={styles.card}>
-              <h3 style={styles.subtitulo}>Pedidos por oficina</h3>
-              {data.pedidosPorOficina.length === 0 ? (
-                <p>Sin datos.</p>
-              ) : (
-                <div style={styles.listado}>
-                  {data.pedidosPorOficina.map((item, idx) => (
-                    <div key={idx} style={styles.item}>
-                      <strong>{item.oficina || "-"}</strong>: {item.total}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div style={styles.grid}>
-            <div style={styles.card}>
-              <h3 style={styles.subtitulo}>Insumos más solicitados</h3>
-              {data.insumosMasSolicitados.length === 0 ? (
-                <p>Sin datos.</p>
-              ) : (
-                <div style={styles.listado}>
-                  {data.insumosMasSolicitados.map((item, idx) => (
-                    <div key={idx} style={styles.item}>
-                      <strong>{item.nombre || "-"}</strong>: {item.total_solicitado}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={styles.card}>
-              <h3 style={styles.subtitulo}>Insumos con más problemas</h3>
-              {data.insumosConProblemas.length === 0 ? (
-                <p>Sin datos.</p>
-              ) : (
-                <div style={styles.listado}>
-                  {data.insumosConProblemas.map((item, idx) => (
-                    <div key={idx} style={styles.item}>
-                      <strong>{item.nombre || "-"}</strong>: {item.total_problemas}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
     </Layout>
   );
 }
-
-const styles = {
-  titulo: {
-    marginTop: 0,
-    marginBottom: "1rem",
-  },
-  headerRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "1rem",
-    flexWrap: "wrap",
-    marginBottom: "1rem",
-  },
-  subtitulo: {
-    marginTop: 0,
-    marginBottom: "0.8rem",
-  },
-  topGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: "1rem",
-    marginBottom: "1rem",
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "1rem",
-    marginBottom: "1rem",
-  },
-  cardResumen: {
-    background: "#dbeafe",
-    borderRadius: "14px",
-    padding: "1rem",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-  },
-  cardTitle: {
-    margin: 0,
-    color: "#1d4ed8",
-  },
-  cardValue: {
-    fontSize: "2rem",
-    fontWeight: "bold",
-    margin: "0.6rem 0 0 0",
-    color: "#1d4ed8",
-  },
-  card: {
-    background: "#fff",
-    borderRadius: "14px",
-    padding: "1rem",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-  },
-  listado: {
-    display: "grid",
-    gap: "0.7rem",
-  },
-  item: {
-    padding: "0.7rem",
-    border: "1px solid #e5e7eb",
-    borderRadius: "10px",
-    background: "#fafafa",
-  },
-  pdfButton: {
-    padding: "0.75rem 1rem",
-    border: "none",
-    borderRadius: "8px",
-    background: "#374151",
-    color: "#fff",
-    cursor: "pointer",
-  },
-  error: {
-    color: "crimson",
-  },
-};
