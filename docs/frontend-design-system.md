@@ -1,158 +1,177 @@
-# Design System — Inventario Judicial
+# Design System y arquitectura frontend — Inventario Judicial
 
-## Objetivo
+Este documento define la base visual, de interacción y de continuidad del frontend del Sistema de Inventario Judicial.
 
-Este documento define la base visual y de interacción del frontend del Sistema de Inventario Judicial. El objetivo es que cada módulo nuevo reutilice los mismos patrones y que la interfaz mantenga consistencia, accesibilidad y una identidad institucional contemporánea.
+Estado de referencia al 11/09/2026:
+- Bloques A–E: completos.
+- PR #11: mergeado a `main`.
+- HEAD UX final previo al merge: `fa6941b830fbcb621b6342ce878c6f2e7a89dd54`.
+- Merge commit: `0cb1f5285ca150b41bc17859eb10f607c784f6cc`.
+- Quality Gate pre-merge: #140, verde.
+
+La evolución posterior del frontend debe preservar esta base y coordinar cualquier cambio de autenticación con `docs/backend-security-architecture.md`.
 
 ## Principios
 
-1. **Claridad operativa antes que decoración.** La información que requiere acción debe identificarse rápido.
-2. **Institucional, no burocrático.** La estética debe transmitir confianza sin parecer un sistema administrativo antiguo.
-3. **Densidad controlada.** Tablas para comparar muchos registros; tarjetas solo para resúmenes, alertas y estados vacíos.
-4. **Permisos comprensibles.** La interfaz refleja lo que el usuario puede hacer, pero la autorización real siempre corresponde al backend.
-5. **Accesibilidad desde el componente.** Etiquetas, foco, teclado, semántica, estados y contraste se resuelven en patrones reutilizables.
-6. **Responsive sin pérdida de información.** En móvil una tabla puede transformarse en una vista compacta, pero nunca desaparecer sin alternativa.
-7. **Una sola gramática visual.** No crear botones, badges, formularios o estados nuevos dentro de cada página si ya existe un componente equivalente.
+1. **Claridad operativa antes que decoración.**
+2. **Institucional, no burocrático.**
+3. **Densidad controlada.** Tablas para comparar registros; tarjetas para resúmenes, estados y acciones claras.
+4. **Permisos comprensibles.** La UI refleja capacidades, pero la autorización real siempre vive en backend.
+5. **Accesibilidad desde el componente.** Etiquetas, foco, teclado, semántica y contraste se resuelven en patrones reutilizables.
+6. **Responsive sin pérdida de información.**
+7. **Una sola gramática visual.** No reimplementar botones, badges, formularios o estados si ya existe un componente equivalente.
+8. **Cambios visuales aislados de reglas de negocio.** Un refresh de UI no debe alterar endpoints, roles, permisos o contratos de seguridad.
 
-## Identidad visual
+## Identidad visual actual
 
-- Tipografía: Inter, con fallback de sistema.
-- Fondo de aplicación: gris azulado muy claro.
+El lenguaje visual final toma referencias de dashboards modernos tipo Admina, pero la implementación es propia.
+
+- Tipografía: Inter local, con fallback de sistema.
+- Fondo de aplicación: gris/lila muy claro.
 - Superficies principales: blanco.
-- Primario: azul petróleo.
-- Acento: turquesa oscuro.
-- Verde, ámbar y rojo: reservados para estados semánticos.
-- Sombras: sutiles; no se utilizan como único delimitador.
-- Radios: moderados, sin estética excesivamente redondeada.
-- Movimiento: corto y funcional; debe respetar `prefers-reduced-motion`.
+- Acento principal del refresh: índigo institucional (`#5b52e8` como referencia visual).
+- Colores semánticos: verde, ámbar, rojo y azul reservados para estados.
+- Bordes: suaves pero suficientemente perceptibles, especialmente en inputs/selects.
+- Sombras: cortas y discretas.
+- Radios: moderados, evitando estética excesivamente redondeada.
+- Movimiento: corto, funcional y respetando `prefers-reduced-motion`.
+- Contraste objetivo: WCAG 2.2 AA.
 
-Los valores definitivos viven como custom properties en `src/styles/design-system.css`.
+Los valores efectivos viven en las hojas CSS del frontend; este documento describe la intención de diseño.
 
-## Arquitectura UI
+## Arquitectura de estilos
 
-Los componentes base están centralizados en `src/components/ui/index.jsx`.
+Capas principales:
+
+- `src/styles/design-system.css`: tokens y primitives globales.
+- `src/styles/ui-kit.css`: componentes UI reutilizables.
+- `src/styles/app-shell.css`: shell, sidebar y topbar.
+- `src/styles/dashboard.css`: dashboard.
+- `src/styles/assets.css`: activos.
+- `src/styles/operations.css`: módulos operativos.
+- `src/styles/admin-flows.css`: solicitudes, pedidos, notificaciones y reportes.
+- `src/styles/administration.css`: usuarios y bitácora.
+- `src/styles/attachments-panel.css`: paneles de adjuntos.
+- `src/styles/admina-refresh.css`: refresh visual de shell/primitives/Dashboard/Activos.
+- `src/styles/admina-modules.css`: propagación del refresh al resto de módulos.
+- `src/styles/admina-premerge-fixes.css`: aislamiento de colisiones CSS y ajustes finales de contraste.
+
+### Regla importante de aislamiento
+
+`admin-flows.css` y `administration.css` comparten históricamente nombres como `.admin-card`, `.admin-toolbar`, `.admin-form` y `.admin-description`. La capa `admina-premerge-fixes.css` delimita esos contextos para impedir contaminación visual entre Solicitudes y Usuarios/Bitácora.
+
+No eliminar esa capa sin revisar primero las colisiones de selectores.
+
+## Componentes base
+
+Los componentes reutilizables se centralizan en `src/components/ui/index.jsx`.
 
 ### Button
+Variantes: `primary`, `secondary`, `ghost`, `danger`.
 
-Variantes actuales: `primary`, `secondary`, `ghost`, `danger`.
-
-Usar `primary` para la acción principal de una vista. Evitar dos acciones primarias compitiendo en el mismo grupo.
+Usar una sola acción primaria dominante por región cuando sea posible.
 
 ### Badge
-
 Tonos: `success`, `warning`, `danger`, `info`, `neutral`.
 
-Un badge debe incluir texto. El color nunca debe ser la única forma de transmitir el estado.
-
-### Field
-
-Agrupa label, control, ayuda y error. Todo formulario nuevo debe mostrar etiquetas persistentes. El placeholder puede complementar, pero no reemplazar el label.
-
-### Alert
-
-Para mensajes de estado globales del módulo. Los errores críticos usan `role="alert"`; los mensajes informativos o de éxito usan un estado no intrusivo.
+El color nunca debe ser la única señal de estado.
 
 ### Card
-
-Contenedor visual neutral. No convertir todas las secciones en tarjetas: usarlo cuando exista un agrupamiento conceptual claro.
+Contenedor visual neutral para agrupamientos conceptuales claros.
 
 ### StatCard
+Resumen compacto para Dashboard o cabeceras de módulo.
 
-Indicador compacto para dashboard o resumen de módulo. Máximo recomendado: 4–8 métricas según contexto y tamaño de pantalla.
+### PageHeader / SectionHeader
+Jerarquía consistente de título, descripción y acciones.
 
-### PageHeader
+### Field
+Agrupa label, control, ayuda y error. El placeholder no reemplaza el label.
 
-Encabezado consistente de página: título, descripción y acciones primarias.
-
-### SectionHeader
-
-Encabezado interno de paneles o bloques de información.
-
-### TableFrame
-
-Región navegable que contiene tablas anchas y permite scroll horizontal controlado. Las tablas deben tener caption accesible y encabezados con `scope="col"`.
+### Alert
+Mensajes de error, advertencia, éxito e información con semántica accesible.
 
 ### EmptyState
-
-Estado vacío accionable. Debe explicar qué ocurre y, cuando corresponde, ofrecer la siguiente acción útil.
+Estado vacío accionable y explicativo.
 
 ### Skeleton
+Indicador de carga acompañado por estado `aria-busy` en el contenedor relevante.
 
-Carga visual no textual. Debe acompañarse de un estado `aria-busy` en el contenedor relevante.
+### TableFrame
+Región navegable para tablas anchas con scroll horizontal controlado.
 
 ### ConfirmDialog
+Confirmación accesible para acciones destructivas/de impacto mediante `dialog` nativo.
 
-Confirmación modal para acciones destructivas o de impacto. Usa `dialog` nativo como fallback sin dependencias externas, con título y descripción accesibles. Las decisiones de seguridad siguen siendo validadas en backend.
+### Dialog
+Diálogo reutilizable para formularios administrativos, incluido reset de contraseña.
 
-## Estrategia Radix / shadcn
+## AppShell y navegación
 
-La arquitectura adopta el principio de shadcn: componentes de aplicación controlados por el proyecto y estilizados con identidad propia, en lugar de una librería visual cerrada.
+- Sidebar responsive para desktop/mobile.
+- Navegación condicionada por rol.
+- Opción activa visualmente destacada.
+- Persistencia de scroll del sidebar durante la sesión.
+- Persistencia de estado colapsado/expandido.
+- El enlace activo se mantiene visible después de navegar.
+- Limpieza del estado al cerrar sesión.
+- E2E específico para evitar regresión de la navegación lateral.
+- Enlace “Saltar al contenido principal”.
 
-Radix Primitives se incorporará únicamente para patrones interactivos que se benefician de primitivas especializadas —por ejemplo menús, tooltips, popovers y selectores avanzados— y siempre con `package.json` y `package-lock.json` actualizados de forma atómica para preservar `npm ci` en CI.
+## Formularios
 
-No se incorpora Tailwind como requisito global. El proyecto ya dispone de una base CSS propia y el Design System debe poder evolucionar sin reescribir todas las pantallas por una dependencia estética.
+- Label visible en todos los controles.
+- Errores asociados mediante `aria-describedby` cuando corresponde.
+- `aria-invalid` en campos inválidos.
+- Estado loading/busy para evitar dobles envíos.
+- Acciones destructivas con confirmación explícita.
+- Validaciones frontend no sustituyen reglas del backend.
+- Contraseñas respetan la política definida por backend.
 
-## Convenciones de formularios
+## Tablas y listados
 
-- Todos los controles tienen label visible.
-- Los errores se asocian con `aria-describedby`.
-- Los campos inválidos usan `aria-invalid`.
-- Las acciones muestran estado de carga y deshabilitan dobles envíos cuando corresponde.
-- Las acciones destructivas requieren confirmación explícita.
-- No introducir reglas de negocio solo en frontend.
-
-## Convenciones de tablas y listados
-
-- Desktop: tabla cuando la comparación entre filas sea importante.
-- Mobile: representación compacta equivalente si la tabla deja de ser usable.
-- El buscador debe filtrar por los campos más reconocibles para el usuario.
-- Los filtros deben poder limpiarse rápidamente.
-- El recuento de resultados debe indicar el alcance actual.
-- Acciones destructivas visualmente separadas de las acciones normales.
+- Desktop: tabla cuando la comparación entre filas sea relevante.
+- Mobile: scroll o representación equivalente; nunca ocultar información sin alternativa.
+- Cabeceras semánticas.
+- Recuento de resultados y filtros claros.
+- Estados loading/error/empty/retry.
+- Acciones sensibles separadas visualmente de acciones normales.
 
 ## Accesibilidad
 
 Objetivo: WCAG 2.2 AA.
 
-Requisitos mínimos del Design System:
-
+Requisitos mínimos:
 - foco visible;
 - navegación completa por teclado;
 - controles con nombre accesible;
-- etiquetas visibles en formularios;
-- contraste suficiente;
+- labels persistentes;
+- contraste suficiente para texto normal y secundario;
 - no depender solo del color;
-- targets táctiles cómodos;
-- soporte de zoom y reflow;
+- targets táctiles razonables;
+- zoom/reflow;
 - `prefers-reduced-motion`;
 - tablas semánticas;
-- estados de error, éxito, carga y vacío;
-- enlace “Saltar al contenido principal” en el AppShell.
+- mensajes de error/éxito/carga/vacío;
+- diálogos con título y descripción accesibles.
 
-## Regla para nuevos módulos
+## Cobertura del rediseño
 
-Antes de crear CSS o JSX específico, revisar si el patrón puede resolverse con los componentes de `components/ui`. El CSS de página debe describir composición y necesidades particulares del módulo, no reimplementar botones, inputs, badges, cards o estados globales.
-
-## Cobertura actual del rediseño
-
-### Bloque A — Base institucional
-
+### Bloque A — Base institucional ✅
 - Login.
 - AppShell y navegación por rol.
 - Dashboard.
 - Activos.
-- Design tokens y kit reusable de componentes.
+- Design tokens y kit reutilizable.
 
-### Bloque B — Operación de inventario
-
+### Bloque B — Operación de inventario ✅
 - Insumos.
 - Stock por oficina.
 - Consumo de oficina.
-- Historial de movimientos de stock.
+- Movimientos de stock.
 - Adjuntos.
 
-### Bloque C — Flujos administrativos
-
+### Bloque C — Flujos administrativos ✅
 - Solicitudes.
 - Pedido mensual de insumos.
 - Historial de pedidos y provisión.
@@ -160,11 +179,52 @@ Antes de crear CSS o JSX específico, revisar si el patrón puede resolverse con
 - Reporte general de pedidos.
 - Reporte mensual de consumo por oficina.
 
-Los bloques de UX/UI no modifican las reglas de autorización del backend ni la rama `security/hardening`. La adopción del encabezado opcional `Idempotency-Key` en operaciones críticas queda reservada para una integración coordinada posterior con el hardening P6.
+### Bloque D — Administración y cierre UX ✅
+- Usuarios.
+- Bitácora.
+- Formulario de alta/edición moderno.
+- Reset de contraseña mediante diálogo propio.
+- Estados loading/error/empty/retry.
+- Revisión responsive.
+- Paneles embebidos de adjuntos migrados al Design System.
+- Persistencia de scroll/selección del sidebar.
+- Correcciones de accesibilidad y consistencia.
 
-## Validación requerida por bloque
+### Bloque E — Refresh visual inspirado en Admina ✅
+- Refresh de AppShell, Dashboard y Activos como piloto.
+- Propagación posterior a todos los módulos autenticados.
+- Sidebar claro y acento índigo.
+- Botones/inputs/badges/tablas refinados.
+- KPI/cards con jerarquía y microanimaciones suaves.
+- Contraste AA reforzado.
+- Aislamiento de colisiones CSS pre-merge.
+- Sin Tailwind y sin dependencias visuales nuevas.
 
-Todo bloque de frontend debe cerrar con:
+## Decisiones deliberadas / deuda controlada
+
+Se mantienen temporalmente algunos diálogos nativos en flujos críticos ya estabilizados por E2E:
+- asignación de stock;
+- registro de consumo;
+- alertas del flujo de provisión/estado de pedidos.
+
+No reescribir estos flujos dentro de un cambio visual menor. Deben tratarse como una tarea futura coordinada y con regresión completa.
+
+La adopción frontend explícita de `Idempotency-Key` también queda diferida hasta después de estabilizar P6.1 y su contrato final de autenticación/transporte.
+
+## Integración con P6.1
+
+El frontend de `main` todavía debe recibir la capa final de seguridad pre-staging mediante PR #13:
+- sesión por cookie `HttpOnly` en producción;
+- `/auth/me` como autoridad de sesión;
+- eliminación del JWT de `localStorage`;
+- UI de MFA/TOTP para `ADMIN`;
+- códigos de recuperación.
+
+Esa integración debe partir del `main` que ya contiene PR #11 y volver a pasar todo el Quality Gate. Ver `docs/backend-security-architecture.md`.
+
+## Validación requerida
+
+Todo bloque frontend debe cerrar como mínimo con:
 
 ```bash
 npm --prefix inventario-frontend ci
@@ -172,4 +232,13 @@ npm --prefix inventario-frontend run lint
 npm --prefix inventario-frontend run build
 ```
 
-Antes de integrar a `main`, ejecutar también el quality gate completo y los E2E críticos del repositorio. Cualquier cambio en dependencias debe incluir el lockfile correspondiente.
+Antes de integrar a `main`, ejecutar además el Quality Gate completo y E2E críticos. Cualquier cambio en dependencias debe incluir `package.json` y `package-lock.json` de forma atómica.
+
+## Regla para futuros módulos
+
+Antes de crear CSS o JSX específico:
+1. revisar `components/ui`;
+2. revisar patrones de módulos equivalentes;
+3. evitar selectores genéricos que puedan colisionar globalmente;
+4. no introducir reglas de autorización solo en frontend;
+5. actualizar este documento si cambia una convención global.
