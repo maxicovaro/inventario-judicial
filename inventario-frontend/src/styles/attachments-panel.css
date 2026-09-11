@@ -1,0 +1,136 @@
+.attachment-panel {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+
+.attachment-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.attachment-panel__title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: .92rem;
+  font-weight: 780;
+}
+
+.attachment-panel__subtitle {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: .8rem;
+  line-height: 1.5;
+}
+
+.attachment-panel__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.attachment-panel__input {
+  min-width: 0;
+  width: 100%;
+}
+
+.attachment-panel__selected {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: .82rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.attachment-panel__messages {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.attachment-panel__loading {
+  display: grid;
+  gap: 8px;
+}
+
+.attachment-panel__list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.attachment-panel__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.attachment-panel__info {
+  min-width: 0;
+}
+
+.attachment-panel__name {
+  margin: 0;
+  color: var(--color-text);
+  font-size: .85rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.attachment-panel__meta {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: .76rem;
+}
+
+.attachment-panel__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.attachment-panel__empty {
+  min-height: 118px;
+}
+
+@media (max-width: 640px) {
+  .attachment-panel {
+    padding: var(--space-3);
+  }
+
+  .attachment-panel__form {
+    grid-template-columns: 1fr;
+  }
+
+  .attachment-panel__form .ui-button {
+    width: 100%;
+  }
+
+  .attachment-panel__item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .attachment-panel__actions {
+    width: 100%;
+  }
+
+  .attachment-panel__actions .ui-button {
+    flex: 1 1 auto;
+  }
+}
