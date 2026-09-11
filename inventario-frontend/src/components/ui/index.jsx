@@ -18,7 +18,7 @@ export function Button({
         "ui-button",
         `ui-button--${variant}`,
         size !== "md" && `ui-button--${size}`,
-        className
+        className,
       )}
       aria-busy={busy || undefined}
       {...props}
@@ -43,7 +43,7 @@ export function Card({ as = "section", className, children, padded = false, ...p
       className: cn("ui-card", padded && "ui-card-pad", className),
       ...props,
     },
-    children
+    children,
   );
 }
 
@@ -149,6 +149,64 @@ export function TableFrame({ children, className, label }) {
 
 export function Skeleton({ className, ...props }) {
   return <div className={cn("ui-skeleton", className)} aria-hidden="true" {...props} />;
+}
+
+export function Dialog({
+  open,
+  title,
+  description,
+  children,
+  actions,
+  onClose,
+  className,
+}) {
+  const ref = useRef(null);
+  const titleId = useId();
+  const descriptionId = useId();
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+
+  const handleCancel = (event) => {
+    event.preventDefault();
+    onClose?.();
+  };
+
+  return (
+    <dialog
+      ref={ref}
+      className={cn("ui-dialog", "ui-dialog--form", className)}
+      onCancel={handleCancel}
+      aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
+    >
+      <div className="ui-dialog-form-header">
+        <div>
+          <h2 className="ui-dialog-title" id={titleId}>{title}</h2>
+          {description && (
+            <p className="ui-dialog-description" id={descriptionId}>
+              {description}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          className="ui-dialog-close"
+          onClick={onClose}
+          aria-label="Cerrar diálogo"
+        >
+          ×
+        </button>
+      </div>
+      <div className="ui-dialog-body">{children}</div>
+      {actions && <div className="ui-dialog-actions">{actions}</div>}
+    </dialog>
+  );
 }
 
 export function ConfirmDialog({
