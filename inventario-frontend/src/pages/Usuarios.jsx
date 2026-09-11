@@ -360,7 +360,6 @@ export default function Usuarios() {
   };
 
   const cerrarResetPassword = () => {
-    if (reseteandoPassword) return;
     setUsuarioReset(null);
     setNuevaPassword("");
     setConfirmarNuevaPassword("");
@@ -868,7 +867,7 @@ export default function Usuarios() {
               ? `Definí una nueva contraseña para ${usuarioReset.nombre} ${usuarioReset.apellido}. Las sesiones vigentes serán revocadas por el backend.`
               : ""
           }
-          onClose={cerrarResetPassword}
+          onClose={() => !reseteandoPassword && cerrarResetPassword()}
           actions={
             <>
               <Button variant="secondary" onClick={cerrarResetPassword} disabled={reseteandoPassword}>
