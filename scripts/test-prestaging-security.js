@@ -12,6 +12,11 @@ const {
   buildAuthCookie,
 } = require("../src/utils/authCookie");
 
+const VALID_MFA_KEY = Buffer.from(
+  "0123456789abcdef0123456789abcdef",
+  "utf8",
+).toString("base64");
+
 const mockResponse = () => {
   const headers = new Map();
   const response = {
@@ -142,7 +147,7 @@ const testRateLimiter = () => {
   console.log("OK - rate limiter bloquea y reinicia la ventana correctamente");
 };
 
-const testProductionTransport = () => {
+const testProductionConfig = () => {
   const baseEnv = {
     ...process.env,
     NODE_ENV: "production",
@@ -153,6 +158,8 @@ const testProductionTransport = () => {
     DB_PASSWORD: "password_test_only",
     JWT_SECRET: "secreto-produccion-test-con-mas-de-32-bytes-2026",
     CORS_ORIGIN: "https://inventario.example.test",
+    REQUIRE_ADMIN_MFA: "true",
+    MFA_ENCRYPTION_KEY: VALID_MFA_KEY,
   };
 
   const insecure = spawnSync(
@@ -167,6 +174,22 @@ const testProductionTransport = () => {
   assert.notStrictEqual(insecure.status, 0);
   assert.match(`${insecure.stdout}\n${insecure.stderr}`, /debe ser cookie/i);
 
+  const missingMfaKey = spawnSync(
+    process.execPath,
+    ["-e", 'require("./src/config/env")'],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...baseEnv,
+        AUTH_TOKEN_TRANSPORT: "cookie",
+        MFA_ENCRYPTION_KEY: "",
+      },
+      encoding: "utf8",
+    },
+  );
+  assert.notStrictEqual(missingMfaKey.status, 0);
+  assert.match(`${missingMfaKey.stdout}\n${missingMfaKey.stderr}`, /MFA_ENCRYPTION_KEY/i);
+
   const secure = spawnSync(
     process.execPath,
     ["-e", 'require("./src/config/env")'],
@@ -177,7 +200,7 @@ const testProductionTransport = () => {
     },
   );
   assert.strictEqual(secure.status, 0, secure.stderr);
-  console.log("OK - production prohíbe exponer JWT mediante transporte hybrid");
+  console.log("OK - production exige cookie HttpOnly y clave MFA separada");
 };
 
 testHeaders();
@@ -185,5 +208,5 @@ testCookie();
 testBridge();
 testOrigin();
 testRateLimiter();
-testProductionTransport();
+testProductionConfig();
 console.log("\n✓ Baseline de seguridad pre-staging validado.");
