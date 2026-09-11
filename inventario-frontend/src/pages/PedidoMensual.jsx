@@ -3,7 +3,23 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import {
+  Alert,
+  Button,
+  Card,
+  Field,
+  PageHeader,
+  SectionHeader,
+  TableFrame,
+} from "../components/ui";
 import { pedidoMensualSchema } from "../schemas/pedidoMensualSchema";
+import "../styles/admin-flows.css";
+
+const grupos = [
+  { titulo: "Para uso exclusivo de Unidad Judicial - Limpieza", categoria: "Limpieza" },
+  { titulo: "Para uso exclusivo de Unidad Móvil", categoria: "Unidad móvil" },
+  { titulo: "Para uso exclusivo de Unidad Judicial - Librería", categoria: "Librería" },
+];
 
 export default function PedidoMensual() {
   const [insumos, setInsumos] = useState([]);
@@ -29,80 +45,74 @@ export default function PedidoMensual() {
     },
   });
 
-  useEffect(() => {
-    cargarInsumos();
-  }, []);
-
   const cargarInsumos = async () => {
     try {
       const res = await api.get("/insumos");
-      setInsumos(res.data);
-
-      const inicial = res.data.map((i) => ({
-        insumo_id: i.id,
-        cantidad_solicitada: "",
-        tuvo_problema: false,
-        detalle_problema: "",
-      }));
-
-      setDetalles(inicial);
+      setInsumos(res.data || []);
+      setDetalles(
+        (res.data || []).map((i) => ({
+          insumo_id: i.id,
+          cantidad_solicitada: "",
+          tuvo_problema: false,
+          detalle_problema: "",
+        })),
+      );
     } catch {
       setError("Error al cargar insumos");
     }
   };
 
+  useEffect(() => {
+    cargarInsumos();
+  }, []);
+
   const actualizarDetalle = (insumoId, campo, valor) => {
     setDetalles((prev) =>
       prev.map((item) =>
-        item.insumo_id === insumoId ? { ...item, [campo]: valor } : item
-      )
+        item.insumo_id === insumoId ? { ...item, [campo]: valor } : item,
+      ),
     );
   };
 
   const agregarExtra = () => {
     setExtras((prev) => [
       ...prev,
-      {
-        articulo_manual: "",
-        cantidad_solicitada: "",
-      },
+      { articulo_manual: "", cantidad_solicitada: "" },
     ]);
   };
 
   const actualizarExtra = (index, campo, valor) => {
     setExtras((prev) => {
       const nuevos = [...prev];
-      nuevos[index][campo] = valor;
+      nuevos[index] = { ...nuevos[index], [campo]: valor };
       return nuevos;
     });
   };
 
-  const insumosAgrupados = useMemo(() => {
-    const ordenar = (arr) =>
-      [...arr].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const quitarExtra = (index) => {
+    setExtras((prev) => prev.filter((_, i) => i !== index));
+  };
 
-    return {
-      "Para uso exclusivo de Unidad Judicial - Limpieza": ordenar(
-        insumos.filter((i) => i.categoria === "Limpieza")
-      ),
-      "Para uso exclusivo de Unidad Móvil": ordenar(
-        insumos.filter((i) => i.categoria === "Unidad móvil")
-      ),
-      "Para uso exclusivo de Unidad Judicial - Librería": ordenar(
-        insumos.filter((i) => i.categoria === "Librería")
-      ),
-    };
+  const insumosAgrupados = useMemo(() => {
+    const ordenar = (arr) => [...arr].sort((a, b) => a.nombre.localeCompare(b.nombre));
+    return grupos.map((grupo) => ({
+      ...grupo,
+      lista: ordenar(insumos.filter((i) => i.categoria === grupo.categoria)),
+    }));
   }, [insumos]);
 
-  const obtenerDetalle = (insumoId) => {
-    return (
-      detalles.find((d) => d.insumo_id === insumoId) || {
-        cantidad_solicitada: "",
-        tuvo_problema: false,
-        detalle_problema: "",
-      }
-    );
-  };
+  const obtenerDetalle = (insumoId) =>
+    detalles.find((d) => d.insumo_id === insumoId) || {
+      cantidad_solicitada: "",
+      tuvo_problema: false,
+      detalle_problema: "",
+    };
+
+  const itemsSeleccionados = useMemo(
+    () => detalles.filter((d) => Number(d.cantidad_solicitada) > 0 || d.tuvo_problema).length +
+      extras.filter((e) => e.articulo_manual && Number(e.cantidad_solicitada) > 0).length,
+    [detalles, extras],
+  );
 
   const onSubmit = async (data) => {
     setError("");
@@ -111,16 +121,14 @@ export default function PedidoMensual() {
 
     try {
       const detallesValidos = detalles.filter(
-        (d) => Number(d.cantidad_solicitada) > 0 || d.tuvo_problema
+        (d) => Number(d.cantidad_solicitada) > 0 || d.tuvo_problema,
       );
-
       const extrasValidos = extras.filter(
-        (e) => e.articulo_manual && Number(e.cantidad_solicitada) > 0
+        (e) => e.articulo_manual && Number(e.cantidad_solicitada) > 0,
       );
 
       if (detallesValidos.length === 0 && extrasValidos.length === 0) {
         setError("Debés cargar al menos un insumo o artículo no listado");
-        setEnviando(false);
         return;
       }
 
@@ -134,9 +142,7 @@ export default function PedidoMensual() {
       };
 
       await api.post("/pedidos-insumos", payload);
-
       setMensaje("Pedido enviado correctamente");
-
       reset({
         mes: new Date().getMonth() + 1,
         anio: new Date().getFullYear(),
@@ -144,14 +150,13 @@ export default function PedidoMensual() {
         cantidad_autopsias: 0,
         observaciones: "",
       });
-
       setExtras([]);
       await cargarInsumos();
     } catch (err) {
       setError(
         err.response?.data?.mensaje ||
           err.response?.data?.error ||
-          "Error al enviar pedido"
+          "Error al enviar pedido",
       );
     } finally {
       setEnviando(false);
@@ -160,204 +165,111 @@ export default function PedidoMensual() {
 
   return (
     <Layout>
-      <style>{`
-        @media (max-width: 900px) {
-          .pedido-desktop {
-            display: none !important;
-          }
+      <div className="ui-page admin-page order-page">
+        <PageHeader
+          eyebrow="Abastecimiento"
+          title="Pedido mensual de insumos"
+          description="Completá una única planilla mensual con cantidades, incidencias y artículos extraordinarios antes de enviarla a Dirección."
+        />
 
-          .pedido-mobile {
-            display: block !important;
-          }
-
-          .pedido-extra-row {
-            grid-template-columns: 1fr !important;
-          }
-        }
-
-        @media (min-width: 901px) {
-          .pedido-desktop {
-            display: block !important;
-          }
-
-          .pedido-mobile {
-            display: none !important;
-          }
-        }
-      `}</style>
-
-      <div style={styles.pageHeader}>
-        <div>
-          <h1 style={styles.titulo}>Pedido mensual de insumos</h1>
-          <p style={styles.descripcion}>
-            Completá la planilla mensual y enviá el pedido a la Dirección.
-          </p>
+        <div className="admin-stack" aria-live="polite">
+          {mensaje && <Alert tone="success">{mensaje}</Alert>}
+          {error && <Alert tone="danger">{error}</Alert>}
         </div>
-      </div>
 
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div style={styles.card}>
-          <h3 style={styles.subtitulo}>Datos del mes</h3>
-
-          <div style={styles.topGrid}>
-            <div>
-              <label style={styles.label}>Mes</label>
-              <input
-                type="number"
-                min="1"
-                max="12"
-                {...register("mes")}
-                style={styles.input}
-              />
-              {errors.mes && (
-                <p style={styles.errorText}>{errors.mes.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label style={styles.label}>Año</label>
-              <input
-                type="number"
-                {...register("anio")}
-                style={styles.input}
-              />
-              {errors.anio && (
-                <p style={styles.errorText}>{errors.anio.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label style={styles.label}>Hechos delictivos</label>
-              <input
-                type="number"
-                min="0"
-                {...register("cantidad_hechos_delictivos")}
-                style={styles.input}
-              />
-              {errors.cantidad_hechos_delictivos && (
-                <p style={styles.errorText}>
-                  {errors.cantidad_hechos_delictivos.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label style={styles.label}>Autopsias</label>
-              <input
-                type="number"
-                min="0"
-                {...register("cantidad_autopsias")}
-                style={styles.input}
-              />
-              {errors.cantidad_autopsias && (
-                <p style={styles.errorText}>
-                  {errors.cantidad_autopsias.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div style={styles.observacionesBox}>
-            <label style={styles.label}>Observaciones</label>
-            <textarea
-              placeholder="Observaciones generales"
-              {...register("observaciones")}
-              style={styles.textarea}
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+          <Card className="order-period-card">
+            <SectionHeader
+              title="Datos del período"
+              description="Estos datos contextualizan el consumo y la necesidad mensual de la dependencia."
             />
-            {errors.observaciones && (
-              <p style={styles.errorText}>{errors.observaciones.message}</p>
-            )}
-          </div>
-        </div>
+            <div className="order-period-grid">
+              <Field label="Mes" htmlFor="pedido-mes" error={errors.mes} errorId="pedido-mes-error">
+                <input id="pedido-mes" className="ui-control" type="number" min="1" max="12" {...register("mes")} aria-invalid={Boolean(errors.mes)} />
+              </Field>
+              <Field label="Año" htmlFor="pedido-anio" error={errors.anio} errorId="pedido-anio-error">
+                <input id="pedido-anio" className="ui-control" type="number" {...register("anio")} aria-invalid={Boolean(errors.anio)} />
+              </Field>
+              <Field label="Hechos delictivos" htmlFor="pedido-hechos" error={errors.cantidad_hechos_delictivos} errorId="pedido-hechos-error">
+                <input id="pedido-hechos" className="ui-control" type="number" min="0" {...register("cantidad_hechos_delictivos")} aria-invalid={Boolean(errors.cantidad_hechos_delictivos)} />
+              </Field>
+              <Field label="Autopsias" htmlFor="pedido-autopsias" error={errors.cantidad_autopsias} errorId="pedido-autopsias-error">
+                <input id="pedido-autopsias" className="ui-control" type="number" min="0" {...register("cantidad_autopsias")} aria-invalid={Boolean(errors.cantidad_autopsias)} />
+              </Field>
+            </div>
+            <div className="order-observations">
+              <Field label="Observaciones generales" htmlFor="pedido-observaciones" error={errors.observaciones} errorId="pedido-observaciones-error">
+                <textarea
+                  id="pedido-observaciones"
+                  className="ui-control admin-textarea"
+                  placeholder="Observaciones generales"
+                  {...register("observaciones")}
+                  aria-invalid={Boolean(errors.observaciones)}
+                />
+              </Field>
+            </div>
+          </Card>
 
-        {Object.entries(insumosAgrupados).map(([tituloGrupo, lista]) =>
-          lista.length > 0 ? (
-            <div key={tituloGrupo} style={styles.card}>
-              <div style={styles.sectionHeader}>
-                <h3 style={styles.sectionTitle}>{tituloGrupo}</h3>
-              </div>
-
-              <div className="pedido-desktop" style={styles.desktopOnly}>
-                <div style={styles.tableWrapper}>
-                  <table style={styles.table}>
+          {insumosAgrupados.map(({ titulo, lista }) =>
+            lista.length > 0 ? (
+              <Card key={titulo} className="order-group-card">
+                <SectionHeader
+                  title={titulo}
+                  description="Indicá cantidad requerida y marcá únicamente los artículos que presentaron inconvenientes."
+                />
+                <TableFrame label={titulo}>
+                  <table className="ui-table order-table">
+                    <caption className="sr-only">{titulo}</caption>
                     <thead>
                       <tr>
-                        <th style={styles.thArticulo}>Artículo</th>
-                        <th style={styles.thCantidad}>Cantidad</th>
-                        <th style={styles.thProblema}>Problema</th>
-                        <th style={styles.thObs}>Observación</th>
+                        <th scope="col">Artículo</th>
+                        <th scope="col">Cantidad</th>
+                        <th scope="col">Problema</th>
+                        <th scope="col">Observación</th>
                       </tr>
                     </thead>
-
                     <tbody>
                       {lista.map((insumo) => {
                         const detalle = obtenerDetalle(insumo.id);
-
+                        const observacionId = `problema-${insumo.id}`;
                         return (
                           <tr key={insumo.id}>
-                            <td style={styles.tdArticulo}>{insumo.nombre}</td>
-
-                            <td style={styles.tdCantidad}>
+                            <td><strong>{insumo.nombre}</strong></td>
+                            <td>
+                              <label className="sr-only" htmlFor={`cantidad-${insumo.id}`}>Cantidad de {insumo.nombre}</label>
                               <input
+                                id={`cantidad-${insumo.id}`}
+                                className="ui-control order-quantity"
                                 type="number"
                                 min="0"
                                 value={detalle.cantidad_solicitada}
-                                onChange={(e) =>
-                                  actualizarDetalle(
-                                    insumo.id,
-                                    "cantidad_solicitada",
-                                    e.target.value
-                                  )
-                                }
-                                style={styles.tableInput}
+                                onChange={(e) => actualizarDetalle(insumo.id, "cantidad_solicitada", e.target.value)}
                               />
                             </td>
-
-                            <td style={styles.tdProblema}>
+                            <td>
+                              <label className="sr-only" htmlFor={`check-${insumo.id}`}>Informar problema con {insumo.nombre}</label>
                               <input
+                                id={`check-${insumo.id}`}
+                                className="order-problem-check"
                                 type="checkbox"
                                 checked={detalle.tuvo_problema}
                                 onChange={(e) => {
-                                  actualizarDetalle(
-                                    insumo.id,
-                                    "tuvo_problema",
-                                    e.target.checked
-                                  );
-
-                                  if (!e.target.checked) {
-                                    actualizarDetalle(
-                                      insumo.id,
-                                      "detalle_problema",
-                                      ""
-                                    );
-                                  }
+                                  actualizarDetalle(insumo.id, "tuvo_problema", e.target.checked);
+                                  if (!e.target.checked) actualizarDetalle(insumo.id, "detalle_problema", "");
                                 }}
+                                aria-controls={observacionId}
                               />
                             </td>
-
-                            <td style={styles.tdObs}>
+                            <td>
+                              <label className="sr-only" htmlFor={observacionId}>Detalle del problema de {insumo.nombre}</label>
                               <input
+                                id={observacionId}
+                                className="ui-control"
                                 type="text"
-                                placeholder={
-                                  detalle.tuvo_problema
-                                    ? "Describa el problema"
-                                    : "Sin problema informado"
-                                }
+                                placeholder={detalle.tuvo_problema ? "Describa el problema" : "Sin problema informado"}
                                 value={detalle.detalle_problema || ""}
                                 disabled={!detalle.tuvo_problema}
-                                onChange={(e) =>
-                                  actualizarDetalle(
-                                    insumo.id,
-                                    "detalle_problema",
-                                    e.target.value
-                                  )
-                                }
-                                style={{
-                                  ...styles.inputSmall,
-                                  ...(detalle.tuvo_problema
-                                    ? styles.inputSmallActive
-                                    : styles.inputSmallDisabled),
-                                }}
+                                onChange={(e) => actualizarDetalle(insumo.id, "detalle_problema", e.target.value)}
                               />
                             </td>
                           </tr>
@@ -365,391 +277,65 @@ export default function PedidoMensual() {
                       })}
                     </tbody>
                   </table>
-                </div>
+                </TableFrame>
+              </Card>
+            ) : null,
+          )}
+
+          <Card className="order-extra-card">
+            <SectionHeader
+              title="Artículos no listados"
+              description="Agregá aquí necesidades excepcionales que no formen parte del catálogo habitual."
+              aside={<Button type="button" variant="secondary" size="sm" onClick={agregarExtra}>+ Agregar artículo</Button>}
+            />
+
+            {extras.length === 0 ? (
+              <p className="ui-help">No agregaste artículos extraordinarios.</p>
+            ) : (
+              <div className="order-extra-list">
+                {extras.map((extra, index) => (
+                  <div className="order-extra-row" key={index}>
+                    <Field label={`Artículo ${index + 1}`} htmlFor={`extra-articulo-${index}`}>
+                      <input
+                        id={`extra-articulo-${index}`}
+                        className="ui-control"
+                        placeholder="Artículo"
+                        value={extra.articulo_manual}
+                        onChange={(e) => actualizarExtra(index, "articulo_manual", e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Cantidad" htmlFor={`extra-cantidad-${index}`}>
+                      <input
+                        id={`extra-cantidad-${index}`}
+                        className="ui-control"
+                        type="number"
+                        min="0"
+                        placeholder="Cantidad"
+                        value={extra.cantidad_solicitada}
+                        onChange={(e) => actualizarExtra(index, "cantidad_solicitada", e.target.value)}
+                      />
+                    </Field>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => quitarExtra(index)} aria-label={`Quitar artículo ${index + 1}`}>
+                      Quitar
+                    </Button>
+                  </div>
+                ))}
               </div>
+            )}
+          </Card>
 
-              <div className="pedido-mobile" style={styles.mobileOnly}>
-                <div style={styles.mobileList}>
-                  {lista.map((insumo) => {
-                    const detalle = obtenerDetalle(insumo.id);
-
-                    return (
-                      <div key={insumo.id} style={styles.mobileItem}>
-                        <p style={styles.mobileTitle}>{insumo.nombre}</p>
-
-                        <div style={styles.mobileField}>
-                          <label style={styles.mobileLabel}>Cantidad</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={detalle.cantidad_solicitada}
-                            onChange={(e) =>
-                              actualizarDetalle(
-                                insumo.id,
-                                "cantidad_solicitada",
-                                e.target.value
-                              )
-                            }
-                            style={styles.input}
-                          />
-                        </div>
-
-                        <div style={styles.mobileCheckboxRow}>
-                          <label style={styles.mobileLabel}>Problema</label>
-                          <input
-                            type="checkbox"
-                            checked={detalle.tuvo_problema}
-                            onChange={(e) => {
-                              actualizarDetalle(
-                                insumo.id,
-                                "tuvo_problema",
-                                e.target.checked
-                              );
-
-                              if (!e.target.checked) {
-                                actualizarDetalle(
-                                  insumo.id,
-                                  "detalle_problema",
-                                  ""
-                                );
-                              }
-                            }}
-                          />
-                        </div>
-
-                        <div style={styles.mobileField}>
-                          <label style={styles.mobileLabel}>Observación</label>
-                          <input
-                            type="text"
-                            placeholder={
-                              detalle.tuvo_problema
-                                ? "Describa el problema"
-                                : "Sin problema informado"
-                            }
-                            value={detalle.detalle_problema || ""}
-                            disabled={!detalle.tuvo_problema}
-                            onChange={(e) =>
-                              actualizarDetalle(
-                                insumo.id,
-                                "detalle_problema",
-                                e.target.value
-                              )
-                            }
-                            style={{
-                              ...styles.input,
-                              ...(detalle.tuvo_problema
-                                ? styles.inputSmallActive
-                                : styles.inputSmallDisabled),
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : null
-        )}
-
-        <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Artículos no listados</h3>
-
-          <div style={styles.extrasContainer}>
-            {extras.map((extra, i) => (
-              <div
-                key={i}
-                className="pedido-extra-row"
-                style={styles.extraRow}
-              >
-                <input
-                  placeholder="Artículo"
-                  value={extra.articulo_manual}
-                  onChange={(e) =>
-                    actualizarExtra(i, "articulo_manual", e.target.value)
-                  }
-                  style={styles.input}
-                />
-
-                <input
-                  type="number"
-                  placeholder="Cantidad"
-                  value={extra.cantidad_solicitada}
-                  onChange={(e) =>
-                    actualizarExtra(i, "cantidad_solicitada", e.target.value)
-                  }
-                  style={styles.input}
-                />
-              </div>
-            ))}
+          <div className="order-footer">
+            <p className="order-footer-copy">
+              {itemsSeleccionados > 0
+                ? `${itemsSeleccionados} artículo${itemsSeleccionados === 1 ? "" : "s"} con cantidad o incidencia cargada.`
+                : "Todavía no cargaste cantidades ni incidencias."}
+            </p>
+            <Button type="submit" disabled={enviando} busy={enviando}>
+              {enviando ? "Enviando..." : "Enviar pedido"}
+            </Button>
           </div>
-
-          <button
-            type="button"
-            onClick={agregarExtra}
-            style={styles.secondaryButton}
-          >
-            + Agregar artículo
-          </button>
-        </div>
-
-        {(mensaje || error) && (
-          <div style={styles.feedbackBox}>
-            {mensaje && <p style={styles.ok}>{mensaje}</p>}
-            {error && <p style={styles.error}>{error}</p>}
-          </div>
-        )}
-
-        <div style={styles.footerActions}>
-          <button type="submit" style={styles.button} disabled={enviando}>
-            {enviando ? "Enviando..." : "Enviar pedido"}
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </Layout>
   );
 }
-
-const styles = {
-  pageHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "1rem",
-    marginBottom: "1rem",
-    flexWrap: "wrap",
-  },
-  titulo: {
-    marginTop: 0,
-    marginBottom: "0.3rem",
-  },
-  descripcion: {
-    margin: 0,
-    color: "#6b7280",
-  },
-  subtitulo: {
-    marginTop: 0,
-    marginBottom: "1rem",
-  },
-  sectionHeader: {
-    marginBottom: "0.8rem",
-  },
-  sectionTitle: {
-    margin: 0,
-    background: "#6b7280",
-    color: "#fff",
-    padding: "0.75rem 1rem",
-    borderRadius: "10px",
-    fontSize: "0.98rem",
-    textTransform: "uppercase",
-    letterSpacing: "0.2px",
-  },
-  card: {
-    background: "#fff",
-    padding: "1rem",
-    marginBottom: "1rem",
-    borderRadius: "14px",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-  },
-  topGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-    gap: "1rem",
-  },
-  observacionesBox: {
-    marginTop: "1rem",
-  },
-  label: {
-    display: "block",
-    marginBottom: "0.45rem",
-    fontWeight: "bold",
-  },
-  input: {
-    width: "100%",
-    padding: "0.75rem",
-    border: "1px solid #d1d5db",
-    borderRadius: "10px",
-    boxSizing: "border-box",
-  },
-  textarea: {
-    width: "100%",
-    minHeight: "100px",
-    padding: "0.8rem",
-    border: "1px solid #d1d5db",
-    borderRadius: "10px",
-    resize: "vertical",
-    boxSizing: "border-box",
-  },
-  errorText: {
-    color: "crimson",
-    marginTop: "0.35rem",
-    marginBottom: 0,
-    fontSize: "0.9rem",
-  },
-  desktopOnly: {
-    display: "block",
-  },
-  mobileOnly: {
-    display: "none",
-  },
-  tableWrapper: {
-    width: "100%",
-    overflowX: "auto",
-  },
-  table: {
-    width: "100%",
-    minWidth: "1100px",
-    borderCollapse: "collapse",
-  },
-  thArticulo: {
-    textAlign: "left",
-    padding: "0.85rem 0.75rem",
-    borderBottom: "1px solid #e5e7eb",
-    background: "#f9fafb",
-    width: "42%",
-  },
-  thCantidad: {
-    textAlign: "center",
-    padding: "0.85rem 0.75rem",
-    borderBottom: "1px solid #e5e7eb",
-    background: "#f9fafb",
-    width: "14%",
-  },
-  thProblema: {
-    textAlign: "center",
-    padding: "0.85rem 0.75rem",
-    borderBottom: "1px solid #e5e7eb",
-    background: "#f9fafb",
-    width: "10%",
-  },
-  thObs: {
-    textAlign: "left",
-    padding: "0.85rem",
-    background: "#f9fafb",
-    borderBottom: "1px solid #e5e7eb",
-    width: "34%",
-  },
-  tdArticulo: {
-    padding: "0.85rem 0.75rem",
-    borderBottom: "1px solid #f0f0f0",
-    verticalAlign: "middle",
-  },
-  tdCantidad: {
-    padding: "0.85rem 0.75rem",
-    borderBottom: "1px solid #f0f0f0",
-    textAlign: "center",
-    verticalAlign: "middle",
-  },
-  tdProblema: {
-    padding: "0.85rem 0.75rem",
-    borderBottom: "1px solid #f0f0f0",
-    textAlign: "center",
-    verticalAlign: "middle",
-  },
-  tdObs: {
-    padding: "0.75rem 0.85rem",
-    borderBottom: "1px solid #f0f0f0",
-    minWidth: "260px",
-  },
-  tableInput: {
-    width: "110px",
-    maxWidth: "100%",
-    padding: "0.55rem",
-    border: "1px solid #d1d5db",
-    borderRadius: "8px",
-    textAlign: "center",
-  },
-  inputSmall: {
-    width: "100%",
-    minWidth: "220px",
-    padding: "0.55rem 0.65rem",
-    borderRadius: "8px",
-    border: "1px solid #ccc",
-    fontSize: "0.85rem",
-    boxSizing: "border-box",
-  },
-  inputSmallActive: {
-    background: "#fff",
-    border: "1px solid #f59e0b",
-  },
-  inputSmallDisabled: {
-    background: "#f3f4f6",
-    color: "#9ca3af",
-    border: "1px solid #e5e7eb",
-  },
-  mobileList: {
-    display: "grid",
-    gap: "0.9rem",
-  },
-  mobileItem: {
-    border: "1px solid #e5e7eb",
-    borderRadius: "12px",
-    padding: "0.9rem",
-    background: "#fafafa",
-  },
-  mobileTitle: {
-    marginTop: 0,
-    marginBottom: "0.8rem",
-    fontWeight: "bold",
-  },
-  mobileField: {
-    marginBottom: "0.8rem",
-  },
-  mobileCheckboxRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "1rem",
-    marginBottom: "0.8rem",
-  },
-  mobileLabel: {
-    fontWeight: "bold",
-    display: "block",
-    marginBottom: "0.35rem",
-  },
-  extrasContainer: {
-    display: "grid",
-    gap: "0.8rem",
-  },
-  extraRow: {
-    display: "grid",
-    gridTemplateColumns: "2fr 1fr",
-    gap: "0.8rem",
-  },
-  secondaryButton: {
-    marginTop: "1rem",
-    padding: "0.8rem 1rem",
-    border: "none",
-    borderRadius: "10px",
-    background: "#374151",
-    color: "#fff",
-    cursor: "pointer",
-    fontWeight: "bold",
-  },
-  feedbackBox: {
-    marginBottom: "1rem",
-  },
-  button: {
-    padding: "1rem 1.2rem",
-    background: "#1f4f82",
-    color: "#fff",
-    border: "none",
-    borderRadius: "10px",
-    cursor: "pointer",
-    fontWeight: "bold",
-    minWidth: "180px",
-  },
-  footerActions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    marginBottom: "2rem",
-  },
-  ok: {
-    color: "green",
-    margin: 0,
-  },
-  error: {
-    color: "crimson",
-    margin: 0,
-  },
-};
