@@ -6,8 +6,17 @@ Este documento define el contrato técnico de P7 para desplegar un entorno de st
 
 P7 se divide operativamente en dos hitos dentro del mismo frente:
 
-- **P7.1 — contrato y guardas de staging:** configuración production-like, preflight, backup/migración protegida, smoke tests y procedimiento reproducible.
-- **P7.2 — staging real:** aprovisionar infraestructura separada, configurar secretos/dominios/proxy, desplegar y validar el procedimiento completo sobre ese entorno.
+- **P7.1 — contrato y guardas de staging: ✅ integrado y cerrado.** Configuración production-like, preflight, backup/migración protegida, smoke tests y procedimiento reproducible.
+- **P7.2 — staging real: 🟡 continuidad activa.** Aprovisionar infraestructura separada, configurar secretos/dominios/proxy, desplegar y validar el procedimiento completo sobre ese entorno.
+
+Evidencia de cierre P7.1:
+
+- PR #20 integrado mediante squash;
+- HEAD validado previo al merge: `5860d4e85a0a64514bdfa8ede052dcdfff9f56ba`;
+- Quality Gate pre-merge #158: **verde**, incluido Chromium E2E;
+- squash en `main`: `eaad8daeb101f988e00310c408554e66affde1d4`;
+- Quality Gate post-merge #159: **verde**, incluido Chromium E2E;
+- continuidad P7.2: rama `ops/p7-staging-real`.
 
 P7 **no se considera cerrado** solo por completar P7.1. El cierre exige evidencia de un staging real separado y validado.
 
@@ -151,6 +160,7 @@ Configurar:
 
 ```text
 DEPLOY_ENV=staging
+DEPLOY_REVISION=<commit-o-version-exacta>
 SMOKE_API_ORIGIN=https://api-staging.ejemplo
 SMOKE_FRONTEND_ORIGIN=https://staging.ejemplo
 SMOKE_TIMEOUT_MS=5000
@@ -164,8 +174,8 @@ npm run deploy:smoke
 
 El smoke comprueba:
 
-- `GET /health/live` → HTTP 200 y servicio esperado;
-- `GET /health/ready` → HTTP 200, incluida conectividad MySQL;
+- `GET /health/live` → HTTP 200, servicio esperado y `environment`/`revision` exactos;
+- `GET /health/ready` → HTTP 200, identidad exacta y conectividad MySQL;
 - frontend → HTTP 200 y raíz React presente;
 - `GET /api/auth/me` sin sesión → HTTP 401;
 - CORS devuelve exactamente el origen del frontend y permite credenciales.
