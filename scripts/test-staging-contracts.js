@@ -108,6 +108,7 @@ assert.throws(
   /DEPLOY_REVISION/,
 );
 
+const gitignore = fs.readFileSync(".gitignore", "utf8");
 const stagingExample = fs.readFileSync(".env.staging.example", "utf8");
 const frontendStagingExample = fs.readFileSync(
   "inventario-frontend/.env.staging.example",
@@ -118,6 +119,8 @@ const stagingDoc = fs.readFileSync("docs/STAGING.md", "utf8");
 const migrateScript = fs.readFileSync("scripts/deploy-migrate.js", "utf8");
 const smokeScript = fs.readFileSync("scripts/deploy-smoke.js", "utf8");
 
+assert.match(gitignore, /^\.env\.\*$/m);
+assert.match(gitignore, /^!\.env\.\*\.example$/m);
 assert.match(stagingExample, /NODE_ENV=production/);
 assert.match(stagingExample, /DEPLOY_ENV=staging/);
 assert.match(stagingExample, /AUTH_TOKEN_TRANSPORT=cookie/);
