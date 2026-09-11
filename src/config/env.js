@@ -132,6 +132,7 @@ const env = {
   ),
   MFA_ENCRYPTION_KEY: process.env.MFA_ENCRYPTION_KEY?.trim() || "",
   MFA_ISSUER: process.env.MFA_ISSUER?.trim() || "Inventario Judicial",
+  UPLOAD_DIR: process.env.UPLOAD_DIR?.trim() || "",
   HEALTH_DB_TIMEOUT_MS: numeroPositivo(
     "HEALTH_DB_TIMEOUT_MS",
     process.env.HEALTH_DB_TIMEOUT_MS,
