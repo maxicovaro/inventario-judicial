@@ -136,6 +136,10 @@ jobs:
           ./.e2e-runtime/node_modules/.bin/playwright install --with-deps chromium
 
       - name: Run critical browser E2E
+        env:
+          AUTH_TOKEN_TRANSPORT: cookie
+          REQUIRE_ADMIN_MFA: true
+          MFA_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
         run: |
           export E2E_TEST_PASSWORD="$(node -e 'process.stdout.write(require("./scripts/integration-fixtures").TEST_PASSWORD)' | tail -n 1)"
           export E2E_ADMIN_EMAIL="$(node -e 'process.stdout.write(require("./scripts/integration-fixtures").TEST_USERS.admin)' | tail -n 1)"
