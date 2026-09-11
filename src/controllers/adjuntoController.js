@@ -1,27 +1,22 @@
 const fs = require("fs");
-const path = require("path");
 const sharp = require("sharp");
 const { Op } = require("sequelize");
 
 const { Adjunto, Activo, Solicitud } = require("../models");
 const { esAdminGeneral } = require("../utils/permisos");
+const {
+  ensureUploadsDir,
+  resolveUploadPath,
+} = require("../utils/uploadStorage");
 
 const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-const uploadsDir = path.join(__dirname, "../../storage/uploads");
-
 const mismoId = (a, b) => Number(a) === Number(b);
-
-const asegurarCarpetaUploads = () => {
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-};
 
 const borrarArchivoFisico = (nombreArchivo) => {
   if (!nombreArchivo) return;
 
-  const filePath = path.join(uploadsDir, nombreArchivo);
+  const filePath = resolveUploadPath(nombreArchivo);
 
   if (fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);
@@ -92,7 +87,7 @@ const subirAdjunto = async (req, res) => {
   let archivoFinalParaBorrar = null;
 
   try {
-    asegurarCarpetaUploads();
+    ensureUploadsDir();
 
     const esDireccion = esAdminGeneral(req.usuario);
     const { activo_id, solicitud_id } = req.body;
@@ -130,11 +125,11 @@ const subirAdjunto = async (req, res) => {
     let tipoArchivo = req.file.mimetype;
     let tamanioArchivo = req.file.size;
 
-    const filePath = path.join(uploadsDir, req.file.filename);
+    const filePath = resolveUploadPath(req.file.filename);
 
     if (IMAGE_MIME_TYPES.includes(req.file.mimetype)) {
       const compressedFilename = `compressed-${Date.now()}.jpg`;
-      const compressedPath = path.join(uploadsDir, compressedFilename);
+      const compressedPath = resolveUploadPath(compressedFilename);
 
       await sharp(filePath)
         .resize({ width: 1600, withoutEnlargement: true })
@@ -254,7 +249,7 @@ const descargarAdjunto = async (req, res) => {
 
     await verificarPermisoAdjunto(adjunto, req, esDireccion);
 
-    const filePath = path.join(uploadsDir, adjunto.ruta_archivo);
+    const filePath = resolveUploadPath(adjunto.ruta_archivo);
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
