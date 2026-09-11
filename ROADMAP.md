@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 11/09/2026 para cerrar P6.1 después de reconciliar seguridad con el frontend final A–E y validar el Quality Gate #148 en verde.
+> Actualizada al 11/09/2026 para registrar el cierre definitivo de P6.1 después de su integración a `main` y del Quality Gate post-merge #151 en verde.
 
 Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión completa, Quality Gate y validación local cuando involucra base de datos o entorno de ejecución. Los PR documentan la evidencia de cada cambio, pero este archivo define **el estado consolidado y el próximo punto de continuidad**.
 
@@ -18,8 +18,8 @@ Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión compl
 | E2E/regresiones P5 | ✅ Completo | Se ejecuta en CI |
 | Concurrencia/idempotencia P6 | ✅ Completo | Se ejecuta en CI |
 | Frontend Bloques A–E | ✅ Integrado a `main` | Merge `0cb1f528...` |
-| P6.1 seguridad pre-staging | ✅ Cierre validado | PR #13; Gate #148 verde; documentación de cierre incluida |
-| P7 staging/despliegue | ⏳ Siguiente | Abrir solo después de integrar PR #13 y confirmar `main` verde |
+| P6.1 seguridad pre-staging | ✅ Integrado y cerrado | PR #13; merge `3ec6492...`; Gate #151 verde |
+| P7 staging/despliegue | ⏳ Siguiente | Condiciones de apertura cumplidas; iniciar desde `main` |
 | P8 rendimiento/escalabilidad | ⏳ Pendiente | Después de staging estable |
 | P9 piloto | ⏳ Pendiente | Después de P7/P8 |
 
@@ -91,11 +91,13 @@ Implementado y validado:
 - E2E de setup y segundo acceso MFA, cookie HttpOnly, ausencia de JWT local y logout real;
 - revalidación integral con MySQL, auth hardening, P6, health, backup/restore y Chromium.
 
-Evidencia de cierre técnico:
-- base reconciliada con `main` `45ae8ad48d050390aa87ea9ad646bb79410f6ceb`;
-- HEAD de implementación previo al cierre documental: `b2e8d935d135a1966078b75faeeae435aedd0cb6`;
-- Quality Gate #148: **verde**;
-- PR #16 fue únicamente evidencia de integración temporal y **NO debe mergearse**.
+Evidencia de cierre definitivo:
+- base reconciliada antes del merge con `main` `45ae8ad48d050390aa87ea9ad646bb79410f6ceb`;
+- HEAD final de PR #13: `541c44c122ded5926f32810bcb95c3e3e4317fcd`;
+- Quality Gate pre-merge #150: **verde**;
+- PR #13 mergeado mediante merge commit `3ec6492a9a1c257c232fafef1e64d1ae5920dc9a`;
+- Quality Gate post-merge #151 sobre `main`: **verde**, incluido Chromium E2E;
+- PR #16 fue únicamente evidencia de integración temporal y quedó **cerrado sin merge**.
 
 El detalle contractual queda en `docs/backend-security-architecture.md` y `docs/frontend-design-system.md`.
 
@@ -151,9 +153,9 @@ Detalles de frontend: `docs/frontend-design-system.md`.
 
 ### P7 — Staging y despliegue controlado ⏳
 
-**Próximo bloque. No abrir hasta que PR #13 esté integrado a `main` y el estado final de Git/CI haya sido comprobado.**
+**Próximo bloque. Las condiciones de apertura quedaron cumplidas el 11/09/2026: PR #13 integrado, `main` en `3ec6492a9a1c257c232fafef1e64d1ae5920dc9a` y Quality Gate post-merge #151 verde.**
 
-Antes de comenzar P7, releer este `ROADMAP.md` y confirmar que P6.1 aparece integrado en `main`.
+Antes de comenzar implementación de P7, partir del `main` vigente y conservar como criterio de entrada que P6.1 permanece verde e integrado.
 
 Alcance previsto:
 - entorno de staging físicamente/lógicamente separado;
