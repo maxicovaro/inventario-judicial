@@ -1,0 +1,565 @@
+/*
+ * Bloque E — Refresh visual inspirado en Admina.
+ * No contiene código de la plantilla: adapta su lenguaje visual al Design System propio.
+ * Piloto: AppShell + Dashboard + Activos, con primitives compartidas coherentes.
+ */
+
+:root {
+  --admina-primary: #635bff;
+  --admina-primary-hover: #5148e5;
+  --admina-primary-soft: #f0efff;
+  --admina-secondary: #2f80ed;
+  --admina-cyan: #15b8a6;
+  --admina-bg: #f6f7fb;
+  --admina-surface: #ffffff;
+  --admina-text: #171b2a;
+  --admina-muted: #72798b;
+  --admina-border: #e7e9f1;
+  --admina-border-strong: #d9dce7;
+  --admina-shadow: 0 1px 2px rgba(16, 24, 40, 0.02), 0 8px 24px rgba(31, 35, 48, 0.045);
+  --admina-shadow-hover: 0 12px 30px rgba(31, 35, 48, 0.09);
+}
+
+body {
+  background: var(--admina-bg);
+}
+
+.app-shell {
+  --color-bg: var(--admina-bg);
+  --color-surface: var(--admina-surface);
+  --color-surface-subtle: #f7f8fc;
+  --color-surface-strong: #eef0f7;
+  --color-text: var(--admina-text);
+  --color-text-muted: var(--admina-muted);
+  --color-text-soft: #9298a9;
+  --color-border: var(--admina-border);
+  --color-border-strong: var(--admina-border-strong);
+  --color-primary: var(--admina-primary);
+  --color-primary-hover: var(--admina-primary-hover);
+  --color-primary-soft: var(--admina-primary-soft);
+  --color-accent: var(--admina-primary);
+  --color-accent-soft: var(--admina-primary-soft);
+  --focus-ring: 0 0 0 3px rgba(99, 91, 255, 0.16);
+  background: var(--admina-bg);
+}
+
+/* Shell */
+.app-shell .app-sidebar {
+  border-right: 1px solid var(--admina-border);
+  background: #ffffff;
+  color: #565d70;
+  box-shadow: 4px 0 18px rgba(31, 35, 48, 0.025);
+}
+
+.app-shell .app-sidebar-header {
+  min-height: 74px;
+  border-bottom-color: var(--admina-border);
+}
+
+.app-shell .app-brand {
+  color: var(--admina-text);
+}
+
+.app-shell .app-brand-mark {
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--admina-primary), #8079ff);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(99, 91, 255, 0.2);
+}
+
+.app-shell .app-brand-subtitle {
+  color: #949aac;
+}
+
+.app-shell .app-collapse-button {
+  color: #7c8395;
+}
+
+.app-shell .app-icon-button {
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.app-shell .app-icon-button:hover {
+  background: #f3f4f8;
+  color: var(--admina-primary);
+}
+
+.app-shell .app-sidebar-section-title {
+  color: #aaaebe;
+  font-size: 0.61rem;
+  letter-spacing: 0.14em;
+}
+
+.app-shell .app-nav-list {
+  gap: 5px;
+}
+
+.app-shell .app-nav-link {
+  min-height: 43px;
+  border-radius: 10px;
+  color: #656c7f;
+  font-weight: 650;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.app-shell .app-nav-link:hover {
+  background: #f6f6fb;
+  color: #34394a;
+  transform: translateX(2px);
+}
+
+.app-shell .app-nav-link.is-active {
+  background: var(--admina-primary-soft);
+  color: var(--admina-primary);
+  box-shadow: none;
+}
+
+.app-shell .app-nav-link.is-active::before {
+  content: "";
+  position: absolute;
+  left: -11px;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 0 6px 6px 0;
+  background: var(--admina-primary);
+}
+
+.app-shell .app-shell.is-collapsed .app-nav-badge,
+.app-shell.is-collapsed .app-nav-badge {
+  border-color: #ffffff;
+}
+
+.app-shell .app-sidebar-footer {
+  border-top-color: var(--admina-border);
+}
+
+.app-shell .app-sidebar-user {
+  border: 1px solid #eceef4;
+  background: #f8f8fb;
+}
+
+.app-shell .app-avatar {
+  background: var(--admina-primary-soft);
+  color: var(--admina-primary);
+}
+
+.app-shell .app-sidebar-user-name {
+  color: #34394a;
+}
+
+.app-shell .app-sidebar-user-role {
+  color: #969cad;
+}
+
+.app-shell .app-logout {
+  color: #a85b65;
+}
+
+.app-shell .app-logout:hover {
+  background: #fff1f2;
+  color: #b42335;
+}
+
+.app-shell .app-topbar {
+  min-height: 70px;
+  border-bottom: 1px solid rgba(231, 233, 241, 0.9);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 1px 8px rgba(31, 35, 48, 0.025);
+  backdrop-filter: blur(16px);
+}
+
+.app-shell .app-topbar-title {
+  color: #252a3a;
+  font-weight: 760;
+}
+
+.app-shell .app-topbar-context {
+  color: #8b91a2;
+}
+
+.app-shell .app-notification-link:hover {
+  background: var(--admina-primary-soft);
+  color: var(--admina-primary);
+}
+
+.app-shell .app-topbar-user {
+  border-left-color: var(--admina-border);
+}
+
+.app-shell .app-content {
+  animation: admina-page-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes admina-page-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Shared primitives inside the authenticated app */
+.app-shell .ui-page-header {
+  margin-bottom: 22px;
+}
+
+.app-shell .ui-page-title {
+  margin-bottom: 5px;
+  color: #171b2a;
+  font-size: clamp(1.45rem, 1.9vw, 1.85rem);
+  font-weight: 760;
+  letter-spacing: -0.035em;
+}
+
+.app-shell .ui-page-description {
+  color: #7d8496;
+  font-size: 0.88rem;
+}
+
+.app-shell .ui-card,
+.app-shell .ui-stat-card,
+.app-shell .dashboard-panel,
+.app-shell .assets-stat {
+  border-color: var(--admina-border);
+  border-radius: 14px;
+  box-shadow: var(--admina-shadow);
+}
+
+.app-shell .ui-card {
+  background: #fff;
+}
+
+.app-shell .ui-button {
+  min-height: 40px;
+  border-radius: 9px;
+  padding: 9px 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: none;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease,
+    box-shadow 160ms ease, transform 160ms ease;
+}
+
+.app-shell .ui-button--primary {
+  background: var(--admina-primary);
+  color: #fff;
+  box-shadow: 0 5px 12px rgba(99, 91, 255, 0.16);
+}
+
+.app-shell .ui-button--primary:hover:not(:disabled) {
+  background: var(--admina-primary-hover);
+  box-shadow: 0 7px 17px rgba(99, 91, 255, 0.24);
+  transform: translateY(-1px);
+}
+
+.app-shell .ui-button--secondary {
+  border-color: #e1e3eb;
+  background: #fff;
+  color: #505669;
+}
+
+.app-shell .ui-button--secondary:hover:not(:disabled) {
+  border-color: #d5d8e4;
+  background: #f8f8fb;
+  color: var(--admina-primary);
+  transform: translateY(-1px);
+}
+
+.app-shell .ui-button--ghost:hover:not(:disabled) {
+  background: var(--admina-primary-soft);
+  color: var(--admina-primary);
+}
+
+.app-shell .ui-control {
+  min-height: 42px;
+  border-color: #e0e3ec;
+  border-radius: 9px;
+  background: #fff;
+  color: #34394a;
+  font-size: 0.84rem;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.015);
+}
+
+.app-shell .ui-control:hover:not(:disabled) {
+  border-color: #c9ccda;
+}
+
+.app-shell .ui-control:focus {
+  border-color: var(--admina-primary);
+  box-shadow: var(--focus-ring);
+}
+
+.app-shell .ui-label {
+  color: #555c70;
+  font-size: 0.79rem;
+  font-weight: 680;
+}
+
+.app-shell .ui-badge {
+  min-height: 23px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  font-size: 0.69rem;
+  font-weight: 720;
+}
+
+.app-shell .ui-badge--info {
+  background: #eef4ff;
+  color: #3567c8;
+}
+
+.app-shell .ui-table-wrap {
+  border-color: var(--admina-border);
+  border-radius: 12px;
+}
+
+.app-shell .ui-table th,
+.app-shell .ui-table td {
+  padding: 12px 15px;
+  border-bottom-color: #eceef4;
+}
+
+.app-shell .ui-table th {
+  background: #fafafd;
+  color: #747b8e;
+  font-size: 0.71rem;
+  font-weight: 740;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.app-shell .ui-table tbody tr {
+  transition: background-color 140ms ease;
+}
+
+.app-shell .ui-table tbody tr:hover {
+  background: #fafaff;
+}
+
+/* Dashboard pilot */
+.dashboard-page .dashboard-stats {
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.dashboard-page .ui-stat-card {
+  min-height: 132px;
+  padding: 20px;
+  overflow: hidden;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.dashboard-page .ui-stat-card::before {
+  inset: auto 20px 0 20px;
+  width: auto;
+  height: 3px;
+  border-radius: 6px 6px 0 0;
+  opacity: 0.8;
+}
+
+.dashboard-page .ui-stat-card::after {
+  content: "";
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ui-stat-accent, var(--admina-primary)) 12%, white);
+}
+
+.dashboard-page .ui-stat-card:hover {
+  border-color: #dedfeb;
+  box-shadow: var(--admina-shadow-hover);
+  transform: translateY(-2px);
+}
+
+.dashboard-page .ui-stat-card-label {
+  max-width: calc(100% - 48px);
+  color: #7a8194;
+  font-size: 0.75rem;
+  font-weight: 660;
+}
+
+.dashboard-page .ui-stat-card-value {
+  margin-top: 14px;
+  color: #202536;
+  font-size: clamp(1.65rem, 2.5vw, 2.25rem);
+  font-weight: 760;
+}
+
+.dashboard-page .ui-stat-card-detail {
+  margin-top: 8px;
+  color: #9aa0b0;
+  font-size: 0.71rem;
+}
+
+.dashboard-page .dashboard-panel {
+  padding: 20px;
+  background: #fff;
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+.dashboard-page .dashboard-panel:hover {
+  box-shadow: var(--admina-shadow-hover);
+}
+
+.dashboard-page .dashboard-panel--attention {
+  border-color: #f0dfb8;
+  background: linear-gradient(180deg, #fffdf8 0%, #ffffff 72%);
+}
+
+.dashboard-page .ui-section-title {
+  color: #2a2f40;
+  font-size: 0.93rem;
+  font-weight: 730;
+}
+
+.dashboard-page .ui-section-description {
+  color: #9298a9;
+}
+
+.dashboard-page .dashboard-list-item {
+  padding: 13px 0;
+  border-bottom-color: #eef0f5;
+}
+
+.dashboard-page .dashboard-list-title {
+  color: #353a4b;
+  font-weight: 680;
+}
+
+.dashboard-page .dashboard-chart {
+  min-height: 274px;
+}
+
+.dashboard-page .dashboard-chart-legend li {
+  border: 1px solid #eceef4;
+  background: #fafafd;
+  color: #747b8e;
+}
+
+/* Activos pilot */
+.assets-page .assets-summary {
+  gap: 16px;
+}
+
+.assets-page .assets-stat {
+  position: relative;
+  min-height: 118px;
+  padding: 19px 20px;
+  overflow: hidden;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.assets-page .assets-stat::after {
+  content: "";
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  right: -22px;
+  bottom: -26px;
+  border-radius: 50%;
+  background: var(--admina-primary-soft);
+  opacity: 0.8;
+}
+
+.assets-page .assets-stat:hover {
+  border-color: #dedfeb;
+  box-shadow: var(--admina-shadow-hover);
+  transform: translateY(-2px);
+}
+
+.assets-page .assets-stat-label {
+  color: #7d8496;
+  font-size: 0.73rem;
+  font-weight: 670;
+  letter-spacing: 0;
+}
+
+.assets-page .assets-stat-value {
+  margin-top: 11px;
+  color: #24293a;
+  font-weight: 760;
+}
+
+.assets-page .assets-stat-detail {
+  color: #9ba1b1;
+}
+
+.assets-page .assets-list-card {
+  border-radius: 14px;
+  box-shadow: var(--admina-shadow);
+}
+
+.assets-page .assets-toolbar {
+  padding: 18px 20px;
+  border-bottom-color: #eceef4;
+  background: #fff;
+}
+
+.assets-page .assets-list-meta {
+  padding: 12px 20px;
+  border-bottom-color: #eceef4;
+  background: #fafafd;
+}
+
+.assets-page .assets-primary-name {
+  color: #303547;
+  font-weight: 690;
+}
+
+.assets-page .assets-primary-code,
+.assets-page .assets-muted {
+  color: #858c9e;
+}
+
+.assets-page .assets-form-panel {
+  border-radius: 14px;
+  box-shadow: var(--admina-shadow-hover);
+}
+
+.assets-page .assets-form-header {
+  background: #fafafd;
+}
+
+.assets-page .assets-form-eyebrow {
+  color: var(--admina-primary);
+}
+
+.assets-page .assets-detail-shell {
+  border-color: #e8eaf1;
+  background: #fafafd;
+}
+
+@media (max-width: 980px) {
+  .app-shell .app-sidebar,
+  .app-shell.is-collapsed .app-sidebar {
+    box-shadow: 12px 0 35px rgba(31, 35, 48, 0.12);
+  }
+
+  .app-shell .app-collapse-button {
+    color: #7c8395;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell .app-content {
+    padding-top: 18px;
+  }
+
+  .dashboard-page .ui-stat-card,
+  .assets-page .assets-stat {
+    min-height: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .app-content,
+  .app-shell .app-nav-link,
+  .app-shell .ui-button,
+  .dashboard-page .ui-stat-card,
+  .assets-page .assets-stat {
+    animation: none !important;
+    transform: none !important;
+  }
+}
