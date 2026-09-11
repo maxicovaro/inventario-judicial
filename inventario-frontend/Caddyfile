@@ -1,0 +1,35 @@
+{
+  admin off
+  persist_config off
+  auto_https off
+
+  log {
+    format json
+  }
+
+  servers {
+    trusted_proxies static private_ranges 100.0.0.0/8
+  }
+}
+
+:{$PORT:3000} {
+  log {
+    format json
+  }
+
+  encode gzip
+
+  handle /api/* {
+    reverse_proxy {$BACKEND_INTERNAL_URL}
+  }
+
+  handle /health {
+    respond "ok" 200
+  }
+
+  handle {
+    root * /srv
+    try_files {path} /index.html
+    file_server
+  }
+}
