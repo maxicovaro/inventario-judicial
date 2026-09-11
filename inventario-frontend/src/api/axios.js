@@ -6,35 +6,50 @@ if (!baseURL) {
   throw new Error("Falta configurar VITE_API_URL para el frontend");
 }
 
+if (typeof window !== "undefined") {
+  localStorage.removeItem("token");
+}
+
 const api = axios.create({
   baseURL,
+  withCredentials: true,
 });
 
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
+const emitirEvento = (nombre, detail) => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(nombre, { detail }));
+};
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (
+      response.config?.url?.includes("/auth/logout") &&
+      response.status >= 200 &&
+      response.status < 300
+    ) {
+      emitirEvento("auth:logout");
+    }
+
+    return response;
+  },
   (error) => {
     const status = error.response?.status;
+    const codigo = error.response?.data?.codigo;
+    const url = String(error.config?.url || "");
+    const falloEsperableDeCredenciales =
+      url.includes("/auth/login") ||
+      url.includes("/auth/mfa/verify") ||
+      url.includes("/auth/mfa/confirm");
 
-    if (status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("usuario");
+    if (status === 401 && !falloEsperableDeCredenciales) {
+      emitirEvento("auth:unauthorized");
+    }
 
-      if (window.location.pathname !== "/") {
-        window.location.href = "/";
-      }
+    if (
+      status === 403 &&
+      (codigo === "MFA_REQUIRED" || codigo === "MFA_SETUP_REQUIRED")
+    ) {
+      emitirEvento("auth:mfa-required", { codigo });
     }
 
     return Promise.reject(error);
