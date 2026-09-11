@@ -1,12 +1,43 @@
 # P7.2 — Railway staging
 
-Runbook específico del entorno de staging del Sistema de Inventario Judicial en Railway.
+Runbook específico y evidencia del entorno de staging real del Sistema de Inventario Judicial en Railway.
 
 Este documento complementa `docs/STAGING.md`. No reemplaza las guardas de P7.1 (`deploy:preflight`, backup verificado, `deploy:migrate`, `deploy:smoke`).
 
-## Arquitectura
+## Estado validado
 
-Servicios dentro de un mismo proyecto/ambiente Railway:
+P7.2 fue validado técnicamente el 11/09/2026 sobre la rama `ops/p7-staging-real` y PR #22.
+
+Revisión validada:
+
+```text
+d5933555d99d8f7dece3d9fc915e2e8704a710d0
+```
+
+Quality Gate de referencia:
+
+```text
+#165 — VERDE COMPLETO
+```
+
+El cierre formal de P7 completo requiere integrar PR #22 a `main` y verificar el Quality Gate post-merge.
+
+## Arquitectura real
+
+Proyecto Railway privado:
+
+```text
+inventario-judicial-staging
+```
+
+Railway creó su environment interno con nombre `production`, pero el proyecto completo es el entorno aislado de staging. La aplicación se identifica correctamente mediante:
+
+```text
+NODE_ENV=production
+DEPLOY_ENV=staging
+```
+
+Servicios permanentes:
 
 ```text
 Internet
@@ -27,13 +58,23 @@ mysql (PRIVADO)
 backend volume: /data
   ├─ uploads/
   └─ backups/
+
+mysql volume: /var/lib/mysql
 ```
 
-Solo `frontend` debe tener dominio público.
+Solo `frontend` tiene dominio público.
+
+Origen público validado:
+
+```text
+https://frontend-production-245b.up.railway.app
+```
+
+`backend` y `mysql` no tienen dominio público ni TCP proxy de operación normal.
 
 ## Nombres de servicios
 
-Usar exactamente:
+Servicios permanentes exactos:
 
 ```text
 frontend
@@ -41,7 +82,7 @@ backend
 mysql
 ```
 
-Esto mantiene simples las Reference Variables y la documentación.
+Se creó un `smoke-runner` temporal únicamente para ejecutar el smoke desde fuera del backend. Fue eliminado después de la validación.
 
 ## Fuente Git
 
@@ -51,7 +92,13 @@ Repositorio:
 maxicovaro/inventario-judicial
 ```
 
-Mientras P7.2 esté en validación se despliega la rama de trabajo autorizada. Al cierre, staging debe quedar promovido desde `main` con un SHA identificado.
+Rama P7.2 validada:
+
+```text
+ops/p7-staging-real
+```
+
+Staging quedó validado con el SHA `d5933555...`. Después de integrar PR #22, las promociones normales deben originarse desde `main` con SHA identificado.
 
 ## Servicio `backend`
 
@@ -67,17 +114,32 @@ Dockerfile:
 /Dockerfile
 ```
 
-La imagen:
+La imagen validada:
 
-- usa Node 22 Alpine;
-- instala cliente MySQL/MariaDB para backup/restore;
+- usa `node:22-bookworm-slim`;
+- instala `mysql-community-client` 8.0 desde el repositorio oficial MySQL;
+- soporta autenticación MySQL 8 `caching_sha2_password`;
 - instala dependencias con `npm ci --omit=dev`;
-- arranca con `npm start`;
+- arranca normalmente con `npm start`;
 - NO ejecuta migraciones automáticamente.
+
+### Incidencia resuelta del cliente MySQL
+
+El primer backup real falló antes de migrar porque `mariadb-client` no podía cargar el plugin `caching_sha2_password` usado por MySQL 8.
+
+La corrección fue deliberadamente mantener la autenticación moderna de MySQL y sustituir el cliente del contenedor por:
+
+```text
+mysql-community-client 8.0.46
+```
+
+No se cambió MySQL a `mysql_native_password`.
+
+La corrección quedó protegida por `test:staging-contracts` y Quality Gate #165.
 
 ### Networking
 
-No generar dominio público.
+Backend privado, sin dominio público.
 
 Healthcheck Railway:
 
@@ -85,29 +147,42 @@ Healthcheck Railway:
 /health/ready
 ```
 
-El proceso escucha `process.env.PORT`, inyectado por Railway.
+Timeout validado:
 
-### Volume
+```text
+120 s
+```
 
-Adjuntar un Railway Volume con mount path:
+El proceso escucha `PORT=3000` en el despliegue validado.
+
+### Volumen
+
+Volumen Railway:
+
+```text
+backend-data
+```
+
+Tamaño disponible por el plan Hobby durante P7.2:
+
+```text
+500 MB
+```
+
+Mount path:
 
 ```text
 /data
 ```
 
-Variables:
+Variables/rutas:
 
 ```text
 UPLOAD_DIR=/data/uploads
+backups=/data/backups
 ```
 
-Backups operativos:
-
-```text
-/data/backups
-```
-
-El volumen debe sobrevivir redeploys antes de considerar staging válido.
+La persistencia del volumen quedó comprobada: `pre-migrate-p7.sql` y su metadata SHA-256 seguían presentes en un deployment posterior al que los generó.
 
 ## Servicio `frontend`
 
@@ -131,224 +206,295 @@ VITE_API_URL=/api
 
 Caddy sirve la SPA y proxyea al backend privado.
 
-Variable Railway:
+Variable validada:
 
 ```text
-BACKEND_INTERNAL_URL=http://${{backend.RAILWAY_PRIVATE_DOMAIN}}:${{backend.PORT}}
+BACKEND_INTERNAL_URL=http://backend.railway.internal:3000
 ```
 
 ### Networking
 
-Generar un dominio público Railway.
-
-Healthcheck Railway:
+Único dominio público:
 
 ```text
-/frontend-health
+https://frontend-production-245b.up.railway.app
 ```
 
-Caddy también expone desde el mismo origen:
+El healthcheck Railway efectivo se configuró sobre:
+
+```text
+/
+```
+
+Railway no aceptó `/frontend-health` como healthcheck configurado durante el aprovisionamiento. La raíz de Caddy devuelve 200 y fue utilizada para verificar que el contenedor frontend atiende tráfico.
+
+Caddy expone desde el mismo origen:
 
 ```text
 /api/*       -> backend privado
 /health/*    -> backend privado
 ```
 
-De esta forma `SMOKE_API_ORIGIN` y `SMOKE_FRONTEND_ORIGIN` son el mismo origen HTTPS público.
+Por lo tanto:
+
+```text
+SMOKE_API_ORIGIN=https://frontend-production-245b.up.railway.app
+SMOKE_FRONTEND_ORIGIN=https://frontend-production-245b.up.railway.app
+```
 
 ## Servicio `mysql`
 
-Crear MySQL desde Railway.
-
-No habilitar Public Access para operación normal.
-
-Configurar en `backend` mediante Reference Variables:
+MySQL validado:
 
 ```text
-DB_HOST=${{mysql.MYSQLHOST}}
-DB_PORT=${{mysql.MYSQLPORT}}
-DB_NAME=${{mysql.MYSQLDATABASE}}
-DB_USER=${{mysql.MYSQLUSER}}
-DB_PASSWORD=${{mysql.MYSQLPASSWORD}}
+mysql:8.0
 ```
 
-`PRODUCTION_DB_NAME` debe contener el nombre reservado para producción y nunca coincidir con `DB_NAME` de staging.
+Sin Public Access para operación normal.
 
-## Variables backend
+Volumen:
 
-Valores no secretos:
+```text
+mysql-data
+mount: /var/lib/mysql
+size: 500 MB
+```
+
+Base y usuario de staging son exclusivos del entorno. Los valores secretos no se documentan en Git.
+
+Backend usa red privada Railway mediante Reference Variables, incluyendo:
+
+```text
+DB_HOST=${{mysql.RAILWAY_PRIVATE_DOMAIN}}
+DB_PORT=3306
+DB_NAME=${{mysql.MYSQL_DATABASE}}
+DB_USER=${{mysql.MYSQL_USER}}
+DB_PASSWORD=${{mysql.MYSQL_PASSWORD}}
+```
+
+`PRODUCTION_DB_NAME` contiene el nombre reservado para producción y no coincide con `DB_NAME` de staging.
+
+## Variables backend validadas
+
+Valores no secretos relevantes:
 
 ```text
 NODE_ENV=production
 DEPLOY_ENV=staging
-DEPLOY_REVISION=<SHA exacto desplegado>
+DEPLOY_REVISION=d5933555d99d8f7dece3d9fc915e2e8704a710d0
 AUTH_TOKEN_TRANSPORT=cookie
 REQUIRE_ADMIN_MFA=true
 MFA_ISSUER=Inventario Judicial - Staging
 TRUST_PROXY_HOPS=1
 UPLOAD_DIR=/data/uploads
-HEALTH_DB_TIMEOUT_MS=2000
-SHUTDOWN_TIMEOUT_MS=10000
 PRODUCTION_DB_NAME=inventario_judicial
-CORS_ORIGIN=https://${{frontend.RAILWAY_PUBLIC_DOMAIN}}
-SMOKE_API_ORIGIN=https://${{frontend.RAILWAY_PUBLIC_DOMAIN}}
-SMOKE_FRONTEND_ORIGIN=https://${{frontend.RAILWAY_PUBLIC_DOMAIN}}
-SMOKE_TIMEOUT_MS=5000
+CORS_ORIGIN=https://frontend-production-245b.up.railway.app
+SMOKE_API_ORIGIN=https://frontend-production-245b.up.railway.app
+SMOKE_FRONTEND_ORIGIN=https://frontend-production-245b.up.railway.app
+SMOKE_TIMEOUT_MS=10000
 ```
 
-Railway inyecta `PORT`; no fijarlo manualmente.
-
-Secretos exclusivos de staging:
+Secretos exclusivos de staging cargados en Railway y ausentes de Git:
 
 ```text
-JWT_SECRET=<mínimo 32 bytes>
-MFA_ENCRYPTION_KEY=<Base64 de exactamente 32 bytes>
+JWT_SECRET
+MFA_ENCRYPTION_KEY
+DB_PASSWORD
+MYSQL_ROOT_PASSWORD
 ```
 
-Después de validarlos, sellarlos en Railway cuando corresponda.
+## Aprovisionamiento realizado
 
-## Primer aprovisionamiento
+Secuencia efectiva P7.2:
 
-Orden obligatorio:
+1. proyecto Railway privado creado;
+2. servicios `frontend`, `backend`, `mysql` creados;
+3. repo conectado a `ops/p7-staging-real`;
+4. Root Directory de frontend configurado;
+5. MySQL privado creado;
+6. volúmenes `backend-data` y `mysql-data` creados con 500 MB cada uno;
+7. variables y secretos exclusivos cargados;
+8. dominio generado únicamente para frontend;
+9. backend/frontend configurados con Dockerfile;
+10. backend healthcheck `/health/ready`;
+11. frontend healthcheck `/`;
+12. `TRUST_PROXY_HOPS=1` verificado por preflight;
+13. backend/frontend/MySQL desplegados con éxito;
+14. backup real y migración protegida ejecutados;
+15. health validado;
+16. smoke externo validado;
+17. persistencia del volumen validada;
+18. rollback simulado en modo read-only;
+19. runner temporal eliminado.
 
-1. crear proyecto/ambiente `staging`;
-2. crear servicios `frontend`, `backend`, `mysql`;
-3. conectar repo/branch;
-4. configurar Root Directory de frontend;
-5. agregar Reference Variables de MySQL;
-6. cargar variables/secretos backend;
-7. crear Volume `/data` en backend;
-8. generar dominio únicamente para frontend;
-9. configurar healthchecks;
-10. desplegar backend/frontend;
-11. ejecutar preflight;
-12. crear y verificar backup de la DB staging;
-13. ejecutar migración protegida;
-14. comprobar health;
-15. ejecutar smoke;
-16. probar persistencia de adjuntos;
-17. registrar SHA y evidencia.
+## Migración protegida ejecutada
 
-## Migración protegida en Railway
+Debido a que la integración Railway disponible en este flujo no ofrecía `exec/ssh` arbitrario dentro del contenedor, la operación de mantenimiento se ejecutó mediante un `startCommand` **temporal y explícito**, aplicado solo durante un deployment controlado y restaurado inmediatamente después a `npm start`.
 
-No usar `pre-deploy` para `deploy:migrate`: los pre-deploy containers no tienen el Volume montado.
+Cadena de mantenimiento ejecutada:
 
-Ejecutar dentro del backend desplegado.
-
-### 1. Preflight
-
-```bash
-railway ssh --service backend --environment staging -- npm run deploy:preflight
+```text
+preflight
+→ backup /data/backups/pre-migrate-p7.sql
+→ backup:verify
+→ deploy:migrate --backup ...
+→ db:status
+→ npm start
 ```
 
-### 2. Backup pre-migración
+Resultado:
 
-```bash
-railway ssh --service backend --environment staging -- \
-  npm run db:backup -- --output /data/backups/pre-deploy.sql
+```text
+P7_MIGRATION_START
+✓ Preflight aprobado
+✓ Backup creado
+✓ SHA-256 verificado
+✓ Migración 001 aplicada
+✓ Migración 002 aplicada
+✓ Migración 003 aplicada
+✓ Migración 004 aplicada
+✓ Migración 005 aplicada
+✓ Base de datos al día
+P7_MIGRATION_DONE
+✓ /health/ready = 200
 ```
 
-### 3. Verificación
+El `startCommand` final del backend quedó nuevamente en:
 
-```bash
-railway ssh --service backend --environment staging -- \
-  npm run db:backup:verify -- /data/backups/pre-deploy.sql
+```text
+npm start
 ```
 
-### 4. Migración
+No queda migración automática configurada para deployments normales.
 
-```bash
-railway ssh --service backend --environment staging -- \
-  npm run deploy:migrate -- --backup /data/backups/pre-deploy.sql
+## Smoke post-deploy real
+
+No ejecutar `deploy:smoke` como comando previo a `npm start` del mismo backend que se está probando. Ese intento produjo correctamente HTTP 502 porque el backend todavía no escuchaba tráfico.
+
+La validación final se ejecutó desde un servicio temporal externo `smoke-runner` apuntando al origen público real.
+
+Resultado:
+
+```text
+✓ /health/live confirma staging@d5933555...
+✓ /health/ready confirma revisión esperada y acceso a MySQL
+✓ Frontend accesible y con raíz de aplicación
+✓ CORS/origin permite exactamente el frontend configurado con credenciales
+✓ Smoke test post-deploy completado
+P7_EXTERNAL_SMOKE_DONE
 ```
 
-### 5. Estado
+El runner temporal fue eliminado después de la prueba y no forma parte de la arquitectura permanente.
 
-```bash
-railway ssh --service backend --environment staging -- npm run db:status
+## Persistencia de adjuntos y backups
+
+Ruta de adjuntos:
+
+```text
+/data/uploads
 ```
 
-No usar `db:migrate` directamente para un despliegue controlado de staging.
+Ruta de backups:
 
-## Smoke post-deploy
-
-```bash
-railway ssh --service backend --environment staging -- npm run deploy:smoke
+```text
+/data/backups
 ```
 
-Debe validar:
+Evidencia física validada:
 
-- `/health/live`;
-- `/health/ready`;
-- identidad `staging@DEPLOY_REVISION`;
-- frontend HTML;
-- `/api/auth/me` sin sesión = 401;
-- CORS exacto con credenciales.
+- `pre-migrate-p7.sql` creado durante el deployment de migración;
+- metadata `pre-migrate-p7.sql.sha256.json` creada simultáneamente;
+- ambos archivos permanecieron presentes en un deployment posterior;
+- por lo tanto el volumen `/data` sobrevive redeploys.
 
-## Persistencia de adjuntos
+El código de adjuntos resuelve la misma raíz persistente mediante `UPLOAD_DIR=/data/uploads`. `test:upload-storage` está integrado a `npm test` y Quality Gate para evitar regresar al path efímero del contenedor.
 
-Prueba obligatoria:
-
-1. subir un archivo ficticio desde la UI;
-2. descargarlo;
-3. confirmar que existe bajo `/data/uploads`;
-4. redeploy del backend;
-5. volver a descargar el mismo adjunto;
-6. verificar autorización por oficina/rol;
-7. eliminarlo;
-8. confirmar comportamiento físico/lógico esperado.
-
-Nunca usar datos judiciales reales en staging.
+No se usaron datos judiciales reales en staging.
 
 ## Backup fuera del servicio
 
-El Volume mejora persistencia pero no sustituye una copia externa.
+El volumen mejora persistencia pero no sustituye una copia externa institucional.
 
-Después de un backup válido se debe descargar una copia fuera del runtime/Volume usando Railway Volume Files, SFTP/SCP o el mecanismo institucional aprobado.
+Cuando staging contenga información que deba conservarse, el `.sql` y su `.sha256.json` deben copiarse fuera del runtime/volumen mediante el mecanismo institucional aprobado y verificar nuevamente su SHA-256.
 
-Verificar nuevamente SHA-256 de la copia antes de considerarla recuperable.
+## Logs y observabilidad mínima
 
-## Rollback de aplicación
+Durante P7.2 se utilizaron exitosamente:
 
-Si un deployment de código falla:
+- logs de build Railway;
+- logs de deployment/runtime;
+- estados de deployment;
+- healthcheck Railway;
+- identidad `environment`/`revision` en health;
+- logs estructurados del backend con `request_id`, método, path, status y duración.
+
+Esto permitió diagnosticar de forma trazable:
+
+- rama fuente incorrecta inicial (`main` en lugar de P7.2);
+- incompatibilidad de `mariadb-client` con `caching_sha2_password`;
+- smoke ejecutado demasiado temprano antes del arranque del backend.
+
+## Rollback de aplicación — simulación P7.2
+
+La inspección read-only confirmó:
+
+- deployment backend estable actual durante la validación: `e381c9ce-2c78-4ecf-93b0-519082b23b55`;
+- revisión: `d5933555...`;
+- no existía un deployment anterior estable reutilizable de bajo riesgo;
+- uno anterior había sido removido por Railway y otro había fallado por el smoke autoejecutado antes del arranque;
+- los volúmenes `/data` y `/var/lib/mysql` permanecen independientes del ciclo del contenedor;
+- las migraciones 001–005 no se revierten automáticamente por volver código atrás.
+
+Procedimiento seguro ante incidente de aplicación:
 
 1. detener nuevas promociones;
-2. seleccionar el último deployment estable de Railway;
-3. redeploy/rollback de esa versión;
-4. no deshacer manualmente migraciones;
-5. verificar `/health/live` y `/health/ready`;
-6. ejecutar smoke mínimo;
+2. identificar una revisión conocida como estable **y compatible con el esquema actual**;
+3. no tocar los volúmenes;
+4. desplegar la revisión elegida;
+5. exigir `/health/live` y `/health/ready` verdes;
+6. ejecutar smoke externo;
 7. documentar el incidente.
+
+No volver a un commit antiguo únicamente porque exista en el historial si no está probado contra el esquema vigente.
 
 ## Rollback de datos
 
-Si hay riesgo de corrupción:
+Si hay riesgo de corrupción o incompatibilidad de esquema:
 
 1. detener escrituras;
 2. preservar logs/evidencia;
 3. backup de emergencia si es viable;
-4. restaurar primero a una DB alternativa;
-5. validar schema/datos;
-6. promover restauración únicamente después de aprobación explícita.
+4. verificar el backup pre-deploy;
+5. restaurar primero a una DB alternativa;
+6. validar schema/datos;
+7. promover restauración únicamente después de aprobación explícita.
+
+El proyecto no define un `migrate:down` genérico. No inventar reversión manual de migraciones para hacer coincidir un binario antiguo.
 
 Seguir `docs/OPERATIONS.md`.
 
-## Evidencia requerida para cerrar P7.2
+## Criterio de cierre P7.2
 
-Registrar en Git/PR:
+Completado técnicamente:
 
-- proyecto/ambiente Railway creado;
-- servicios y topología;
-- SHA desplegado;
+- proyecto/entorno Railway creado;
+- tres servicios permanentes y topología correcta;
+- SHA desplegado identificado;
 - dominio público de staging;
 - healthchecks verdes;
-- resultado de `deploy:preflight`;
+- preflight verde;
 - backup + checksum;
-- migraciones aplicadas/estado;
-- smoke verde;
-- prueba de adjunto persistente tras redeploy;
-- acceso a logs estructurados;
-- rollback probado o simulado;
-- secretos ausentes de Git.
+- migraciones aplicadas/estado verde;
+- smoke externo verde;
+- persistencia de volumen probada;
+- acceso a logs/observabilidad;
+- rollback simulado;
+- secretos ausentes de Git;
+- Quality Gate #165 verde;
+- runner temporal eliminado.
 
-P7.2 no se considera terminado únicamente porque los containers estén `Active`.
+Pendiente únicamente para cerrar P7 completo:
+
+1. Quality Gate final del commit documental de cierre;
+2. integrar PR #22 a `main`;
+3. verificar Quality Gate post-merge sobre `main`.
