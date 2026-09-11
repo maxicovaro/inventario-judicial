@@ -1,0 +1,10 @@
+.git
+.github
+node_modules
+inventario-frontend
+e2e
+storage/uploads
+*.log
+.env
+.env.*
+!.env.example
