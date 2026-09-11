@@ -17,10 +17,16 @@ const withTimeout = (promise, timeoutMs) =>
     }),
   ]);
 
+const deploymentIdentity = () => ({
+  environment: env.DEPLOY_ENV,
+  ...(env.DEPLOY_REVISION ? { revision: env.DEPLOY_REVISION } : {}),
+});
+
 router.get("/live", (req, res) => {
   return res.status(200).json({
     status: "ok",
     service: "inventario-judicial",
+    ...deploymentIdentity(),
     uptime_seconds: Math.floor(process.uptime()),
   });
 });
@@ -35,6 +41,7 @@ router.get("/ready", async (req, res) => {
     return res.status(200).json({
       status: "ready",
       service: "inventario-judicial",
+      ...deploymentIdentity(),
     });
   } catch (error) {
     logger.warn("health_readiness_failed", {
@@ -45,6 +52,7 @@ router.get("/ready", async (req, res) => {
     return res.status(503).json({
       status: "not_ready",
       service: "inventario-judicial",
+      ...deploymentIdentity(),
     });
   }
 });
