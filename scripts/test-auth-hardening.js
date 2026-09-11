@@ -85,6 +85,8 @@ const validarSecretoProduccion = () => {
     DB_USER: "inventario_prod_test",
     DB_PASSWORD: "password_test_only",
     CORS_ORIGIN: "https://inventario.example.test",
+    AUTH_TOKEN_TRANSPORT: "cookie",
+    REQUIRE_ADMIN_MFA: "false",
   };
 
   const weak = spawnSync(

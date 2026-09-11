@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 11/09/2026 después de integrar el rediseño frontend A–E a `main` mediante PR #11.
+> Actualizada al 11/09/2026 para cerrar P6.1 después de reconciliar seguridad con el frontend final A–E y validar el Quality Gate #148 en verde.
 
 Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión completa, Quality Gate y validación local cuando involucra base de datos o entorno de ejecución. Los PR documentan la evidencia de cada cambio, pero este archivo define **el estado consolidado y el próximo punto de continuidad**.
 
@@ -18,8 +18,8 @@ Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión compl
 | E2E/regresiones P5 | ✅ Completo | Se ejecuta en CI |
 | Concurrencia/idempotencia P6 | ✅ Completo | Se ejecuta en CI |
 | Frontend Bloques A–E | ✅ Integrado a `main` | Merge `0cb1f528...` |
-| P6.1 seguridad pre-staging | 🔄 En curso | PR #13; revalidar contra `main` actual |
-| P7 staging/despliegue | ⏳ Siguiente | Iniciar después de P6.1 verde e integrado |
+| P6.1 seguridad pre-staging | ✅ Cierre validado | PR #13; Gate #148 verde; documentación de cierre incluida |
+| P7 staging/despliegue | ⏳ Siguiente | Abrir solo después de integrar PR #13 y confirmar `main` verde |
 | P8 rendimiento/escalabilidad | ⏳ Pendiente | Después de staging estable |
 | P9 piloto | ⏳ Pendiente | Después de P7/P8 |
 
@@ -70,28 +70,34 @@ Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión compl
 - Migración 003 validada en base descartable antes de integración.
 - Operaciones sensibles preparadas para claves de idempotencia donde corresponde.
 
-### P6.1 — Cierre de seguridad pre-staging 🔄
+### P6.1 — Cierre de seguridad pre-staging ✅
 
-Frente activo: PR #13 (`security/prestaging-hardening`).
+PR de cierre: #13 (`security/prestaging-hardening`).
 
-Objetivos del bloque:
-- transporte de sesión mediante cookie `HttpOnly` en producción;
+Implementado y validado:
+- transporte de sesión mediante cookie `HttpOnly`;
 - `SameSite=Strict` y `Secure` en production;
+- prefijo `__Host-` para la cookie de producción;
+- production fuerza transporte por cookie y no expone el JWT al navegador;
 - `/api/auth/me` como autoridad de sesión;
 - JWT fuera de `localStorage` en el frontend final;
+- Axios con credenciales y `AuthProvider`/`PrivateRoute` gobernados por backend;
 - validación de `Origin` y CORS con credenciales para sesión por cookie;
 - rate limiting de login/MFA;
 - `trust proxy`, CSP y HSTS configurables de forma explícita;
 - MFA/TOTP obligatorio para `ADMIN` en producción;
-- secretos MFA cifrados y códigos de recuperación almacenados como hashes;
+- secretos MFA cifrados con AES-256-GCM y códigos de recuperación almacenados como hashes;
 - migración 005 para MFA administrativo;
-- revalidación integral con MySQL, auth, P6, backup/restore y Chromium.
+- E2E de setup y segundo acceso MFA, cookie HttpOnly, ausencia de JWT local y logout real;
+- revalidación integral con MySQL, auth hardening, P6, health, backup/restore y Chromium.
 
-**Regla de integración:** PR #11 ya fue integrado a `main` mediante merge commit `0cb1f5285ca150b41bc17859eb10f607c784f6cc`. P6.1 debe incorporar ese `main`, reconciliar la capa frontend de cookie/MFA y ejecutar nuevamente el Quality Gate completo antes de mergear PR #13.
+Evidencia de cierre técnico:
+- base reconciliada con `main` `45ae8ad48d050390aa87ea9ad646bb79410f6ceb`;
+- HEAD de implementación previo al cierre documental: `b2e8d935d135a1966078b75faeeae435aedd0cb6`;
+- Quality Gate #148: **verde**;
+- PR #16 fue únicamente evidencia de integración temporal y **NO debe mergearse**.
 
-PRs de integración temporales usados para comprobar compatibilidad son evidencia de trabajo y **no deben sustituir la validación final contra el `main` vigente**.
-
-Detalles de arquitectura: `docs/backend-security-architecture.md`.
+El detalle contractual queda en `docs/backend-security-architecture.md` y `docs/frontend-design-system.md`.
 
 ## Frontend / UX/UI
 
@@ -132,28 +138,34 @@ Detalles de arquitectura: `docs/backend-security-architecture.md`.
 - Contraste WCAG 2.2 AA reforzado.
 - Aislamiento de colisiones CSS entre flujos administrativos.
 
-Integración final:
+Integración UX final:
 - PR #11: mergeado.
 - HEAD UX final previo al merge: `fa6941b830fbcb621b6342ce878c6f2e7a89dd54`.
 - Merge commit en `main`: `0cb1f5285ca150b41bc17859eb10f607c784f6cc`.
 - Quality Gate pre-merge: #140, verde.
+- P6.1 preserva esta base y agrega el contrato de autenticación seguro sin reemplazar el refresh A–E.
 
 Detalles de frontend: `docs/frontend-design-system.md`.
 
 ## Próximos bloques
 
 ### P7 — Staging y despliegue controlado ⏳
-**No iniciar hasta que P6.1 esté integrado y verde.**
 
-- Entorno de staging físicamente/lógicamente separado.
-- MySQL de staging separado de datos reales.
-- Variables y secretos por ambiente.
-- Política de cookies/orígenes adecuada al dominio real de staging.
-- Migraciones controladas con preflight y backup.
-- Procedimiento reproducible de deploy y rollback.
-- Smoke tests post-deploy.
-- Verificación `/health/live` y `/health/ready`.
-- Observabilidad mínima del entorno.
+**Próximo bloque. No abrir hasta que PR #13 esté integrado a `main` y el estado final de Git/CI haya sido comprobado.**
+
+Antes de comenzar P7, releer este `ROADMAP.md` y confirmar que P6.1 aparece integrado en `main`.
+
+Alcance previsto:
+- entorno de staging físicamente/lógicamente separado;
+- MySQL de staging separado de datos reales;
+- variables y secretos por ambiente;
+- política de cookies/orígenes adecuada al dominio real de staging;
+- `trust proxy` definido según la infraestructura real;
+- migraciones controladas con preflight y backup;
+- procedimiento reproducible de deploy y rollback;
+- smoke tests post-deploy;
+- verificación `/health/live` y `/health/ready`;
+- observabilidad mínima del entorno.
 
 ### P8 — Escalabilidad y rendimiento ⏳
 - Medición de consultas y endpoints críticos.
@@ -173,10 +185,10 @@ Detalles de frontend: `docs/frontend-design-system.md`.
 
 ## Deuda técnica / decisiones diferidas
 
-No abrir estos puntos como bloques paralelos mientras P6.1/P7 estén en curso, salvo que bloqueen la seguridad o el despliegue:
+No abrir estos puntos como bloques paralelos mientras P7 esté en curso, salvo que bloqueen seguridad o despliegue:
 
 - reemplazar diálogos nativos restantes de asignación de stock, consumo y provisión por el componente accesible definitivo;
-- decidir adopción frontend explícita de `Idempotency-Key` en operaciones críticas después de estabilizar P6.1;
+- decidir adopción frontend explícita de `Idempotency-Key` en operaciones críticas después de estabilizar el contrato de despliegue;
 - evaluar primitivas especializadas (por ejemplo Radix) solo cuando exista una necesidad concreta;
 - no introducir Tailwind únicamente por motivos estéticos: el Design System actual es CSS propio.
 
@@ -184,7 +196,7 @@ No abrir estos puntos como bloques paralelos mientras P6.1/P7 estén en curso, s
 
 - **Estado y próximos pasos:** `ROADMAP.md`.
 - **Mapa de documentos:** `docs/README.md`.
-- **Frontend / UX / Design System:** `docs/frontend-design-system.md`.
+- **Frontend / UX / Design System / contrato auth cliente:** `docs/frontend-design-system.md`.
 - **Backend / autenticación / autorización / P6.1:** `docs/backend-security-architecture.md`.
 - **Operación, backup, restore e incidentes:** `docs/OPERATIONS.md`.
 - **Evidencia de implementación:** commits, PRs y Quality Gates.
@@ -203,5 +215,5 @@ Si existe contradicción entre un PR histórico y esta hoja de ruta, debe verifi
 8. Toda autorización sensible se valida en backend.
 9. Toda migración debe ser versionada e idempotente o fallar de forma segura.
 10. Los PR de integración/validación no se mergean si están marcados explícitamente como temporales.
-11. Si se abre un bloque nuevo, este documento debe conservar el punto exacto de continuidad.
-12. Un bloque no se considera cerrado hasta que documentación, CI y estado de Git estén alineados.
+11. **Antes de abrir un bloque nuevo, releer este `ROADMAP.md` y confirmar el punto exacto de continuidad.**
+12. **Un bloque no se considera cerrado hasta que `ROADMAP.md`, el documento técnico correspondiente, CI y estado de Git estén alineados.**

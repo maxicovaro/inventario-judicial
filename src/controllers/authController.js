@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const sequelize = require("../config/database");
+const env = require("../config/env");
 const { Usuario, Role, Oficina, AuthSession } = require("../models");
 const { registrarBitacora } = require("../utils/bitacora");
 const { revocarSesionPorJti } = require("../utils/authSessions");
@@ -138,10 +139,15 @@ const login = async (req, res) => {
     ]);
 
     const oficinaEsCentral = Boolean(oficina?.es_central);
+    const roleNombre = role?.nombre || "";
+    const segundoFactorRequerido =
+      Boolean(usuario.mfa_enabled) ||
+      (env.REQUIRE_ADMIN_MFA && roleNombre === "ADMIN");
+
     const payload = {
       id: usuario.id,
       email: usuario.email,
-      role: role?.nombre || "",
+      role: roleNombre,
       role_id: usuario.role_id,
       oficina_id: usuario.oficina_id,
       oficina_nombre: oficina?.nombre || "",
@@ -167,6 +173,7 @@ const login = async (req, res) => {
         jti,
         expires_at: expiresAt,
         revoked_at: null,
+        mfa_verified_at: segundoFactorRequerido ? null : new Date(),
       },
       { transaction },
     );
@@ -181,20 +188,33 @@ const login = async (req, res) => {
       descripcion: `Login exitoso de ${usuario.email}`,
     });
 
+    const usuarioRespuesta = {
+      id: usuario.id,
+      nombre: usuario.nombre,
+      apellido: usuario.apellido,
+      email: usuario.email,
+      role: roleNombre,
+      role_id: usuario.role_id,
+      oficina_id: usuario.oficina_id,
+      oficina_nombre: oficina?.nombre || "",
+      oficina_es_central: oficinaEsCentral,
+      mfa_enabled: Boolean(usuario.mfa_enabled),
+    };
+
     res.setHeader("Cache-Control", "no-store");
+
+    if (segundoFactorRequerido) {
+      return res.status(202).json({
+        token,
+        mfa_required: Boolean(usuario.mfa_enabled),
+        mfa_setup_required: !usuario.mfa_enabled,
+        usuario: usuarioRespuesta,
+      });
+    }
+
     return res.status(200).json({
       token,
-      usuario: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        apellido: usuario.apellido,
-        email: usuario.email,
-        role: role?.nombre || "",
-        role_id: usuario.role_id,
-        oficina_id: usuario.oficina_id,
-        oficina_nombre: oficina?.nombre || "",
-        oficina_es_central: oficinaEsCentral,
-      },
+      usuario: usuarioRespuesta,
     });
   } catch (error) {
     if (transaction) {
@@ -204,6 +224,21 @@ const login = async (req, res) => {
     console.error("Error en login:", error);
     return res.status(500).json({ mensaje: "Error en login" });
   }
+};
+
+const me = (req, res) => {
+  const mfaVerified = Boolean(req.auth?.mfa_verified);
+  const adminMfaRequired = env.REQUIRE_ADMIN_MFA && req.usuario.role === "ADMIN";
+  const secondFactorRequired = Boolean(req.usuario.mfa_enabled) || adminMfaRequired;
+  const pending = secondFactorRequired && !mfaVerified;
+
+  res.setHeader("Cache-Control", "no-store");
+  return res.status(pending ? 202 : 200).json({
+    usuario: req.usuario,
+    mfa_required: pending && Boolean(req.usuario.mfa_enabled),
+    mfa_setup_required: pending && !req.usuario.mfa_enabled,
+    mfa_verified: mfaVerified,
+  });
 };
 
 const logout = async (req, res) => {
@@ -228,4 +263,4 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { login, logout };
+module.exports = { login, me, logout };

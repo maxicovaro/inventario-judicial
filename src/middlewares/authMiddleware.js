@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const { Op } = require("sequelize");
+const env = require("../config/env");
 const { Usuario, Role, Oficina, AuthSession } = require("../models");
 const { opcionesVerificacionJwt } = require("../config/jwt");
 const {
@@ -9,7 +10,7 @@ const {
 
 const MAX_BEARER_TOKEN_LENGTH = 4096;
 
-const verificarToken = async (req, res, next) => {
+const crearVerificadorSesion = ({ exigirMfa }) => async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -63,7 +64,7 @@ const verificarToken = async (req, res, next) => {
         revoked_at: { [Op.is]: null },
         expires_at: { [Op.gt]: new Date() },
       },
-      attributes: ["id", "jti", "expires_at"],
+      attributes: ["id", "jti", "expires_at", "mfa_verified_at"],
     });
 
     if (!sesion) {
@@ -95,17 +96,40 @@ const verificarToken = async (req, res, next) => {
       session_id: sesion.id,
       jti: decoded.jti,
       exp: decoded.exp,
+      mfa_verified: Boolean(sesion.mfa_verified_at),
+      mfa_verified_at: sesion.mfa_verified_at || null,
     };
 
     req.usuario = {
       id: usuario.id,
+      nombre: usuario.nombre,
+      apellido: usuario.apellido,
       email: usuario.email,
       role: usuario.Role?.nombre || "",
       role_id: usuario.role_id,
       oficina_id: usuario.oficina_id,
       oficina_nombre: usuario.Oficina?.nombre || "",
       oficina_es_central: Boolean(usuario.Oficina?.es_central),
+      mfa_enabled: Boolean(usuario.mfa_enabled),
     };
+
+    const adminMfaRequerido =
+      env.REQUIRE_ADMIN_MFA && req.usuario.role === "ADMIN";
+    const segundoFactorRequerido =
+      req.usuario.mfa_enabled || adminMfaRequerido;
+
+    if (exigirMfa && segundoFactorRequerido && !req.auth.mfa_verified) {
+      const codigo = req.usuario.mfa_enabled
+        ? "MFA_REQUIRED"
+        : "MFA_SETUP_REQUIRED";
+      return res.status(403).json({
+        codigo,
+        mensaje:
+          codigo === "MFA_REQUIRED"
+            ? "Se requiere segundo factor de autenticación"
+            : "Debés configurar MFA antes de continuar",
+      });
+    }
 
     next();
   } catch (error) {
@@ -115,6 +139,9 @@ const verificarToken = async (req, res, next) => {
     });
   }
 };
+
+const verificarToken = crearVerificadorSesion({ exigirMfa: true });
+const verificarSesionMfa = crearVerificadorSesion({ exigirMfa: false });
 
 const verificarRol = (...rolesPermitidos) => {
   return (req, res, next) => {
@@ -174,6 +201,7 @@ const verificarGestionOficina = (req, res, next) => {
 
 module.exports = {
   verificarToken,
+  verificarSesionMfa,
   verificarRol,
   permitirRoles,
   verificarAdminGeneral,

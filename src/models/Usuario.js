@@ -43,6 +43,26 @@ const Usuario = sequelize.define(
       allowNull: true,
       defaultValue: null,
     },
+    mfa_enabled: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    mfa_secret_enc: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      defaultValue: null,
+    },
+    mfa_pending_secret_enc: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      defaultValue: null,
+    },
+    mfa_recovery_codes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      defaultValue: null,
+    },
   },
   {
     tableName: "usuarios",

@@ -44,6 +44,8 @@ jobs:
       DB_PASSWORD: inventario_ci_password
       JWT_SECRET: ci_only_secret_not_for_real_environments_2026
       CORS_ORIGIN: http://localhost:5173
+      AUTH_TOKEN_TRANSPORT: hybrid
+      REQUIRE_ADMIN_MFA: false
       VITE_API_URL: http://localhost:3000/api
       E2E_BASE_URL: http://localhost:5173
       HEALTH_DB_TIMEOUT_MS: 2000
@@ -88,6 +90,13 @@ jobs:
           node scripts/test-auth-hardening.js
           node scripts/test-login-concurrency.js
 
+      - name: Run admin MFA flows
+        env:
+          AUTH_TOKEN_TRANSPORT: cookie
+          REQUIRE_ADMIN_MFA: true
+          MFA_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+        run: node scripts/test-mfa.js
+
       - name: Run concurrency and idempotency flows
         run: node scripts/test-concurrency.js
 
@@ -127,6 +136,10 @@ jobs:
           ./.e2e-runtime/node_modules/.bin/playwright install --with-deps chromium
 
       - name: Run critical browser E2E
+        env:
+          AUTH_TOKEN_TRANSPORT: cookie
+          REQUIRE_ADMIN_MFA: true
+          MFA_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
         run: |
           export E2E_TEST_PASSWORD="$(node -e 'process.stdout.write(require("./scripts/integration-fixtures").TEST_PASSWORD)' | tail -n 1)"
           export E2E_ADMIN_EMAIL="$(node -e 'process.stdout.write(require("./scripts/integration-fixtures").TEST_USERS.admin)' | tail -n 1)"

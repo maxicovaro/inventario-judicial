@@ -1,0 +1,137 @@
+.auth-route-status {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: var(--color-bg);
+}
+
+.auth-route-status-card,
+.auth-login-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-text-muted);
+}
+
+.auth-route-status-card {
+  min-width: min(100%, 320px);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.auth-route-status-card p,
+.auth-login-status p {
+  margin: 0;
+}
+
+.auth-route-spinner {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: auth-spin 700ms linear infinite;
+}
+
+@keyframes auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.auth-step {
+  display: grid;
+  gap: 20px;
+}
+
+.auth-eyebrow {
+  color: var(--color-accent);
+}
+
+.auth-secret-box {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+
+.auth-secret-box > span {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.auth-secret-box code {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+}
+
+.auth-secret-box a {
+  width: fit-content;
+  color: var(--color-accent);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.auth-code-input {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+.auth-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.auth-recovery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.auth-recovery-code {
+  display: block;
+  padding: 10px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  color: var(--color-primary);
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 750;
+  letter-spacing: 0.035em;
+}
+
+@media (max-width: 560px) {
+  .auth-actions {
+    flex-direction: column-reverse;
+  }
+
+  .auth-actions .ui-button {
+    width: 100%;
+  }
+
+  .auth-recovery-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-route-spinner {
+    animation-duration: 1400ms;
+  }
+}

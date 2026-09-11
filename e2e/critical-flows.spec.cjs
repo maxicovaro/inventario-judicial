@@ -5,16 +5,27 @@ const sequelize = require("../src/config/database");
 const {
   resetIntegrationData,
 } = require("../scripts/integration-fixtures");
+const { totpAt } = require("../src/utils/mfa");
+const { AUTH_COOKIE_NAME } = require("../src/utils/authCookie");
 
 const PASSWORD = process.env.E2E_TEST_PASSWORD;
+const API_URL = process.env.VITE_API_URL;
+const E2E_ORIGIN = process.env.E2E_BASE_URL;
 const USERS = {
   admin: process.env.E2E_ADMIN_EMAIL,
   responsable: process.env.E2E_RESPONSABLE_EMAIL,
   usuario: process.env.E2E_USUARIO_EMAIL,
 };
 
-if (!PASSWORD || !USERS.admin || !USERS.responsable || !USERS.usuario) {
-  throw new Error("Faltan credenciales E2E en variables de entorno");
+if (
+  !PASSWORD ||
+  !API_URL ||
+  !E2E_ORIGIN ||
+  !USERS.admin ||
+  !USERS.responsable ||
+  !USERS.usuario
+) {
+  throw new Error("Faltan credenciales o URLs E2E en variables de entorno");
 }
 
 const uploadsDir = path.join(__dirname, "../storage/uploads");
@@ -29,19 +40,70 @@ const limpiarUploadsE2E = () => {
   }
 };
 
+const verificarSesionEnCookie = async (page) => {
+  const tokenLocal = await page.evaluate(() => localStorage.getItem("token"));
+  expect(tokenLocal).toBeNull();
+
+  const cookies = await page.context().cookies();
+  const sessionCookie = cookies.find((cookie) => cookie.name === AUTH_COOKIE_NAME);
+  expect(sessionCookie).toBeTruthy();
+  expect(sessionCookie.httpOnly).toBe(true);
+  expect(sessionCookie.sameSite).toBe("Strict");
+};
+
+const completarMfaInicialAdmin = async (page) => {
+  await expect(
+    page.getByRole("heading", { name: "Protegé tu cuenta administrativa" }),
+  ).toBeVisible();
+
+  const secret = String(
+    (await page.locator(".auth-secret-box code").textContent()) || "",
+  ).trim();
+  expect(secret).toMatch(/^[A-Z2-7]{20,}$/);
+
+  const code = totpAt(secret, Date.now());
+  await page.getByLabel("Código de verificación").fill(code);
+  await page.getByRole("button", { name: "Activar verificación" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Guardá tus códigos de recuperación" }),
+  ).toBeVisible();
+  await expect(page.locator(".auth-recovery-code")).not.toHaveCount(0);
+  await page.getByRole("button", { name: "Ya los guardé, continuar" }).click();
+
+  return secret;
+};
+
 const login = async (page, email, password = PASSWORD) => {
   await page.goto("/");
   await page.getByPlaceholder("Ingresá tu email").fill(email);
   await page.getByPlaceholder("Ingresá tu contraseña").fill(password);
   await page.getByRole("button", { name: "Ingresar" }).click();
+
+  let mfaSecret = null;
+  if (email === USERS.admin) {
+    mfaSecret = await completarMfaInicialAdmin(page);
+  }
+
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await verificarSesionEnCookie(page);
+
+  return { mfaSecret };
+};
+
+const cerrarSesionPorApi = async (page) => {
+  const response = await page.request.post(`${API_URL}/auth/logout`, {
+    headers: { Origin: E2E_ORIGIN },
+  });
+  expect(response.status()).toBe(200);
+
+  await page.context().clearCookies();
+  await page.evaluate(() => localStorage.clear());
 };
 
 const cambiarUsuario = async (page, email) => {
-  await page.evaluate(() => {
-    localStorage.clear();
-  });
+  await cerrarSesionPorApi(page);
   await login(page, email);
 };
 
@@ -71,6 +133,29 @@ test("credenciales inválidas muestran error sin crear sesión", async ({ page }
   await page.getByRole("button", { name: "Ingresar" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText(/Credenciales inválidas/i)).toBeVisible();
+  const cookies = await page.context().cookies();
+  expect(cookies.some((cookie) => cookie.name === AUTH_COOKIE_NAME)).toBe(false);
+});
+
+test("ADMIN configura MFA y lo verifica en un segundo acceso", async ({ page }) => {
+  const { mfaSecret } = await login(page, USERS.admin);
+  expect(mfaSecret).toBeTruthy();
+
+  await cerrarSesionPorApi(page);
+  await page.goto("/");
+  await page.getByPlaceholder("Ingresá tu email").fill(USERS.admin);
+  await page.getByPlaceholder("Ingresá tu contraseña").fill(PASSWORD);
+  await page.getByRole("button", { name: "Ingresar" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Confirmá que sos vos" }),
+  ).toBeVisible();
+  await page.getByLabel("Código").fill(totpAt(mfaSecret, Date.now()));
+  await page.getByRole("button", { name: "Verificar y continuar" }).click();
+
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await verificarSesionEnCookie(page);
 });
 
 test("RESPONSABLE crea un activo propio y no entra a administración", async ({ page }) => {
@@ -112,6 +197,7 @@ test("RESPONSABLE crea un activo propio y no entra a administración", async ({ 
   );
   await busquedaRecargada.fill("E2E-RESP-001");
   await expect(page.getByText("Notebook creada desde Playwright")).toBeVisible();
+  await verificarSesionEnCookie(page);
 
   await page.goto("/usuarios");
   await expect(page).toHaveURL(/\/dashboard$/);
