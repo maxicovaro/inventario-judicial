@@ -20,10 +20,31 @@ const normalizeOrigin = (name, value, { requireHttps = true } = {}) => {
   return url.origin;
 };
 
+const deploymentExpectation = (input = process.env) => {
+  const environment = text(input.DEPLOY_ENV).toLowerCase();
+  const revision = text(input.DEPLOY_REVISION);
+
+  if (!["staging", "production"].includes(environment)) {
+    throw new Error("DEPLOY_ENV debe ser staging o production para ejecutar el smoke de despliegue");
+  }
+  if (!revision) {
+    throw new Error("Falta DEPLOY_REVISION para verificar la revisión desplegada");
+  }
+
+  return { environment, revision };
+};
+
+const smokeTimeoutMs = () => {
+  const value = Number(process.env.SMOKE_TIMEOUT_MS || 5000);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("SMOKE_TIMEOUT_MS debe ser un entero positivo");
+  }
+  return value;
+};
+
 const fetchWithTimeout = async (url, options = {}) => {
-  const timeoutMs = Number(process.env.SMOKE_TIMEOUT_MS || 5000);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(), smokeTimeoutMs());
   timer.unref?.();
 
   try {
@@ -57,8 +78,8 @@ const expectJson = async (url, expectedStatus, expectedBody = {}) => {
 };
 
 const main = async () => {
-  const deployEnv = text(process.env.DEPLOY_ENV).toLowerCase();
-  const requireHttps = deployEnv === "staging" || deployEnv === "production";
+  const expectedDeployment = deploymentExpectation(process.env);
+  const requireHttps = true;
   const apiOrigin = normalizeOrigin("SMOKE_API_ORIGIN", process.env.SMOKE_API_ORIGIN, {
     requireHttps,
   });
@@ -71,14 +92,18 @@ const main = async () => {
   await expectJson(`${apiOrigin}/health/live`, 200, {
     status: "ok",
     service: "inventario-judicial",
+    ...expectedDeployment,
   });
-  console.log("✓ /health/live responde correctamente.");
+  console.log(
+    `✓ /health/live confirma ${expectedDeployment.environment}@${expectedDeployment.revision}.`,
+  );
 
   await expectJson(`${apiOrigin}/health/ready`, 200, {
     status: "ready",
     service: "inventario-judicial",
+    ...expectedDeployment,
   });
-  console.log("✓ /health/ready confirma acceso a MySQL.");
+  console.log("✓ /health/ready confirma revisión esperada y acceso a MySQL.");
 
   const frontendResponse = await fetchWithTimeout(`${frontendOrigin}/`, {
     headers: { Accept: "text/html" },
@@ -127,7 +152,9 @@ if (require.main === module) {
 }
 
 module.exports = {
+  deploymentExpectation,
   expectJson,
   fetchWithTimeout,
   normalizeOrigin,
+  smokeTimeoutMs,
 };
