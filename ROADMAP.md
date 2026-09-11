@@ -2,275 +2,293 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 11/09/2026 para registrar P7.2 validado sobre staging real en Railway y dejar su integración a `main` como único paso pendiente antes de abrir P8.
+> Actualizada al 11/09/2026 después del cierre formal de P7. El bloque activo pasa a ser **P8 — rendimiento y escalabilidad**.
 
-Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión completa, Quality Gate y validación local cuando involucra base de datos o entorno de ejecución. Los PR documentan la evidencia de cada cambio, pero este archivo define **el estado consolidado y el próximo punto de continuidad**.
+Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
 ## Estado ejecutivo
 
-| Frente | Estado | Continuidad |
+| Frente | Estado | Evidencia / continuidad |
 | --- | --- | --- |
-| Integridad funcional P0 | ✅ Completo | Mantener regresiones |
-| Base técnica/calidad P1 | ✅ Completo | Mantener Quality Gate |
-| Autorización/historial P2 | ✅ Completo | Mantener controles negativos |
-| Resiliencia/recuperación P3 | ✅ Completo | Mantener restore drills |
-| Integración MySQL P4 | ✅ Completo | Se ejecuta en CI |
-| E2E/regresiones P5 | ✅ Completo | Se ejecuta en CI |
-| Concurrencia/idempotencia P6 | ✅ Completo | Se ejecuta en CI |
-| Frontend Bloques A–E | ✅ Integrado a `main` | Merge `0cb1f528...` |
-| P6.1 seguridad pre-staging | ✅ Integrado y cerrado | PR #13; merge `3ec6492...`; Gate #151/#153 verde |
-| P7.1 contrato/guardas staging | ✅ Integrado y cerrado | PR #20; squash `eaad8dae...`; Gate #158/#159 verde |
-| P7.2 staging real | ✅ Validado, integración pendiente | PR #22 draft; Railway real + Gate #165 verde |
-| P8 rendimiento/escalabilidad | ⏳ Pendiente | Abrir solo después de integrar P7.2 y validar `main` |
-| P9 piloto | ⏳ Pendiente | Después de P7/P8 |
+| P0 Integridad funcional crítica | ✅ Completo | Mantener regresiones |
+| P1 Base técnica y calidad | ✅ Completo | Quality Gate obligatorio |
+| P2 Autorización e historial | ✅ Completo | Mantener tests negativos |
+| P3 Resiliencia y recuperación | ✅ Completo | Backup/restore + runbooks |
+| P4 Integración MySQL | ✅ Completo | Se ejecuta en CI |
+| P5 E2E y regresiones | ✅ Completo | Chromium en Quality Gate |
+| P6 Concurrencia/idempotencia | ✅ Completo | Suite P6 en Quality Gate |
+| P6.1 Seguridad pre-staging | ✅ Completo | PR #13; Gate post-merge #151/#153 |
+| Frontend Bloques A–E | ✅ Completo | PR #11; merge `0cb1f528...` |
+| P7.1 Contrato/guardas staging | ✅ Completo | PR #20; Gate #158/#159 |
+| P7.2 Staging real | ✅ Completo | PR #22; merge `6872095e...`; Gate #168 |
+| **P8 Rendimiento/escalabilidad** | 🟡 **Activo** | Siguiente bloque autorizado |
+| P9 Piloto | ⏳ Pendiente | Después de P8 |
 
-## Backend, calidad y seguridad
+---
 
-### P0 — Integridad funcional crítica ✅
-- P0.1 Integridad de asignación de stock.
-- P0.2 Restricciones únicas en base de datos.
-- P0.3 Flujo consistente de pedidos.
-- P0.4 Seguridad crítica inicial.
+## P0 — Integridad funcional crítica ✅
 
-### P1 — Base técnica y calidad ✅
-- P1.1 Configuración por ambientes.
-- P1.2 Respuestas de error seguras.
-- P1.3 Migraciones versionadas y arranque sin `sequelize.sync()`.
-- P1.4 Baseline de calidad y lint estricto.
-- P1.5 CI obligatorio mediante Quality Gate.
-- P1.6 Auditoría y actualización segura de dependencias.
+- integridad de asignación de stock;
+- restricciones únicas en base de datos;
+- consistencia del flujo de pedidos;
+- controles de seguridad críticos iniciales.
 
-### P2 — Autorización por alcance e historial de activos ✅
-- P2.1 Administrador General definido por `oficina.es_central`.
-- P2.2 `RESPONSABLE` limitado a la gestión de su propia oficina.
-- P2.3 Historial transaccional de altas, traslados, cambios de estado y bajas.
+## P1 — Base técnica y calidad ✅
 
-### P3 — Resiliencia operativa y recuperación ✅
-- P3.0 Documentación formal de hoja de ruta.
-- P3.1 Backup, checksum y restauración segura MySQL con restore drill en CI.
-- P3.2 Health checks, Request ID, logging estructurado y apagado controlado.
-- P3.3 Runbook de recuperación, rollback e incidentes (`docs/OPERATIONS.md`).
+- configuración por ambientes;
+- respuestas de error seguras;
+- migraciones versionadas sin `sequelize.sync()` como mecanismo de despliegue;
+- baseline de calidad;
+- lint estricto;
+- CI obligatorio mediante Quality Gate;
+- auditoría de dependencias.
 
-### P4 — Integración con MySQL real de test ✅
-- Flujos completos con base MySQL descartable.
-- Usuarios, activos, stock, pedidos y movimientos.
-- Casos negativos de autorización por rol/oficina.
-- Fixtures reproducibles y aislados.
-- Migraciones aplicadas y reejecutadas de forma segura en CI.
+## P2 — Autorización e historial ✅
 
-### P5 — Protección contra regresiones y E2E ✅
-- Playwright/Chromium para recorridos críticos.
-- Login, activos, solicitudes, provisión, reportes y adjuntos.
-- Validación de permisos por rol.
-- Regresión específica de navegación/sidebar.
-- Los recorridos críticos forman parte del Quality Gate.
+- administrador general definido por oficina central;
+- `RESPONSABLE` restringido a su oficina;
+- permisos sensibles validados en backend;
+- historial transaccional de altas, traslados, cambios de estado y bajas.
 
-### P6 — Consistencia, concurrencia e idempotencia ✅
-- Operaciones simultáneas de stock/pedidos protegidas.
-- Suite de concurrencia/idempotencia incluida en Quality Gate.
-- Migración 003 validada de forma idempotente.
-- Operaciones sensibles preparadas para claves de idempotencia donde corresponde.
+## P3 — Resiliencia operativa ✅
 
-### P6.1 — Cierre de seguridad pre-staging ✅
+- backup MySQL con checksum;
+- restore drill en CI;
+- health checks;
+- Request ID;
+- logging estructurado;
+- shutdown controlado;
+- runbook de recuperación, rollback e incidentes en `docs/OPERATIONS.md`.
 
-PR de cierre: #13 (`security/prestaging-hardening`).
+## P4 — Integración MySQL real ✅
 
-Implementado y validado:
-- transporte de sesión mediante cookie `HttpOnly`;
+- flujos completos sobre MySQL descartable de test;
+- usuarios, activos, stock, pedidos y movimientos;
+- autorización por rol/oficina;
+- fixtures reproducibles;
+- migraciones reejecutables y verificadas.
+
+## P5 — Protección contra regresiones y E2E ✅
+
+- Playwright/Chromium para recorridos críticos;
+- login, activos, solicitudes, provisión, reportes y adjuntos;
+- validación de permisos por rol;
+- regresión de navegación/sidebar;
+- E2E incluido en Quality Gate.
+
+## P6 — Consistencia, concurrencia e idempotencia ✅
+
+- operaciones simultáneas de stock/pedidos protegidas;
+- suite de concurrencia/idempotencia en Quality Gate;
+- migración 003 validada de forma idempotente;
+- soporte de `Idempotency-Key` preparado en backend donde corresponde.
+
+## P6.1 — Seguridad pre-staging ✅
+
+Cierre principal: PR #13.
+
+Incluye:
+- sesión mediante cookie `HttpOnly`;
 - `SameSite=Strict` y `Secure` en production;
-- prefijo `__Host-` para la cookie de producción;
-- production fuerza transporte por cookie y no expone el JWT al navegador;
-- `/api/auth/me` como autoridad de sesión;
+- prefijo `__Host-`;
 - JWT fuera de `localStorage` en el frontend final;
-- Axios con credenciales y `AuthProvider`/`PrivateRoute` gobernados por backend;
-- validación de `Origin` y CORS con credenciales para sesión por cookie;
+- `/api/auth/me` como autoridad de sesión;
+- validación de `Origin` y CORS con credenciales;
 - rate limiting de login/MFA;
-- `trust proxy`, CSP y HSTS configurables de forma explícita;
+- `trust proxy`, CSP y HSTS configurables;
 - MFA/TOTP obligatorio para `ADMIN` en producción;
-- secretos MFA cifrados con AES-256-GCM y códigos de recuperación almacenados como hashes;
-- migración 005 para MFA administrativo;
-- E2E de setup y segundo acceso MFA, cookie HttpOnly, ausencia de JWT local y logout real;
-- revalidación integral con MySQL, auth hardening, P6, health, backup/restore y Chromium.
+- secretos MFA cifrados con AES-256-GCM;
+- migración 005;
+- E2E de MFA, cookie HttpOnly y logout real.
 
-Evidencia de cierre definitivo:
-- base reconciliada antes del merge con `main` `45ae8ad48d050390aa87ea9ad646bb79410f6ceb`;
-- HEAD final de PR #13: `541c44c122ded5926f32810bcb95c3e3e4317fcd`;
-- Quality Gate pre-merge #150: **verde**;
-- PR #13 mergeado mediante merge commit `3ec6492a9a1c257c232fafef1e64d1ae5920dc9a`;
-- Quality Gate post-merge #151 sobre `main`: **verde**, incluido Chromium E2E;
-- cierre documental PR #19 integrado en `0cbfcd0e83f9cae95e5a6a8e3859202ac366d6b9`;
-- Quality Gate post-cierre #153 sobre ese `main`: **verde**, incluido Chromium E2E;
-- PR #16 fue únicamente evidencia de integración temporal y quedó **cerrado sin merge**.
+Evidencia:
+- merge PR #13: `3ec6492a9a1c257c232fafef1e64d1ae5920dc9a`;
+- Gate post-merge #151: verde;
+- cierre documental posterior: `0cbfcd0e83f9cae95e5a6a8e3859202ac366d6b9`;
+- Gate #153: verde.
 
-El detalle contractual queda en `docs/backend-security-architecture.md` y `docs/frontend-design-system.md`.
+Detalle: `docs/backend-security-architecture.md`.
 
-## Frontend / UX/UI
+---
 
-### Bloque A — Design System e infraestructura UI ✅
-- Design tokens y kit reusable.
-- Login, AppShell, Dashboard y Activos.
-- Navegación por rol y accesibilidad base.
+## Frontend / UX/UI A–E ✅
 
-### Bloque B — Operación de inventario ✅
-- Insumos.
-- Stock por oficina.
-- Consumo de oficina.
-- Movimientos de stock.
+### A — Design System
+- tokens y kit reusable;
+- Login, AppShell, Dashboard y Activos;
+- navegación por rol y accesibilidad base.
+
+### B — Operación de inventario
+- Insumos;
+- Stock por oficina;
+- Consumo;
+- Movimientos;
 - Adjuntos.
 
-### Bloque C — Flujos administrativos ✅
-- Solicitudes.
-- Pedido mensual.
-- Historial/provisión.
-- Notificaciones.
+### C — Flujos administrativos
+- Solicitudes;
+- Pedido mensual;
+- Historial/provisión;
+- Notificaciones;
 - Reportes.
 
-### Bloque D — Administración y cierre UX ✅
-- Usuarios.
-- Bitácora.
-- Diálogos reutilizables.
-- Estados loading/error/empty/retry.
-- Responsive y revisión de accesibilidad.
-- Paneles de adjuntos alineados al Design System.
-- Persistencia visual del sidebar y E2E específico.
+### D — Administración y cierre UX
+- Usuarios;
+- Bitácora;
+- diálogos reutilizables;
+- loading/error/empty/retry;
+- responsive y accesibilidad;
+- persistencia visual del sidebar.
 
-### Bloque E — Refresh visual completo ✅
-- Lenguaje visual inspirado en Admina, implementado con CSS propio.
-- Sin incorporar Tailwind ni copiar código de la plantilla.
-- Sidebar/topbar, cards, KPI, inputs, botones, badges y tablas refinados.
-- Propagación a todos los módulos autenticados.
-- `prefers-reduced-motion`.
-- Contraste WCAG 2.2 AA reforzado.
-- Aislamiento de colisiones CSS entre flujos administrativos.
+### E — Refresh visual completo
+- lenguaje visual inspirado en Admina con CSS propio;
+- sin Tailwind ni copia de código del template;
+- sidebar/topbar/cards/KPI/inputs/botones/badges/tablas refinados;
+- `prefers-reduced-motion`;
+- contraste WCAG 2.2 AA;
+- aislamiento de colisiones CSS administrativas.
 
-Integración UX final:
-- PR #11: mergeado.
-- HEAD UX final previo al merge: `fa6941b830fbcb621b6342ce878c6f2e7a89dd54`.
-- Merge commit en `main`: `0cb1f5285ca150b41bc17859eb10f607c784f6cc`.
-- Quality Gate pre-merge: #140, verde.
-- P6.1 preserva esta base y agrega el contrato de autenticación seguro sin reemplazar el refresh A–E.
+Evidencia:
+- PR #11 mergeado;
+- HEAD UX final: `fa6941b830fbcb621b6342ce878c6f2e7a89dd54`;
+- merge `0cb1f5285ca150b41bc17859eb10f607c784f6cc`;
+- Gate #140 verde.
 
-Detalles de frontend: `docs/frontend-design-system.md`.
+Detalle: `docs/frontend-design-system.md`.
 
-## Bloque activo
+---
 
-### P7 — Staging y despliegue controlado 🟡 integración final pendiente
+## P7 — Staging y despliegue controlado ✅ CERRADO
 
-**Rama de continuidad:** `ops/p7-staging-real`.
+P7 quedó formalmente cerrado el 11/09/2026.
 
-P7.1 quedó integrado en `main`. P7.2 ya fue validado sobre infraestructura real; P7 completo se cerrará formalmente cuando PR #22 se integre y el Quality Gate post-merge sobre `main` quede verde.
+### P7.1 — Contrato y guardas de staging ✅
 
-#### P7.1 — contrato y guardas reproducibles ✅
-
-Implementado:
-- staging mantiene `NODE_ENV=production` y usa `DEPLOY_ENV=staging` como etiqueta operativa;
-- plantillas de variables separadas para backend/frontend;
-- secretos y MySQL exclusivos por ambiente;
-- preflight que rechaza configuraciones inseguras o ambiguas;
+- `NODE_ENV=production` + `DEPLOY_ENV=staging`;
+- secretos separados;
 - `TRUST_PROXY_HOPS` explícito;
-- identidad `environment`/`revision` en health;
-- migraciones protegidas por backup verificado y asociado a la DB correcta;
-- smoke post-deploy para frontend, health, sesión sin autenticar y CORS;
-- smoke valida además el `DEPLOY_ENV` y `DEPLOY_REVISION` exactos para impedir falsos verdes contra otro entorno o revisión;
-- archivos `.env.*` reales excluidos de Git, preservando solo plantillas `*.example`;
-- runbook reproducible y rollback documentado;
-- pruebas automáticas de los contratos de staging.
+- identidad environment/revision en health;
+- preflight obligatorio;
+- backup verificado antes de migrar;
+- `deploy:migrate` protegido;
+- smoke post-deploy;
+- exclusión de `.env.*` reales de Git.
 
-Evidencia de P7.1:
-- PR #20: **integrado** mediante squash;
-- HEAD validado previo al merge: `5860d4e85a0a64514bdfa8ede052dcdfff9f56ba`;
-- Quality Gate pre-merge #158: **verde**, incluido Chromium E2E;
-- squash en `main`: `eaad8daeb101f988e00310c408554e66affde1d4`;
-- Quality Gate post-merge #159: **verde**, incluido Chromium E2E.
+Evidencia:
+- PR #20 integrado;
+- HEAD validado `5860d4e85a0a64514bdfa8ede052dcdfff9f56ba`;
+- Gate #158 verde;
+- squash `eaad8daeb101f988e00310c408554e66affde1d4`;
+- Gate post-merge #159 verde.
 
-#### P7.2 — staging real ✅ validado; integración pendiente
+### P7.2 — Staging real Railway ✅
 
-Rama: `ops/p7-staging-real`. PR: #22.
-
-Infraestructura validada el 11/09/2026:
+Arquitectura validada:
 - proyecto Railway privado `inventario-judicial-staging`;
-- servicios permanentes: `frontend`, `backend`, `mysql`;
-- `frontend` como único servicio público mediante HTTPS Railway;
-- `backend` y `mysql` únicamente en red privada;
-- MySQL 8 de staging sin datos judiciales reales;
-- volumen `backend-data` de 500 MB montado en `/data`;
-- volumen `mysql-data` de 500 MB montado en `/var/lib/mysql`;
+- `frontend` público por HTTPS;
+- `backend` privado;
+- `mysql` privado;
+- Caddy same-origin para `/api/*` y `/health/*`;
+- volumen `backend-data` de 500 MB en `/data`;
+- volumen `mysql-data` de 500 MB en `/var/lib/mysql`;
 - `UPLOAD_DIR=/data/uploads`;
-- same-origin `/api` y `/health` mediante Caddy;
-- `TRUST_PROXY_HOPS=1` validado por preflight sobre la topología real;
-- secretos exclusivos de staging cargados fuera de Git.
+- MySQL 8 con `caching_sha2_password`;
+- cliente runtime `mysql-community-client` 8.0;
+- secretos exclusivos fuera de Git.
 
-Evidencia técnica:
-- revisión de código validada: `d5933555d99d8f7dece3d9fc915e2e8704a710d0`;
-- Quality Gate #165: **verde completo**, incluido Chromium E2E, MySQL, auth hardening, MFA, P6, health y backup/restore;
-- cliente de runtime corregido a `mysql-community-client` 8.0.46 para compatibilidad con `caching_sha2_password`, sin degradar autenticación MySQL;
-- `deploy:preflight`: verde;
-- backup real `/data/backups/pre-migrate-p7.sql` creado y verificado por SHA-256;
-- migraciones 001–005 aplicadas mediante `deploy:migrate` únicamente después del backup verificado;
-- `db:status`: todas las migraciones `[x]`;
-- `/health/live` y `/health/ready`: verdes con identidad exacta `staging@d5933555...`;
-- smoke post-deploy ejecutado desde runner externo temporal: verde para frontend, health, `/api/auth/me` sin sesión y CORS con credenciales;
-- runner temporal eliminado después de la validación;
-- backup y metadata permanecieron en `/data/backups` después de redeploys posteriores, demostrando persistencia física del volumen;
-- contrato de adjuntos apunta al mismo volumen mediante `UPLOAD_DIR=/data/uploads` y está protegido por `test:upload-storage` en Quality Gate;
-- logs/build/deploy accesibles y utilizados durante diagnóstico real;
-- rollback inspeccionado/simulado en modo read-only: volúmenes preservados, migraciones no se revierten automáticamente y cualquier incompatibilidad de esquema exige restore seguro o corrección hacia adelante según `docs/OPERATIONS.md`.
+Validaciones reales:
+- preflight verde;
+- backup + SHA-256 en `/data/backups`;
+- migraciones 001–005 aplicadas con backup verificado;
+- `/health/live` y `/health/ready` verdes;
+- smoke externo verde;
+- persistencia del volumen comprobada entre redeploys;
+- rollback simulado read-only;
+- logs y observabilidad mínima disponibles;
+- runner temporal de smoke eliminado.
 
-El entorno real y los detalles de operación están documentados en `docs/STAGING.md` y `docs/RAILWAY_STAGING.md`.
+Evidencia definitiva:
+- PR #22: **mergeado**;
+- HEAD pre-merge: `3836cd828359fc0500453e2bfb4bdeb729a9c95d`;
+- Gate pre-merge #167: verde completo;
+- merge commit en `main`: `6872095e3f4e6d11bf097c6254e83104a2a5e394`;
+- Gate post-merge #168: **verde completo**, incluido Chromium E2E;
+- detalle de cierre: `docs/P7_CLOSURE.md`;
+- runbooks: `docs/STAGING.md`, `docs/RAILWAY_STAGING.md`, `docs/OPERATIONS.md`.
 
-**Paso pendiente para cerrar P7 completo:** integrar PR #22 a `main`, ejecutar/verificar Quality Gate post-merge y actualizar esta continuidad únicamente si el estado real de `main` difiere de lo documentado.
+---
 
-No iniciar P8 antes de ese cierre.
+## BLOQUE ACTIVO — P8 Rendimiento y escalabilidad 🟡
 
-### P8 — Escalabilidad y rendimiento ⏳
-- Medición de consultas y endpoints críticos.
-- Índices y paginación.
-- Límites de carga, uploads y reportes.
-- Revisión de queries N+1 y payloads excesivos.
-- Pruebas de carga apropiadas al volumen del piloto.
-- Presupuestos de rendimiento frontend y backend.
+**P8 es el único bloque nuevo autorizado después del cierre de P7.**
 
-### P9 — Operación de piloto ⏳
-- Soporte e incident response.
-- Alta controlada de oficinas/usuarios.
-- Procedimiento de moderación/administración operativa.
-- Indicadores de uso, errores y tiempos de respuesta.
-- Revisión periódica de backups y restore drill.
-- Criterios de salida del piloto y paso a producción institucional.
+Objetivos:
+1. establecer baseline medible de rendimiento;
+2. identificar endpoints/queries críticas;
+3. detectar N+1 y payloads excesivos;
+4. revisar índices y planes de ejecución MySQL;
+5. asegurar paginación y límites razonables;
+6. medir uploads/reportes y operaciones pesadas;
+7. definir pruebas de carga representativas del piloto;
+8. fijar presupuestos de rendimiento frontend/backend;
+9. verificar que optimizaciones no rompan permisos, seguridad ni consistencia;
+10. documentar resultados y criterios de salida antes de P9.
+
+### Orden sugerido P8
+
+- **P8.0 Baseline y metodología**
+- **P8.1 Perfilado backend/MySQL**
+- **P8.2 Índices, queries y paginación**
+- **P8.3 Payloads, uploads y reportes**
+- **P8.4 Rendimiento frontend**
+- **P8.5 Pruebas de carga**
+- **P8.6 Optimización + regresión**
+- **P8.7 Cierre documental y criterios de piloto**
+
+No iniciar P9 hasta completar P8 y su Quality Gate final.
+
+## P9 — Operación de piloto ⏳
+
+- soporte e incident response;
+- alta controlada de oficinas/usuarios;
+- procedimiento operativo de administración;
+- indicadores de uso, errores y tiempos de respuesta;
+- revisión periódica de backups y restore drill;
+- criterios de salida del piloto y paso a producción institucional.
+
+---
 
 ## Deuda técnica / decisiones diferidas
 
-No abrir estos puntos como bloques paralelos mientras P7 esté en curso, salvo que bloqueen seguridad o despliegue:
+No abrir como frentes paralelos salvo que bloqueen P8/P9:
 
-- reemplazar diálogos nativos restantes de asignación de stock, consumo y provisión por el componente accesible definitivo;
-- decidir adopción frontend explícita de `Idempotency-Key` en operaciones críticas después de estabilizar el contrato de despliegue;
-- evaluar primitivas especializadas (por ejemplo Radix) solo cuando exista una necesidad concreta;
-- no introducir Tailwind únicamente por motivos estéticos: el Design System actual es CSS propio.
+- reemplazar diálogos nativos restantes por componente accesible definitivo;
+- decidir adopción frontend explícita de `Idempotency-Key` en operaciones críticas;
+- evaluar primitivas especializadas solo por necesidad concreta;
+- no introducir Tailwind únicamente por motivos estéticos.
 
 ## Fuente de verdad documental
 
-- **Estado y próximos pasos:** `ROADMAP.md`.
-- **Mapa de documentos:** `docs/README.md`.
-- **Frontend / UX / Design System / contrato auth cliente:** `docs/frontend-design-system.md`.
-- **Backend / autenticación / autorización / P6.1:** `docs/backend-security-architecture.md`.
-- **Operación, backup, restore e incidentes:** `docs/OPERATIONS.md`.
-- **Staging, preflight, deploy, smoke y rollback:** `docs/STAGING.md`.
-- **Staging Railway real:** `docs/RAILWAY_STAGING.md`.
-- **Evidencia de implementación:** commits, PRs y Quality Gates.
-
-Si existe contradicción entre un PR histórico y esta hoja de ruta, debe verificarse el estado real de `main` y actualizarse este documento en el siguiente PR de continuidad.
+- estado/próximo paso: `ROADMAP.md`;
+- mapa documental: `docs/README.md`;
+- frontend: `docs/frontend-design-system.md`;
+- backend/seguridad: `docs/backend-security-architecture.md`;
+- operación/restore/incidentes: `docs/OPERATIONS.md`;
+- staging general: `docs/STAGING.md`;
+- Railway staging: `docs/RAILWAY_STAGING.md`;
+- cierre P7: `docs/P7_CLOSURE.md`;
+- evidencia ejecutable: commits, PRs y Quality Gates.
 
 ## Reglas de trabajo
 
 1. No desarrollar directamente sobre `main`.
-2. Un bloque lógico = un commit identificable, salvo correcciones absorbidas antes del merge.
+2. Cada bloque trabaja en rama propia.
 3. No mergear con Quality Gate fallando.
-4. Revisar el diff completo del PR antes del merge.
+4. Revisar diff completo antes de mergear.
 5. No ejecutar cambios destructivos de base sin preflight y respaldo verificado.
-6. No usar `npm audit fix --force` de manera automática.
-7. No introducir permisos basados en nombres visibles o decisiones del frontend.
-8. Toda autorización sensible se valida en backend.
-9. Toda migración debe ser versionada e idempotente o fallar de forma segura.
-10. Los PR de integración/validación no se mergean si están marcados explícitamente como temporales.
-11. **Antes de abrir un bloque nuevo, releer este `ROADMAP.md` y confirmar el punto exacto de continuidad.**
-12. **Un bloque no se considera cerrado hasta que `ROADMAP.md`, el documento técnico correspondiente, CI y estado de Git estén alineados.**
+6. No usar `npm audit fix --force` automáticamente.
+7. Toda autorización sensible se valida en backend.
+8. Toda migración debe ser versionada e idempotente o fallar de forma segura.
+9. No abrir bloques posteriores mientras el bloque activo permanezca sin cerrar.
+10. Antes de abrir un bloque nuevo, releer este `ROADMAP.md`.
+11. Un bloque no está cerrado hasta alinear código, CI, documentación y estado real del entorno.
