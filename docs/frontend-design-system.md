@@ -1,13 +1,16 @@
 # Design System y arquitectura frontend — Inventario Judicial
 
-Este documento define la base visual, de interacción y de continuidad del frontend del Sistema de Inventario Judicial.
+Este documento define la base visual, de interacción y de continuidad del frontend del Sistema de Inventario Judicial, incluido el contrato de autenticación cliente consolidado en P6.1.
 
 Estado de referencia al 11/09/2026:
 - Bloques A–E: completos.
 - PR #11: mergeado a `main`.
 - HEAD UX final previo al merge: `fa6941b830fbcb621b6342ce878c6f2e7a89dd54`.
-- Merge commit: `0cb1f5285ca150b41bc17859eb10f607c784f6cc`.
-- Quality Gate pre-merge: #140, verde.
+- Merge UX: `0cb1f5285ca150b41bc17859eb10f607c784f6cc`.
+- Quality Gate UX pre-merge: #140, verde.
+- P6.1 cookie/MFA reconciliado sobre esta base mediante PR #13.
+- HEAD de implementación P6.1 previo al cierre documental: `b2e8d935d135a1966078b75faeeae435aedd0cb6`.
+- Quality Gate #148: verde, incluido Chromium E2E.
 
 La evolución posterior del frontend debe preservar esta base y coordinar cualquier cambio de autenticación con `docs/backend-security-architecture.md`.
 
@@ -21,6 +24,7 @@ La evolución posterior del frontend debe preservar esta base y coordinar cualqu
 6. **Responsive sin pérdida de información.**
 7. **Una sola gramática visual.** No reimplementar botones, badges, formularios o estados si ya existe un componente equivalente.
 8. **Cambios visuales aislados de reglas de negocio.** Un refresh de UI no debe alterar endpoints, roles, permisos o contratos de seguridad.
+9. **La sesión la confirma el backend.** Datos cacheados en el navegador nunca conceden autorización.
 
 ## Identidad visual actual
 
@@ -55,12 +59,13 @@ Capas principales:
 - `src/styles/admina-refresh.css`: refresh visual de shell/primitives/Dashboard/Activos.
 - `src/styles/admina-modules.css`: propagación del refresh al resto de módulos.
 - `src/styles/admina-premerge-fixes.css`: aislamiento de colisiones CSS y ajustes finales de contraste.
+- `src/styles/auth-security.css`: estados de restauración de sesión y UI de MFA/recovery codes.
 
 ### Regla importante de aislamiento
 
 `admin-flows.css` y `administration.css` comparten históricamente nombres como `.admin-card`, `.admin-toolbar`, `.admin-form` y `.admin-description`. La capa `admina-premerge-fixes.css` delimita esos contextos para impedir contaminación visual entre Solicitudes y Usuarios/Bitácora.
 
-No eliminar esa capa sin revisar primero las colisiones de selectores.
+No eliminar esa capa sin revisar primero las colisiones de selectores. P6.1 preservó explícitamente esta capa al integrar autenticación segura.
 
 ## Componentes base
 
@@ -118,6 +123,34 @@ Diálogo reutilizable para formularios administrativos, incluido reset de contra
 - E2E específico para evitar regresión de la navegación lateral.
 - Enlace “Saltar al contenido principal”.
 
+## Contrato de autenticación frontend — P6.1 ✅
+
+La aplicación ya no utiliza el JWT almacenado en `localStorage` como mecanismo de sesión.
+
+Contrato:
+- Axios usa `withCredentials`;
+- production recibe la sesión por cookie `HttpOnly` y el JS del navegador no accede al JWT;
+- cualquier token legado en `localStorage` se elimina;
+- `/api/auth/me` restaura y confirma la sesión;
+- `AuthProvider` mantiene los estados `loading`, `anonymous`, `authenticated`, `mfa_setup` y `mfa_verify` según respuesta del backend;
+- `PrivateRoute` solo habilita contenido cuando el backend confirmó `authenticated`;
+- el usuario cacheado localmente puede ayudar a la UX, pero no concede acceso;
+- logout llama al backend y luego limpia el estado local;
+- respuestas 401 limpian la sesión del cliente;
+- respuestas de MFA obligatoria llevan al flujo correspondiente sin debilitar permisos.
+
+### MFA administrativo
+
+La pantalla de acceso soporta:
+- setup TOTP en primer acceso cuando el backend lo exige;
+- visualización controlada del secreto/URI de enrolamiento;
+- confirmación del código TOTP;
+- presentación única de códigos de recuperación;
+- verificación TOTP o recovery code en accesos posteriores;
+- mensajes y estados de carga integrados con el Design System.
+
+Los secretos y códigos no se persisten en `localStorage`.
+
 ## Formularios
 
 - Label visible en todos los controles.
@@ -153,7 +186,8 @@ Requisitos mínimos:
 - `prefers-reduced-motion`;
 - tablas semánticas;
 - mensajes de error/éxito/carga/vacío;
-- diálogos con título y descripción accesibles.
+- diálogos con título y descripción accesibles;
+- estados de verificación de sesión anunciables mediante `role=status`/`aria-live` cuando corresponda.
 
 ## Cobertura del rediseño
 
@@ -209,18 +243,21 @@ Se mantienen temporalmente algunos diálogos nativos en flujos críticos ya esta
 
 No reescribir estos flujos dentro de un cambio visual menor. Deben tratarse como una tarea futura coordinada y con regresión completa.
 
-La adopción frontend explícita de `Idempotency-Key` también queda diferida hasta después de estabilizar P6.1 y su contrato final de autenticación/transporte.
+La adopción frontend explícita de `Idempotency-Key` permanece diferida hasta después de estabilizar staging/despliegue y debe coordinarse con los flujos afectados y sus E2E.
 
-## Integración con P6.1
+## Integración P6.1
 
-El frontend de `main` todavía debe recibir la capa final de seguridad pre-staging mediante PR #13:
-- sesión por cookie `HttpOnly` en producción;
-- `/auth/me` como autoridad de sesión;
-- eliminación del JWT de `localStorage`;
-- UI de MFA/TOTP para `ADMIN`;
-- códigos de recuperación.
+P6.1 fue reconciliado sobre el frontend final de PR #11 y validado en Quality Gate #148.
 
-Esa integración debe partir del `main` que ya contiene PR #11 y volver a pasar todo el Quality Gate. Ver `docs/backend-security-architecture.md`.
+La integración conserva:
+- sesión por cookie `HttpOnly` en production;
+- `/auth/me` como autoridad;
+- JWT fuera de `localStorage`;
+- UI de MFA/TOTP para `ADMIN` y códigos de recuperación;
+- refresh visual A–E y `admina-premerge-fixes.css`;
+- E2E críticos de navegación y módulos funcionales.
+
+PR #16 fue exclusivamente un frente de validación y **NO debe mergearse**.
 
 ## Validación requerida
 
@@ -237,8 +274,9 @@ Antes de integrar a `main`, ejecutar además el Quality Gate completo y E2E crí
 ## Regla para futuros módulos
 
 Antes de crear CSS o JSX específico:
-1. revisar `components/ui`;
-2. revisar patrones de módulos equivalentes;
-3. evitar selectores genéricos que puedan colisionar globalmente;
-4. no introducir reglas de autorización solo en frontend;
-5. actualizar este documento si cambia una convención global.
+1. revisar `ROADMAP.md` para confirmar el bloque activo;
+2. revisar `components/ui`;
+3. revisar patrones de módulos equivalentes;
+4. evitar selectores genéricos que puedan colisionar globalmente;
+5. no introducir reglas de autorización solo en frontend;
+6. actualizar este documento si cambia una convención global.
