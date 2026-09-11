@@ -2,6 +2,8 @@
 
 Este documento define el procedimiento mínimo de operación, respaldo y recuperación para el piloto. No reemplaza la política institucional de seguridad o continuidad que pueda establecer la Dirección.
 
+Para el contrato específico de staging, preflight, migración protegida y smoke post-deploy ver `STAGING.md`.
+
 ## 1. Objetivos operativos iniciales
 
 Para el piloto se adoptan como objetivos de trabajo:
@@ -52,7 +54,7 @@ Después de crear y verificar el backup:
 3. Volver a ejecutar la verificación SHA-256 sobre la copia antes de considerarla válida.
 4. No enviar dumps de datos reales por canales de mensajería no aprobados.
 
-La automatización del almacenamiento externo se definirá junto con el entorno de despliegue (P7); hasta entonces este paso es operativo/manual.
+P7.1 formaliza esta exigencia dentro del procedimiento de despliegue. La automatización concreta del almacenamiento externo depende de la infraestructura/proveedor que se seleccione en P7.2; no se deben introducir credenciales ni un adaptador de proveedor ficticio en el repositorio.
 
 ## 4. Restauración segura
 
@@ -102,6 +104,8 @@ Variables:
 HEALTH_DB_TIMEOUT_MS=2000
 SHUTDOWN_TIMEOUT_MS=10000
 ```
+
+Desde P7.1 ambos endpoints incluyen `environment` y, cuando está definida, `revision`. Estos campos permiten confirmar el entorno y commit desplegados sin exponer secretos.
 
 Interpretación:
 
@@ -179,10 +183,10 @@ Si el incidente proviene de código y no de datos:
 
 1. detener nuevos despliegues;
 2. identificar el último merge estable de `main`;
-3. revertir mediante Git/PR o desplegar el artefacto estable anterior cuando P7 defina la plataforma;
+3. revertir mediante Git/PR o desplegar el artefacto estable anterior según el procedimiento de `STAGING.md` y la plataforma real;
 4. no revertir manualmente una migración de base solo para hacer coincidir código antiguo;
 5. si el esquema ya avanzó, preferir una corrección hacia adelante o una restauración previamente verificada;
-6. comprobar ambos health checks y recorridos críticos antes de reabrir tráfico.
+6. comprobar ambos health checks y el smoke post-deploy antes de reabrir tráfico.
 
 ## 12. Secreto o credencial comprometida
 
@@ -197,12 +201,15 @@ Si el incidente proviene de código y no de datos:
 
 - working tree limpio y commit identificado;
 - Quality Gate verde;
+- `DEPLOY_REVISION` identifica el commit/versión a desplegar;
+- `npm run deploy:preflight` verde para staging/production;
 - backup creado;
 - checksum verificado;
-- copia fuera del host confirmada cuando el entorno contenga datos reales;
+- copia fuera del host confirmada cuando el entorno contenga datos que deban conservarse;
 - `db:status` revisado;
+- migración de despliegue ejecutada con `npm run deploy:migrate -- --backup ...`;
 - plan de rollback identificado;
-- después del cambio: `db:status`, `/health/live`, `/health/ready` y smoke test funcional.
+- después del cambio: `db:status`, `/health/live`, `/health/ready` y `npm run deploy:smoke`.
 
 ## 14. Cierre de incidente
 
@@ -217,3 +224,21 @@ Todo incidente SEV-1 o SEV-2 debe terminar con un registro que contenga, sin sec
 - acciones preventivas pendientes.
 
 Las acciones preventivas deben volver a la hoja de ruta o convertirse en issue antes de dar el incidente por cerrado.
+
+## 15. Staging y evidencia de despliegue
+
+El procedimiento completo está en `STAGING.md`.
+
+P7.1 aporta las guardas reproducibles dentro del repositorio; P7.2 debe conectar esas guardas con una infraestructura real. Para cerrar P7 se debe conservar evidencia, sin secretos, de:
+
+- entorno y base separados;
+- dominio/origin HTTPS;
+- topología de proxy y `TRUST_PROXY_HOPS`;
+- commit identificado en `DEPLOY_REVISION`;
+- preflight y Quality Gate verdes;
+- backup/migración controlada;
+- health checks y smoke post-deploy;
+- rollback probado o simulado;
+- ubicación autorizada del backup fuera del host cuando corresponda.
+
+No marcar P7 como terminado si solo existe la configuración en Git y todavía no se desplegó un staging real.

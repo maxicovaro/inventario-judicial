@@ -65,7 +65,7 @@ const start = async () => {
 
   server = app.listen(env.PORT, () => {
     logger.info("server_started", {
-      environment: env.NODE_ENV,
+      node_environment: env.NODE_ENV,
       port: env.PORT,
     });
   });

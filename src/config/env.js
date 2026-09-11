@@ -9,6 +9,37 @@ if (!entornosPermitidos.has(NODE_ENV)) {
   );
 }
 
+const DEPLOY_ENV = String(process.env.DEPLOY_ENV || NODE_ENV)
+  .trim()
+  .toLowerCase();
+const deployEnvironments = new Set([
+  "development",
+  "test",
+  "staging",
+  "production",
+]);
+
+if (!deployEnvironments.has(DEPLOY_ENV)) {
+  throw new Error(
+    `DEPLOY_ENV inválido: ${DEPLOY_ENV}. Usá development, test, staging o production`,
+  );
+}
+
+if (["staging", "production"].includes(DEPLOY_ENV) && NODE_ENV !== "production") {
+  throw new Error(
+    `${DEPLOY_ENV} debe ejecutar NODE_ENV=production para conservar las protecciones de seguridad`,
+  );
+}
+
+if (
+  NODE_ENV === "production" &&
+  !["staging", "production"].includes(DEPLOY_ENV)
+) {
+  throw new Error(
+    "NODE_ENV=production requiere DEPLOY_ENV=staging o production",
+  );
+}
+
 const requerir = (nombre) => {
   const valor = process.env[nombre];
   if (valor === undefined || String(valor).trim() === "") {
@@ -55,6 +86,8 @@ if (!transportesAuthPermitidos.has(authTokenTransport)) {
 
 const env = {
   NODE_ENV,
+  DEPLOY_ENV,
+  DEPLOY_REVISION: process.env.DEPLOY_REVISION?.trim() || "",
   IS_PRODUCTION: NODE_ENV === "production",
   PORT: numeroPositivo("PORT", process.env.PORT, 3000),
   DB_HOST: requerir("DB_HOST"),
@@ -113,6 +146,26 @@ const env = {
 
 if (env.IS_PRODUCTION && !env.CORS_ORIGIN) {
   throw new Error("Falta la variable de entorno requerida en production: CORS_ORIGIN");
+}
+
+if (env.IS_PRODUCTION) {
+  try {
+    const corsOrigin = new URL(env.CORS_ORIGIN);
+    const isOriginOnly =
+      corsOrigin.pathname === "/" &&
+      !corsOrigin.search &&
+      !corsOrigin.hash &&
+      !corsOrigin.username &&
+      !corsOrigin.password;
+
+    if (corsOrigin.protocol !== "https:" || !isOriginOnly) {
+      throw new Error("invalid_origin");
+    }
+  } catch {
+    throw new Error(
+      "CORS_ORIGIN debe ser un origen HTTPS válido y sin ruta en production",
+    );
+  }
 }
 
 if (env.IS_PRODUCTION && Buffer.byteLength(env.JWT_SECRET, "utf8") < 32) {

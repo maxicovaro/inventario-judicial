@@ -24,6 +24,8 @@ const write = (level, event, fields = {}) => {
     timestamp: new Date().toISOString(),
     level,
     event,
+    environment: env.DEPLOY_ENV,
+    ...(env.DEPLOY_REVISION ? { revision: env.DEPLOY_REVISION } : {}),
   });
 
   if (level === "error") console.error(line);
