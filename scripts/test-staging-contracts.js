@@ -122,12 +122,18 @@ const frontendDockerfile = fs.readFileSync(
 );
 const caddyfile = fs.readFileSync("inventario-frontend/Caddyfile", "utf8");
 const envConfig = fs.readFileSync("src/config/env.js", "utf8");
+const uploadStorage = fs.readFileSync("src/utils/uploadStorage.js", "utf8");
 const uploadMiddleware = fs.readFileSync(
   "src/middlewares/uploadMiddleware.js",
   "utf8",
 );
+const adjuntoController = fs.readFileSync(
+  "src/controllers/adjuntoController.js",
+  "utf8",
+);
 const operations = fs.readFileSync("docs/OPERATIONS.md", "utf8");
 const stagingDoc = fs.readFileSync("docs/STAGING.md", "utf8");
+const railwayDoc = fs.readFileSync("docs/RAILWAY_STAGING.md", "utf8");
 const migrateScript = fs.readFileSync("scripts/deploy-migrate.js", "utf8");
 const smokeScript = fs.readFileSync("scripts/deploy-smoke.js", "utf8");
 
@@ -158,8 +164,13 @@ assert.match(caddyfile, /try_files \{path\} \/index\.html/);
 assert.match(caddyfile, /trusted_proxies static private_ranges 100\.0\.0\.0\/8/);
 
 assert.match(envConfig, /UPLOAD_DIR:/);
-assert.match(uploadMiddleware, /env\.UPLOAD_DIR/);
-assert.match(uploadMiddleware, /\.\.\/\.\.\/storage\/uploads/);
+assert.match(uploadStorage, /env\.UPLOAD_DIR/);
+assert.match(uploadStorage, /\.\.\/\.\.\/storage\/uploads/);
+assert.match(uploadStorage, /ensureUploadsDir/);
+assert.match(uploadStorage, /resolveUploadPath/);
+assert.match(uploadMiddleware, /ensureUploadsDir/);
+assert.match(uploadMiddleware, /uploadsDir/);
+assert.match(adjuntoController, /resolveUploadPath/);
 
 assert.match(migrateScript, /verifyBackupFile/);
 assert.match(migrateScript, /backupDatabase !== currentDatabase/);
@@ -171,5 +182,8 @@ assert.match(operations, /STAGING\.md/);
 assert.match(stagingDoc, /npm run deploy:preflight/);
 assert.match(stagingDoc, /npm run deploy:migrate/);
 assert.match(stagingDoc, /npm run deploy:smoke/);
+assert.match(railwayDoc, /railway ssh --service backend/);
+assert.match(railwayDoc, /\/data\/uploads/);
+assert.match(railwayDoc, /BACKEND_INTERNAL_URL/);
 
 console.log("✓ Contratos P7.1/P7.2 de staging y Railway validados.");
