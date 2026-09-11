@@ -5,12 +5,23 @@ const sharedStore = new Map();
 const clientKey = (req) =>
   String(req.ip || req.socket?.remoteAddress || "unknown").trim() || "unknown";
 
+const refundSuccessfulAttempt = ({ store, key, bucket }) => {
+  const current = store.get(key);
+  if (current !== bucket) return;
+
+  current.count = Math.max(0, Number(current.count || 0) - 1);
+  if (current.count === 0) {
+    store.delete(key);
+  }
+};
+
 const createFixedWindowRateLimiter = ({
   prefix,
   windowMs,
   max,
   store = sharedStore,
   now = () => Date.now(),
+  skipSuccessfulRequests = false,
 }) => {
   if (!prefix || !Number.isInteger(windowMs) || windowMs <= 0) {
     throw new Error("Configuración inválida de rate limiter");
@@ -48,6 +59,14 @@ const createFixedWindowRateLimiter = ({
       });
     }
 
+    if (skipSuccessfulRequests && typeof res.once === "function") {
+      res.once("finish", () => {
+        if (Number(res.statusCode || 500) < 400) {
+          refundSuccessfulAttempt({ store, key, bucket });
+        }
+      });
+    }
+
     next();
   };
 };
@@ -56,12 +75,14 @@ const loginRateLimit = createFixedWindowRateLimiter({
   prefix: "auth-login",
   windowMs: env.LOGIN_RATE_LIMIT_WINDOW_MS,
   max: env.LOGIN_RATE_LIMIT_MAX,
+  skipSuccessfulRequests: true,
 });
 
 const mfaRateLimit = createFixedWindowRateLimiter({
   prefix: "auth-mfa",
   windowMs: env.MFA_RATE_LIMIT_WINDOW_MS,
   max: env.MFA_RATE_LIMIT_MAX,
+  skipSuccessfulRequests: true,
 });
 
 module.exports = {

@@ -19,6 +19,7 @@ const VALID_MFA_KEY = Buffer.from(
 
 const mockResponse = () => {
   const headers = new Map();
+  const finishListeners = [];
   const response = {
     statusCode: 200,
     body: null,
@@ -35,6 +36,14 @@ const mockResponse = () => {
     json(body) {
       this.body = body;
       return this;
+    },
+    once(eventName, listener) {
+      if (eventName === "finish") finishListeners.push(listener);
+      return this;
+    },
+    emitFinish() {
+      const listeners = finishListeners.splice(0, finishListeners.length);
+      for (const listener of listeners) listener();
     },
   };
   return response;
@@ -147,6 +156,41 @@ const testRateLimiter = () => {
   console.log("OK - rate limiter bloquea y reinicia la ventana correctamente");
 };
 
+const testSuccessfulRequestsAreRefunded = () => {
+  const store = new Map();
+  const limiter = createFixedWindowRateLimiter({
+    prefix: "test-login-failures",
+    windowMs: 10000,
+    max: 2,
+    store,
+    now: () => 1000,
+    skipSuccessfulRequests: true,
+  });
+  const req = { ip: "127.0.0.2", headers: {}, socket: {} };
+
+  const run = (statusCode) => {
+    const res = mockResponse();
+    let nextCalled = false;
+    limiter(req, res, () => {
+      nextCalled = true;
+      res.statusCode = statusCode;
+      res.emitFinish();
+    });
+    return { res, nextCalled };
+  };
+
+  for (let index = 0; index < 5; index += 1) {
+    assert.ok(run(200).nextCalled);
+  }
+
+  assert.ok(run(401).nextCalled);
+  assert.ok(run(401).nextCalled);
+  const blocked = run(401);
+  assert.strictEqual(blocked.nextCalled, false);
+  assert.strictEqual(blocked.res.statusCode, 429);
+  console.log("OK - éxitos no consumen el cupo; fallos consecutivos sí se limitan");
+};
+
 const testProductionConfig = () => {
   const baseEnv = {
     ...process.env,
@@ -208,5 +252,6 @@ testCookie();
 testBridge();
 testOrigin();
 testRateLimiter();
+testSuccessfulRequestsAreRefunded();
 testProductionConfig();
 console.log("\n✓ Baseline de seguridad pre-staging validado.");
