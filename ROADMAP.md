@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 11/09/2026 para registrar el cierre definitivo de P6.1 y la apertura formal de P7 — staging y despliegue controlado.
+> Actualizada al 11/09/2026 para registrar P7.1 integrado y validado, y fijar P7.2 — staging real — como continuidad activa.
 
 Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión completa, Quality Gate y validación local cuando involucra base de datos o entorno de ejecución. Los PR documentan la evidencia de cada cambio, pero este archivo define **el estado consolidado y el próximo punto de continuidad**.
 
@@ -19,7 +19,8 @@ Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión compl
 | Concurrencia/idempotencia P6 | ✅ Completo | Se ejecuta en CI |
 | Frontend Bloques A–E | ✅ Integrado a `main` | Merge `0cb1f528...` |
 | P6.1 seguridad pre-staging | ✅ Integrado y cerrado | PR #13; merge `3ec6492...`; Gate #151/#153 verde |
-| P7 staging/despliegue | 🟡 En curso | P7.1 en `ops/p7-staging-deploy`; falta staging real P7.2 |
+| P7.1 contrato/guardas staging | ✅ Integrado y cerrado | PR #20; squash `eaad8dae...`; Gate #158/#159 verde |
+| P7.2 staging real | 🟡 En curso | Rama `ops/p7-staging-real`; falta infraestructura real validada |
 | P8 rendimiento/escalabilidad | ⏳ Pendiente | Después de staging estable |
 | P9 piloto | ⏳ Pendiente | Después de P7/P8 |
 
@@ -155,17 +156,17 @@ Detalles de frontend: `docs/frontend-design-system.md`.
 
 ### P7 — Staging y despliegue controlado 🟡
 
-**Rama activa:** `ops/p7-staging-deploy`.
+**Rama activa de continuidad:** `ops/p7-staging-real`.
 
-Condiciones de apertura verificadas el 11/09/2026:
+Condiciones de apertura de P7 verificadas el 11/09/2026:
 - P6.1 integrado y documentado;
-- `main` de apertura: `0cbfcd0e83f9cae95e5a6a8e3859202ac366d6b9`;
+- `main` de apertura de P7: `0cbfcd0e83f9cae95e5a6a8e3859202ac366d6b9`;
 - Quality Gate #153 sobre ese `main`: **verde**, incluido Chromium E2E;
 - `ROADMAP.md` releído antes de iniciar P7.
 
-#### P7.1 — contrato y guardas reproducibles
+#### P7.1 — contrato y guardas reproducibles ✅
 
-Objetivo de la primera entrega:
+Implementado:
 - staging mantiene `NODE_ENV=production` y usa `DEPLOY_ENV=staging` como etiqueta operativa;
 - plantillas de variables separadas para backend/frontend;
 - secretos y MySQL exclusivos por ambiente;
@@ -174,12 +175,23 @@ Objetivo de la primera entrega:
 - identidad `environment`/`revision` en health;
 - migraciones protegidas por backup verificado y asociado a la DB correcta;
 - smoke post-deploy para frontend, health, sesión sin autenticar y CORS;
+- smoke valida además el `DEPLOY_ENV` y `DEPLOY_REVISION` exactos para impedir falsos verdes contra otro entorno o revisión;
+- archivos `.env.*` reales excluidos de Git, preservando solo plantillas `*.example`;
 - runbook reproducible y rollback documentado;
 - pruebas automáticas de los contratos de staging.
 
-P7.1 **no cierra P7** por sí solo.
+Evidencia de P7.1:
+- PR #20: **integrado** mediante squash;
+- HEAD validado previo al merge: `5860d4e85a0a64514bdfa8ede052dcdfff9f56ba`;
+- Quality Gate pre-merge #158: **verde**, incluido Chromium E2E;
+- squash en `main`: `eaad8daeb101f988e00310c408554e66affde1d4`;
+- Quality Gate post-merge #159: **verde**, incluido Chromium E2E.
 
-#### P7.2 — staging real
+P7.1 queda cerrado, pero **P7 completo continúa abierto** hasta validar P7.2.
+
+#### P7.2 — staging real 🟡
+
+Rama de continuidad: `ops/p7-staging-real`.
 
 Para cerrar P7 todavía se deberá:
 - aprovisionar un entorno de staging físicamente/lógicamente separado;
