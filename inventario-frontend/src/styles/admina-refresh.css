@@ -5,8 +5,8 @@
  */
 
 :root {
-  --admina-primary: #635bff;
-  --admina-primary-hover: #5148e5;
+  --admina-primary: #5b52e8;
+  --admina-primary-hover: #5148d8;
   --admina-primary-soft: #f0efff;
   --admina-secondary: #2f80ed;
   --admina-cyan: #15b8a6;
@@ -39,7 +39,7 @@ body {
   --color-primary-soft: var(--admina-primary-soft);
   --color-accent: var(--admina-primary);
   --color-accent-soft: var(--admina-primary-soft);
-  --focus-ring: 0 0 0 3px rgba(99, 91, 255, 0.16);
+  --focus-ring: 0 0 0 3px rgba(91, 82, 232, 0.16);
   background: var(--admina-bg);
 }
 
@@ -63,9 +63,9 @@ body {
 .app-shell .app-brand-mark {
   border: 0;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--admina-primary), #8079ff);
+  background: linear-gradient(135deg, var(--admina-primary), #7770f5);
   color: #fff;
-  box-shadow: 0 8px 18px rgba(99, 91, 255, 0.2);
+  box-shadow: 0 8px 18px rgba(91, 82, 232, 0.2);
 }
 
 .app-shell .app-brand-subtitle {
@@ -100,6 +100,7 @@ body {
   border-radius: 10px;
   color: #656c7f;
   font-weight: 650;
+  text-decoration: none;
   transition: background-color 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
 
@@ -126,7 +127,6 @@ body {
   background: var(--admina-primary);
 }
 
-.app-shell .app-shell.is-collapsed .app-nav-badge,
 .app-shell.is-collapsed .app-nav-badge {
   border-color: #ffffff;
 }
@@ -242,12 +242,12 @@ body {
 .app-shell .ui-button--primary {
   background: var(--admina-primary);
   color: #fff;
-  box-shadow: 0 5px 12px rgba(99, 91, 255, 0.16);
+  box-shadow: 0 5px 12px rgba(91, 82, 232, 0.16);
 }
 
 .app-shell .ui-button--primary:hover:not(:disabled) {
   background: var(--admina-primary-hover);
-  box-shadow: 0 7px 17px rgba(99, 91, 255, 0.24);
+  box-shadow: 0 7px 17px rgba(91, 82, 232, 0.24);
   transform: translateY(-1px);
 }
 
