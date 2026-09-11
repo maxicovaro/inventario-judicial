@@ -4,7 +4,10 @@ const {
   isValidBase64Key32,
   validateDeployment,
 } = require("./deploy-preflight");
-const { normalizeOrigin } = require("./deploy-smoke");
+const {
+  deploymentExpectation,
+  normalizeOrigin,
+} = require("./deploy-smoke");
 
 const VALID_MFA_KEY = Buffer.from(
   "0123456789abcdef0123456789abcdef",
@@ -86,6 +89,25 @@ assert.throws(
   /origen sin ruta/,
 );
 
+assert.deepStrictEqual(
+  deploymentExpectation({
+    DEPLOY_ENV: "staging",
+    DEPLOY_REVISION: "0123456789abcdef",
+  }),
+  {
+    environment: "staging",
+    revision: "0123456789abcdef",
+  },
+);
+assert.throws(
+  () => deploymentExpectation({ DEPLOY_ENV: "development", DEPLOY_REVISION: "abc" }),
+  /staging o production/,
+);
+assert.throws(
+  () => deploymentExpectation({ DEPLOY_ENV: "staging", DEPLOY_REVISION: "" }),
+  /DEPLOY_REVISION/,
+);
+
 const stagingExample = fs.readFileSync(".env.staging.example", "utf8");
 const frontendStagingExample = fs.readFileSync(
   "inventario-frontend/.env.staging.example",
@@ -106,6 +128,7 @@ assert.match(migrateScript, /verifyBackupFile/);
 assert.match(migrateScript, /backupDatabase !== currentDatabase/);
 assert.match(smokeScript, /health\/live/);
 assert.match(smokeScript, /health\/ready/);
+assert.match(smokeScript, /expectedDeployment/);
 assert.match(smokeScript, /access-control-allow-origin/);
 assert.match(operations, /STAGING\.md/);
 assert.match(stagingDoc, /npm run deploy:preflight/);
