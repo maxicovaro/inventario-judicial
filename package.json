@@ -36,7 +36,8 @@
     "test:ci-config": "node scripts/test-ci-config.js",
     "test:prestage-security": "node scripts/test-prestaging-security.js",
     "test:mfa": "node scripts/test-mfa.js",
-    "test": "npm run test:pedido-rules && npm run test:security-rules && npm run test:env-config && npm run test:safe-errors && npm run test:db-lifecycle && npm run test:quality-baseline && npm run test:dependencies && npm run test:authorization-scope && npm run test:asset-movements && npm run test:operational-contracts && npm run test:recovery-runbook && npm run test:integration-e2e-contracts && npm run test:ci-config && npm run test:prestage-security",
+    "test:staging-contract": "node scripts/test-staging-contract.js",
+    "test": "npm run test:pedido-rules && npm run test:security-rules && npm run test:env-config && npm run test:safe-errors && npm run test:db-lifecycle && npm run test:quality-baseline && npm run test:dependencies && npm run test:authorization-scope && npm run test:asset-movements && npm run test:operational-contracts && npm run test:recovery-runbook && npm run test:integration-e2e-contracts && npm run test:ci-config && npm run test:prestage-security && npm run test:staging-contract",
     "check": "npm run check:backend && npm test && npm run check:frontend"
   },
   "keywords": [],
