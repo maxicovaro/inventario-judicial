@@ -76,6 +76,21 @@ Contiene:
 - procedimiento de rollback;
 - evidencia requerida para cerrar P7.
 
+### 6. Railway staging — implementación P7.2
+
+`RAILWAY_STAGING.md`
+
+Contiene:
+- topología concreta `frontend` / `backend` / `mysql`;
+- backend y MySQL privados;
+- frontend público con Caddy y proxy same-origin;
+- Reference Variables Railway;
+- Volume `/data` para uploads/backups;
+- variables exactas de staging;
+- comandos `railway ssh` para preflight, backup, migración y smoke;
+- persistencia de adjuntos;
+- rollback y evidencia de cierre de P7.2.
+
 ## Evidencia técnica
 
 La documentación anterior define el estado consolidado. La evidencia detallada de que un cambio fue implementado/validado vive en:
@@ -94,8 +109,9 @@ Para retomar el proyecto después de una pausa:
 2. Revisar el PR activo indicado allí.
 3. Leer el documento técnico del frente afectado.
 4. Consultar `OPERATIONS.md` si hay base de datos, despliegue o incidente involucrado.
-5. Para P7/staging, consultar además `STAGING.md`.
-6. Verificar último Quality Gate antes de modificar/integrar.
+5. Para P7/staging, consultar `STAGING.md`.
+6. Si el proveedor activo es Railway, leer también `RAILWAY_STAGING.md`.
+7. Verificar último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
 
