@@ -327,7 +327,38 @@ Secuencia efectiva P7.2:
 18. rollback simulado en modo read-only;
 19. runner temporal eliminado.
 
-## Migración protegida ejecutada
+## Operación manual por Railway CLI/SSH
+
+Para operadores humanos con Railway CLI autenticada, el procedimiento preferido de mantenimiento sigue siendo ejecutar los comandos dentro del backend ya desplegado mediante `railway ssh --service backend`.
+
+Ejemplos:
+
+```bash
+railway ssh --service backend -- npm run deploy:preflight
+```
+
+```bash
+railway ssh --service backend -- \
+  npm run db:backup -- --output /data/backups/pre-deploy.sql
+```
+
+```bash
+railway ssh --service backend -- \
+  npm run db:backup:verify -- /data/backups/pre-deploy.sql
+```
+
+```bash
+railway ssh --service backend -- \
+  npm run deploy:migrate -- --backup /data/backups/pre-deploy.sql
+```
+
+```bash
+railway ssh --service backend -- npm run db:status
+```
+
+El smoke debe ejecutarse desde un proceso externo al backend que se está validando. No usar `railway ssh` para arrancar `deploy:smoke` antes de que el propio backend esté atendiendo tráfico.
+
+## Migración protegida ejecutada en P7.2
 
 Debido a que la integración Railway disponible en este flujo no ofrecía `exec/ssh` arbitrario dentro del contenedor, la operación de mantenimiento se ejecutó mediante un `startCommand` **temporal y explícito**, aplicado solo durante un deployment controlado y restaurado inmediatamente después a `npm start`.
 
