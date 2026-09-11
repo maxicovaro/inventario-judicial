@@ -1,10 +1,12 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/axios";
 import { esAdminGeneral } from "../utils/permisos";
 import "../styles/app-shell.css";
 
 const MOBILE_QUERY = "(max-width: 980px)";
+const SIDEBAR_SCROLL_KEY = "inventario.sidebar.scrollTop";
+const SIDEBAR_COLLAPSED_KEY = "inventario.sidebar.collapsed";
 
 const obtenerUsuarioLocal = () => {
   try {
@@ -183,13 +185,22 @@ const routeMeta = {
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const sidebarNavRef = useRef(null);
   const usuario = useMemo(() => obtenerUsuarioLocal(), []);
   const esDireccion = esAdminGeneral(usuario);
 
   const [noLeidas, setNoLeidas] = useState(0);
-  const [colapsado, setColapsado] = useState(false);
+  const [colapsado, setColapsado] = useState(
+    () => sessionStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true",
+  );
   const [menuMobileAbierto, setMenuMobileAbierto] = useState(false);
   const [esMobile, setEsMobile] = useState(false);
+
+  const guardarPosicionSidebar = useCallback(() => {
+    const nav = sidebarNavRef.current;
+    if (!nav) return;
+    sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(nav.scrollTop));
+  }, []);
 
   const cargarNoLeidas = useCallback(async () => {
     try {
@@ -229,6 +240,39 @@ export default function Layout({ children }) {
   }, []);
 
   useEffect(() => {
+    sessionStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(colapsado));
+  }, [colapsado]);
+
+  useEffect(() => {
+    const nav = sidebarNavRef.current;
+    if (!nav) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      const posicionGuardada = Number(sessionStorage.getItem(SIDEBAR_SCROLL_KEY));
+      if (Number.isFinite(posicionGuardada) && posicionGuardada >= 0) {
+        nav.scrollTop = posicionGuardada;
+      }
+
+      const enlaceActivo = nav.querySelector('.app-nav-link[aria-current="page"]');
+      if (enlaceActivo) {
+        const navRect = nav.getBoundingClientRect();
+        const activoRect = enlaceActivo.getBoundingClientRect();
+        const margen = 10;
+
+        if (activoRect.top < navRect.top + margen) {
+          nav.scrollTop -= navRect.top + margen - activoRect.top;
+        } else if (activoRect.bottom > navRect.bottom - margen) {
+          nav.scrollTop += activoRect.bottom - (navRect.bottom - margen);
+        }
+      }
+
+      sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(nav.scrollTop));
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.pathname]);
+
+  useEffect(() => {
     if (!menuMobileAbierto) return undefined;
 
     const overflowAnterior = document.body.style.overflow;
@@ -254,12 +298,19 @@ export default function Layout({ children }) {
     } finally {
       localStorage.removeItem("token");
       localStorage.removeItem("usuario");
+      sessionStorage.removeItem(SIDEBAR_SCROLL_KEY);
+      sessionStorage.removeItem(SIDEBAR_COLLAPSED_KEY);
       navigate("/", { replace: true });
     }
   };
 
   const cerrarMenuMobile = () => {
     if (esMobile) setMenuMobileAbierto(false);
+  };
+
+  const manejarNavegacionSidebar = () => {
+    guardarPosicionSidebar();
+    cerrarMenuMobile();
   };
 
   const secciones = useMemo(() => {
@@ -378,7 +429,7 @@ export default function Layout({ children }) {
           <Link
             to="/dashboard"
             className="app-brand"
-            onClick={cerrarMenuMobile}
+            onClick={manejarNavegacionSidebar}
             aria-label="Inventario Judicial, ir al inicio"
           >
             <span className="app-brand-mark" aria-hidden="true">
@@ -419,7 +470,12 @@ export default function Layout({ children }) {
           </button>
         </div>
 
-        <nav className="app-sidebar-nav" aria-label="Secciones del sistema">
+        <nav
+          ref={sidebarNavRef}
+          className="app-sidebar-nav"
+          aria-label="Secciones del sistema"
+          onScroll={guardarPosicionSidebar}
+        >
           {secciones.map((seccion) => (
             <section className="app-sidebar-section" key={seccion.titulo}>
               <h2 className="app-sidebar-section-title">{seccion.titulo}</h2>
@@ -432,7 +488,7 @@ export default function Layout({ children }) {
                     <li key={item.to}>
                       <Link
                         to={item.to}
-                        onClick={cerrarMenuMobile}
+                        onClick={manejarNavegacionSidebar}
                         className={`app-nav-link${activo ? " is-active" : ""}`}
                         aria-current={activo ? "page" : undefined}
                         aria-label={colapsado && !esMobile ? item.label : undefined}
