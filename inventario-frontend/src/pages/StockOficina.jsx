@@ -2,7 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  PageHeader,
+  StatCard,
+  TableFrame,
+} from "../components/ui";
 import { esAdminGeneral } from "../utils/permisos";
+import "../styles/operations.css";
 
 const formInicial = {
   insumo_id: "",
@@ -11,10 +23,11 @@ const formInicial = {
   motivo: "",
 };
 
+const formatearNumero = (valor) =>
+  new Intl.NumberFormat("es-AR").format(Number(valor) || 0);
 
 export default function StockOficina() {
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-
   const esDireccion = esAdminGeneral(usuario);
 
   const [stock, setStock] = useState([]);
@@ -64,7 +77,6 @@ export default function StockOficina() {
       setStock(response.data || []);
     } catch (err) {
       console.error("Error stock oficina:", err.response?.data || err.message);
-
       setError(
         err.response?.data?.mensaje ||
           err.response?.data?.error ||
@@ -101,7 +113,7 @@ export default function StockOficina() {
   }, [oficinaSeleccionada]);
 
   const stockFiltrado = useMemo(() => {
-    const texto = busqueda.toLowerCase();
+    const texto = busqueda.trim().toLowerCase();
 
     return stock.filter((item) => {
       const nombre = item.Insumo?.nombre?.toLowerCase() || "";
@@ -110,16 +122,31 @@ export default function StockOficina() {
         item.Insumo?.Categoria?.nombre?.toLowerCase() ||
         "";
 
-      return nombre.includes(texto) || categoria.includes(texto);
+      return !texto || nombre.includes(texto) || categoria.includes(texto);
     });
   }, [stock, busqueda]);
 
-  const totalItems = stockFiltrado.length;
+  const resumen = useMemo(() => {
+    const totalUnidades = stock.reduce(
+      (acc, item) => acc + (Number(item.cantidad) || 0),
+      0,
+    );
+    const sinStock = stock.filter((item) => Number(item.cantidad) <= 0).length;
+    const categorias = new Set(
+      stock
+        .map(
+          (item) => item.Insumo?.categoria || item.Insumo?.Categoria?.nombre,
+        )
+        .filter(Boolean),
+    );
 
-  const totalUnidades = stockFiltrado.reduce(
-    (acc, item) => acc + (Number(item.cantidad) || 0),
-    0,
-  );
+    return {
+      items: stock.length,
+      totalUnidades,
+      sinStock,
+      categorias: categorias.size,
+    };
+  }, [stock]);
 
   const oficinaActual = oficinas.find(
     (oficina) => String(oficina.id) === String(oficinaSeleccionada),
@@ -191,7 +218,6 @@ export default function StockOficina() {
       await cargarInsumos();
     } catch (err) {
       console.error("Error asignar stock:", err.response?.data || err.message);
-
       toast.error(
         err.response?.data?.mensaje ||
           err.response?.data?.error ||
@@ -202,374 +228,260 @@ export default function StockOficina() {
     }
   };
 
+  const nombreOficina = esDireccion
+    ? oficinaActual?.nombre || "Sin seleccionar"
+    : usuario.oficina_nombre || usuario.Oficina?.nombre || "Mi oficina";
+
   return (
     <Layout>
-      <div style={styles.pageHeader}>
-        <div>
-          <h1 style={styles.titulo}>Stock por oficina</h1>
-          <p style={styles.subtitulo}>
-            {esDireccion
-              ? "Consulta y asignación de stock a cada oficina o unidad judicial."
-              : "Consulta del stock asignado a tu oficina o unidad judicial."}
-          </p>
-        </div>
-      </div>
+      <div className="ui-page ops-page">
+        <PageHeader
+          eyebrow={esDireccion ? "Distribución interna" : "Disponibilidad local"}
+          title="Stock por oficina"
+          description={
+            esDireccion
+              ? "Consultá existencias por dependencia y asigná insumos desde el depósito central."
+              : "Consultá los insumos actualmente disponibles en tu oficina o unidad judicial."
+          }
+        />
 
-      {esDireccion && (
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>
-            <div>
-              <h2 style={styles.cardTitle}>Asignar stock desde depósito</h2>
-              <p style={styles.cardSubtitle}>
-                Esta operación descuenta del stock central y suma al stock de la
-                oficina seleccionada.
-              </p>
-            </div>
-          </div>
-
-          <form onSubmit={asignarStock} style={styles.formGrid}>
-            <select
-              name="oficina_id"
-              value={formAsignacion.oficina_id}
-              onChange={(e) => {
-                handleAsignacionChange(e);
-                setOficinaSeleccionada(e.target.value);
-              }}
-              style={styles.input}
-            >
-              <option value="">Seleccionar oficina</option>
-              {oficinas.map((oficina) => (
-                <option key={oficina.id} value={oficina.id}>
-                  {oficina.nombre}
-                </option>
-              ))}
-            </select>
-
-            <select
-              name="insumo_id"
-              value={formAsignacion.insumo_id}
-              onChange={handleAsignacionChange}
-              style={styles.input}
-            >
-              <option value="">Seleccionar insumo</option>
-              {insumosActivos.map((insumo) => (
-                <option key={insumo.id} value={insumo.id}>
-                  {insumo.nombre} — Stock depósito: {insumo.stock_actual ?? 0}
-                </option>
-              ))}
-            </select>
-
-            <input
-              name="cantidad"
-              type="number"
-              min="1"
-              step="1"
-              placeholder="Cantidad"
-              value={formAsignacion.cantidad}
-              onChange={handleAsignacionChange}
-              style={styles.input}
-            />
-
-            <input
-              name="motivo"
-              type="text"
-              placeholder="Motivo u observación"
-              value={formAsignacion.motivo}
-              onChange={handleAsignacionChange}
-              style={styles.input}
-            />
-
-            <button
-              type="submit"
-              style={styles.primaryButton}
-              disabled={asignando}
-            >
-              {asignando ? "Asignando..." : "Asignar stock"}
-            </button>
-          </form>
-        </div>
-      )}
-
-      <div style={styles.card}>
-        <div style={styles.filters}>
-          {esDireccion ? (
-            <select
-              value={oficinaSeleccionada}
-              onChange={(e) => setOficinaSeleccionada(e.target.value)}
-              style={styles.input}
-            >
-              <option value="">Seleccionar oficina</option>
-              {oficinas.map((oficina) => (
-                <option key={oficina.id} value={oficina.id}>
-                  {oficina.nombre}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              value={usuario.oficina_nombre || "Mi oficina"}
-              style={styles.input}
-              disabled
-              readOnly
-            />
-          )}
-
-          <input
-            type="text"
-            placeholder="Buscar insumo o categoría..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            style={styles.input}
+        <section className="ops-summary" aria-label="Resumen del stock de oficina">
+          <StatCard
+            label="Oficina"
+            value={nombreOficina}
+            detail={esDireccion ? "Dependencia seleccionada" : "Tu alcance actual"}
           />
-        </div>
+          <StatCard
+            label="Insumos distintos"
+            value={formatearNumero(resumen.items)}
+            detail="Referencias asignadas"
+            tone="accent"
+          />
+          <StatCard
+            label="Unidades totales"
+            value={formatearNumero(resumen.totalUnidades)}
+            detail="Stock disponible en oficina"
+            tone="success"
+          />
+          <StatCard
+            label="Sin disponibilidad"
+            value={formatearNumero(resumen.sinStock)}
+            detail={`${formatearNumero(resumen.categorias)} categorías representadas`}
+            tone={resumen.sinStock > 0 ? "warning" : "success"}
+          />
+        </section>
 
-        <div style={styles.summaryGrid}>
-          <div style={styles.summaryCard}>
-            <span style={styles.summaryLabel}>Oficina</span>
-            <strong style={styles.summaryValue}>
-              {esDireccion
-                ? oficinaActual?.nombre || "Sin seleccionar"
-                : usuario.oficina_nombre || "-"}
-            </strong>
-          </div>
+        {error && <Alert tone="danger">{error}</Alert>}
 
-          <div style={styles.summaryCard}>
-            <span style={styles.summaryLabel}>Insumos distintos</span>
-            <strong style={styles.summaryValue}>{totalItems}</strong>
-          </div>
+        {esDireccion && (
+          <Card className="ops-card" aria-labelledby="asignar-stock-title">
+            <div className="ops-card__header">
+              <div>
+                <h2 className="ops-card__title" id="asignar-stock-title">
+                  Asignar stock desde depósito
+                </h2>
+                <p className="ops-card__description">
+                  Esta operación descuenta existencias del depósito central y las acredita en la oficina seleccionada.
+                </p>
+              </div>
+              <Badge tone="warning">Movimiento de stock</Badge>
+            </div>
 
-          <div style={styles.summaryCard}>
-            <span style={styles.summaryLabel}>Unidades totales</span>
-            <strong style={styles.summaryValue}>{totalUnidades}</strong>
-          </div>
-        </div>
+            <div className="ops-card__body">
+              <form className="ops-inline-form" onSubmit={asignarStock}>
+                <Field label="Oficina destino" htmlFor="stock-asignar-oficina">
+                  <select
+                    id="stock-asignar-oficina"
+                    name="oficina_id"
+                    className="ui-control"
+                    value={formAsignacion.oficina_id}
+                    onChange={(e) => {
+                      handleAsignacionChange(e);
+                      setOficinaSeleccionada(e.target.value);
+                    }}
+                  >
+                    <option value="">Seleccionar oficina</option>
+                    {oficinas.map((oficina) => (
+                      <option key={oficina.id} value={oficina.id}>
+                        {oficina.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
 
-        {error && <p style={styles.error}>{error}</p>}
+                <Field label="Insumo" htmlFor="stock-asignar-insumo">
+                  <select
+                    id="stock-asignar-insumo"
+                    name="insumo_id"
+                    className="ui-control"
+                    value={formAsignacion.insumo_id}
+                    onChange={handleAsignacionChange}
+                  >
+                    <option value="">Seleccionar insumo</option>
+                    {insumosActivos.map((insumo) => (
+                      <option key={insumo.id} value={insumo.id}>
+                        {insumo.nombre} — Stock depósito: {insumo.stock_actual ?? 0}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
 
-        {!oficinaSeleccionada ? (
-          <div style={styles.emptyBox}>
-            Seleccioná una oficina para consultar su stock.
-          </div>
-        ) : cargando ? (
-          <div style={styles.emptyBox}>Cargando stock...</div>
-        ) : stockFiltrado.length === 0 ? (
-          <div style={styles.emptyBox}>
-            No hay stock asignado para esta oficina.
-          </div>
-        ) : (
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Insumo</th>
-                  <th style={styles.th}>Categoría</th>
-                  <th style={styles.th}>Unidad</th>
-                  <th style={styles.thRight}>Cantidad</th>
-                </tr>
-              </thead>
+                <Field label="Cantidad" htmlFor="stock-asignar-cantidad">
+                  <input
+                    id="stock-asignar-cantidad"
+                    name="cantidad"
+                    type="number"
+                    min="1"
+                    step="1"
+                    className="ui-control"
+                    placeholder="Cantidad"
+                    value={formAsignacion.cantidad}
+                    onChange={handleAsignacionChange}
+                  />
+                </Field>
 
-              <tbody>
-                {stockFiltrado.map((item) => (
-                  <tr key={item.id} style={styles.tr}>
-                    <td style={styles.td}>
-                      <strong>{item.Insumo?.nombre || "-"}</strong>
-                    </td>
+                <Field label="Motivo u observación" htmlFor="stock-asignar-motivo">
+                  <input
+                    id="stock-asignar-motivo"
+                    name="motivo"
+                    type="text"
+                    className="ui-control"
+                    placeholder="Motivo u observación"
+                    value={formAsignacion.motivo}
+                    onChange={handleAsignacionChange}
+                  />
+                </Field>
 
-                    <td style={styles.td}>
-                      {item.Insumo?.categoria ||
-                        item.Insumo?.Categoria?.nombre ||
-                        "-"}
-                    </td>
-
-                    <td style={styles.td}>
-                      {item.Insumo?.unidad_medida || "-"}
-                    </td>
-
-                    <td style={styles.tdRight}>{item.cantidad}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                <Button type="submit" disabled={asignando} busy={asignando}>
+                  {asignando ? "Asignando..." : "Asignar stock"}
+                </Button>
+              </form>
+            </div>
+          </Card>
         )}
+
+        <Card className="ops-card" aria-labelledby="stock-oficina-listado-title">
+          <div className="ops-toolbar ops-toolbar--two">
+            {esDireccion ? (
+              <Field label="Oficina" htmlFor="stock-oficina-selector">
+                <select
+                  id="stock-oficina-selector"
+                  className="ui-control"
+                  value={oficinaSeleccionada}
+                  onChange={(e) => setOficinaSeleccionada(e.target.value)}
+                >
+                  <option value="">Seleccionar oficina</option>
+                  {oficinas.map((oficina) => (
+                    <option key={oficina.id} value={oficina.id}>
+                      {oficina.nombre}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : (
+              <Field label="Oficina" htmlFor="stock-oficina-actual">
+                <input
+                  id="stock-oficina-actual"
+                  className="ui-control"
+                  value={nombreOficina}
+                  disabled
+                  readOnly
+                />
+              </Field>
+            )}
+
+            <Field label="Buscar" htmlFor="stock-oficina-buscar">
+              <input
+                id="stock-oficina-buscar"
+                type="search"
+                className="ui-control"
+                placeholder="Buscar insumo o categoría..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+              />
+            </Field>
+          </div>
+
+          <div className="ops-meta">
+            <p className="ops-meta__count" id="stock-oficina-listado-title">
+              {oficinaSeleccionada
+                ? `${formatearNumero(stockFiltrado.length)} insumos visibles`
+                : "Seleccioná una oficina"}
+            </p>
+            <p className="ops-meta__scope">
+              {busqueda ? `Filtro: “${busqueda}”` : "Existencias asignadas por dependencia"}
+            </p>
+          </div>
+
+          {!oficinaSeleccionada ? (
+            <EmptyState
+              className="ops-empty"
+              title="Elegí una oficina"
+              description="Seleccioná una dependencia para consultar su stock disponible."
+            />
+          ) : cargando ? (
+            <div className="ops-card__body" role="status">
+              Cargando stock...
+            </div>
+          ) : stockFiltrado.length === 0 ? (
+            <EmptyState
+              className="ops-empty"
+              title="Sin stock para mostrar"
+              description={
+                busqueda
+                  ? "No hay insumos que coincidan con la búsqueda actual."
+                  : "Esta oficina todavía no tiene stock asignado."
+              }
+            />
+          ) : (
+            <TableFrame label={`Stock de ${nombreOficina}`}>
+              <table className="ui-table ops-table">
+                <caption className="sr-only">Stock de {nombreOficina}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Insumo</th>
+                    <th scope="col">Categoría</th>
+                    <th scope="col">Unidad</th>
+                    <th scope="col">Cantidad</th>
+                    <th scope="col">Disponibilidad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockFiltrado.map((item) => {
+                    const cantidad = Number(item.cantidad) || 0;
+                    return (
+                      <tr key={item.id}>
+                        <td className="ops-cell-primary">
+                          <div className="ops-primary">
+                            <span className="ops-primary__name">
+                              {item.Insumo?.nombre || "-"}
+                            </span>
+                            <span className="ops-primary__meta">ID stock #{item.id}</span>
+                          </div>
+                        </td>
+                        <td className="ops-muted">
+                          {item.Insumo?.categoria ||
+                            item.Insumo?.Categoria?.nombre ||
+                            "-"}
+                        </td>
+                        <td className="ops-muted">{item.Insumo?.unidad_medida || "-"}</td>
+                        <td className="ops-number">
+                          <strong>{formatearNumero(cantidad)}</strong>
+                        </td>
+                        <td>
+                          <Badge tone={cantidad > 0 ? "success" : "danger"}>
+                            {cantidad > 0 ? "Disponible" : "Sin stock"}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </TableFrame>
+          )}
+        </Card>
       </div>
     </Layout>
   );
 }
-
-const styles = {
-  pageHeader: {
-    marginBottom: 24,
-  },
-
-  titulo: {
-    margin: 0,
-    fontSize: 34,
-    fontWeight: 700,
-    color: "#1f2937",
-    letterSpacing: "-0.03em",
-  },
-
-  subtitulo: {
-    margin: "6px 0 0 0",
-    fontSize: 15,
-    color: "#6b7280",
-    fontWeight: 500,
-  },
-
-  card: {
-    background: "#fff",
-    border: "1px solid #dde3ea",
-    borderRadius: 18,
-    padding: 22,
-    boxShadow: "0 2px 8px rgba(31,41,55,0.04)",
-    marginBottom: 20,
-  },
-
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 16,
-    marginBottom: 16,
-  },
-
-  cardTitle: {
-    margin: 0,
-    fontSize: 20,
-    fontWeight: 700,
-    color: "#1f2937",
-  },
-
-  cardSubtitle: {
-    margin: "5px 0 0 0",
-    fontSize: 14,
-    color: "#6b7280",
-  },
-
-  formGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 14,
-    alignItems: "center",
-  },
-
-  filters: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: 14,
-    marginBottom: 18,
-  },
-
-  input: {
-    width: "100%",
-    padding: "12px 14px",
-    border: "1px solid #d9dee5",
-    borderRadius: 12,
-    background: "#fff",
-    color: "#1f2937",
-    fontSize: 14,
-    outline: "none",
-    boxSizing: "border-box",
-  },
-
-  primaryButton: {
-    padding: "12px 16px",
-    border: "none",
-    borderRadius: 12,
-    background: "#16345d",
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-
-  summaryGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-    gap: 14,
-    marginBottom: 20,
-  },
-
-  summaryCard: {
-    background: "#f8fafc",
-    border: "1px solid #e2e8f0",
-    borderRadius: 14,
-    padding: 16,
-  },
-
-  summaryLabel: {
-    display: "block",
-    fontSize: 13,
-    color: "#6b7280",
-    fontWeight: 600,
-    marginBottom: 6,
-  },
-
-  summaryValue: {
-    fontSize: 18,
-    color: "#1f2937",
-    fontWeight: 700,
-  },
-
-  tableWrapper: {
-    overflowX: "auto",
-    border: "1px solid #e2e8f0",
-    borderRadius: 14,
-  },
-
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: 14,
-  },
-
-  th: {
-    textAlign: "left",
-    padding: "14px 16px",
-    background: "#f8fafc",
-    color: "#475569",
-    fontWeight: 700,
-    borderBottom: "1px solid #e2e8f0",
-  },
-
-  thRight: {
-    textAlign: "right",
-    padding: "14px 16px",
-    background: "#f8fafc",
-    color: "#475569",
-    fontWeight: 700,
-    borderBottom: "1px solid #e2e8f0",
-  },
-
-  tr: {
-    borderBottom: "1px solid #edf2f7",
-  },
-
-  td: {
-    padding: "14px 16px",
-    color: "#334155",
-  },
-
-  tdRight: {
-    padding: "14px 16px",
-    color: "#334155",
-    textAlign: "right",
-    fontWeight: 700,
-  },
-
-  emptyBox: {
-    border: "1px dashed #cbd5e1",
-    borderRadius: 14,
-    padding: 24,
-    color: "#64748b",
-    background: "#f8fafc",
-    textAlign: "center",
-    fontWeight: 600,
-  },
-
-  error: {
-    color: "#b03a3a",
-    fontWeight: 600,
-  },
-};

@@ -1,0 +1,23 @@
+/*
+ * Activos usa una única representación semántica de los registros.
+ * En pantallas estrechas la tabla conserva todas las columnas y se desplaza
+ * horizontalmente dentro de una región enfocables, evitando duplicar el DOM.
+ */
+@media (max-width: 760px) {
+  .assets-table-wrap {
+    display: block !important;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .assets-table {
+    min-width: 900px;
+  }
+
+  .assets-list-card {
+    overflow: hidden;
+  }
+}

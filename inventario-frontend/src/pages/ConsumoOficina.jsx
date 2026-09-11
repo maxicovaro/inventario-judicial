@@ -2,7 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  PageHeader,
+  StatCard,
+  TableFrame,
+} from "../components/ui";
 import { esAdminGeneral } from "../utils/permisos";
+import "../styles/operations.css";
 
 const meses = [
   { value: 1, label: "Enero" },
@@ -21,10 +32,11 @@ const meses = [
 
 const fechaActual = new Date();
 
+const formatearNumero = (valor) =>
+  new Intl.NumberFormat("es-AR").format(Number(valor) || 0);
 
 export default function ConsumoOficina() {
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-
   const esDireccion = esAdminGeneral(usuario);
 
   const [oficinas, setOficinas] = useState([]);
@@ -136,6 +148,10 @@ export default function ConsumoOficina() {
     (o) => String(o.id) === String(filtros.oficina_id),
   );
 
+  const mesActual = meses.find(
+    (mes) => String(mes.value) === String(filtros.mes),
+  );
+
   const handleFiltroChange = (e) => {
     const { name, value } = e.target;
 
@@ -218,356 +234,283 @@ export default function ConsumoOficina() {
     }
   };
 
+  const nombreOficina =
+    oficinaActual?.nombre ||
+    usuario.oficina_nombre ||
+    usuario.Oficina?.nombre ||
+    "Sin seleccionar";
+
   return (
     <Layout>
-      <div style={styles.pageHeader}>
-        <div>
-          <h1 style={styles.titulo}>Consumo de oficina</h1>
-          <p style={styles.subtitulo}>
-            Registro mensual de insumos consumidos por oficina o unidad judicial.
-          </p>
-        </div>
-      </div>
+      <div className="ui-page ops-page">
+        <PageHeader
+          eyebrow="Uso operativo"
+          title="Consumo de oficina"
+          description="Registrá y consultá el consumo mensual de insumos con trazabilidad por dependencia y período."
+        />
 
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Filtros</h2>
+        <section className="ops-summary" aria-label="Resumen del consumo mensual">
+          <StatCard
+            label="Oficina"
+            value={nombreOficina}
+            detail="Dependencia del período consultado"
+          />
+          <StatCard
+            label="Período"
+            value={`${mesActual?.label || filtros.mes} ${filtros.anio}`}
+            detail="Mes actualmente seleccionado"
+            tone="accent"
+          />
+          <StatCard
+            label="Registros"
+            value={formatearNumero(consumos.length)}
+            detail="Movimientos de consumo"
+          />
+          <StatCard
+            label="Unidades consumidas"
+            value={formatearNumero(totalConsumido)}
+            detail="Total del período"
+            tone={totalConsumido > 0 ? "warning" : "success"}
+          />
+        </section>
 
-        <div style={styles.filters}>
-          {esDireccion ? (
-            <select
-              name="oficina_id"
-              value={filtros.oficina_id}
-              onChange={handleFiltroChange}
-              style={styles.input}
-            >
-              <option value="">Seleccionar oficina</option>
-              {oficinas.map((oficina) => (
-                <option key={oficina.id} value={oficina.id}>
-                  {oficina.nombre}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              value={usuario.oficina_nombre || "Mi oficina"}
-              style={styles.input}
-              disabled
-              readOnly
+        <Card className="ops-card" aria-labelledby="consumo-filtros-title">
+          <div className="ops-card__header">
+            <div>
+              <h2 className="ops-card__title" id="consumo-filtros-title">
+                Período y dependencia
+              </h2>
+              <p className="ops-card__description">
+                Cambiá estos valores para consultar el consumo histórico de una oficina.
+              </p>
+            </div>
+          </div>
+
+          <div className="ops-card__body">
+            <div className="ops-form-grid ops-form-grid--four">
+              {esDireccion ? (
+                <Field label="Oficina" htmlFor="consumo-oficina-filtro">
+                  <select
+                    id="consumo-oficina-filtro"
+                    name="oficina_id"
+                    className="ui-control"
+                    value={filtros.oficina_id}
+                    onChange={handleFiltroChange}
+                  >
+                    <option value="">Seleccionar oficina</option>
+                    {oficinas.map((oficina) => (
+                      <option key={oficina.id} value={oficina.id}>
+                        {oficina.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : (
+                <Field label="Oficina" htmlFor="consumo-oficina-actual">
+                  <input
+                    id="consumo-oficina-actual"
+                    className="ui-control"
+                    value={nombreOficina}
+                    disabled
+                    readOnly
+                  />
+                </Field>
+              )}
+
+              <Field label="Mes" htmlFor="consumo-mes-filtro">
+                <select
+                  id="consumo-mes-filtro"
+                  name="mes"
+                  className="ui-control"
+                  value={filtros.mes}
+                  onChange={handleFiltroChange}
+                >
+                  {meses.map((mes) => (
+                    <option key={mes.value} value={mes.value}>
+                      {mes.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Año" htmlFor="consumo-anio-filtro">
+                <input
+                  id="consumo-anio-filtro"
+                  name="anio"
+                  type="number"
+                  className="ui-control"
+                  value={filtros.anio}
+                  onChange={handleFiltroChange}
+                />
+              </Field>
+
+              <div className="ops-detail__item">
+                <span className="ops-detail__label">Stock con disponibilidad</span>
+                <span className="ops-detail__value">
+                  <strong>{formatearNumero(stockDisponible.length)}</strong> insumos para registrar consumo
+                </span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="ops-card" aria-labelledby="registrar-consumo-title">
+          <div className="ops-card__header">
+            <div>
+              <h2 className="ops-card__title" id="registrar-consumo-title">
+                Registrar consumo
+              </h2>
+              <p className="ops-card__description">
+                El registro descuenta unidades del stock disponible de la oficina seleccionada.
+              </p>
+            </div>
+            <Badge tone="warning">Descuenta stock</Badge>
+          </div>
+
+          <div className="ops-card__body">
+            <form className="ops-inline-form" onSubmit={registrarConsumo}>
+              <Field label="Insumo" htmlFor="consumo-insumo">
+                <select
+                  id="consumo-insumo"
+                  name="insumo_id"
+                  className="ui-control"
+                  value={form.insumo_id}
+                  onChange={handleFormChange}
+                  disabled={!filtros.oficina_id}
+                >
+                  <option value="">Seleccionar insumo disponible</option>
+                  {stockDisponible.map((item) => (
+                    <option key={item.id} value={item.insumo_id}>
+                      {item.Insumo?.nombre || "Insumo sin nombre"} — Disponible: {item.cantidad}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Cantidad consumida" htmlFor="consumo-cantidad">
+                <input
+                  id="consumo-cantidad"
+                  name="cantidad_consumida"
+                  type="number"
+                  min="1"
+                  step="1"
+                  className="ui-control"
+                  placeholder="Cantidad consumida"
+                  value={form.cantidad_consumida}
+                  onChange={handleFormChange}
+                  disabled={!filtros.oficina_id}
+                />
+              </Field>
+
+              <Field label="Observaciones" htmlFor="consumo-observaciones">
+                <input
+                  id="consumo-observaciones"
+                  name="observaciones"
+                  type="text"
+                  className="ui-control"
+                  placeholder="Observaciones"
+                  value={form.observaciones}
+                  onChange={handleFormChange}
+                  disabled={!filtros.oficina_id}
+                />
+              </Field>
+
+              <div className="ops-detail__item">
+                <span className="ops-detail__label">Período</span>
+                <span className="ops-detail__value">
+                  {mesActual?.label || filtros.mes} de {filtros.anio}
+                </span>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={registrando || !filtros.oficina_id}
+                busy={registrando}
+              >
+                {registrando ? "Registrando..." : "Registrar consumo"}
+              </Button>
+            </form>
+          </div>
+        </Card>
+
+        <Card className="ops-card" aria-labelledby="consumos-listado-title">
+          <div className="ops-meta">
+            <p className="ops-meta__count" id="consumos-listado-title">
+              Consumos registrados
+            </p>
+            <p className="ops-meta__scope">
+              {nombreOficina} · {mesActual?.label || filtros.mes} {filtros.anio}
+            </p>
+          </div>
+
+          {!filtros.oficina_id ? (
+            <EmptyState
+              className="ops-empty"
+              title="Elegí una oficina"
+              description="Seleccioná una dependencia para consultar sus consumos."
             />
-          )}
-
-          <select
-            name="mes"
-            value={filtros.mes}
-            onChange={handleFiltroChange}
-            style={styles.input}
-          >
-            {meses.map((mes) => (
-              <option key={mes.value} value={mes.value}>
-                {mes.label}
-              </option>
-            ))}
-          </select>
-
-          <input
-            name="anio"
-            type="number"
-            value={filtros.anio}
-            onChange={handleFiltroChange}
-            style={styles.input}
-          />
-        </div>
-
-        <div style={styles.summaryGrid}>
-          <div style={styles.summaryCard}>
-            <span style={styles.summaryLabel}>Oficina</span>
-            <strong style={styles.summaryValue}>
-              {oficinaActual?.nombre || usuario.oficina_nombre || "-"}
-            </strong>
-          </div>
-
-          <div style={styles.summaryCard}>
-            <span style={styles.summaryLabel}>Registros</span>
-            <strong style={styles.summaryValue}>{consumos.length}</strong>
-          </div>
-
-          <div style={styles.summaryCard}>
-            <span style={styles.summaryLabel}>Unidades consumidas</span>
-            <strong style={styles.summaryValue}>{totalConsumido}</strong>
-          </div>
-        </div>
-      </div>
-
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Registrar consumo</h2>
-
-        <form onSubmit={registrarConsumo} style={styles.formGrid}>
-          <select
-            name="insumo_id"
-            value={form.insumo_id}
-            onChange={handleFormChange}
-            style={styles.input}
-            disabled={!filtros.oficina_id}
-          >
-            <option value="">Seleccionar insumo disponible</option>
-
-            {stockDisponible.map((item) => (
-              <option key={item.id} value={item.insumo_id}>
-                {item.Insumo?.nombre || "Insumo sin nombre"} — Disponible:{" "}
-                {item.cantidad}
-              </option>
-            ))}
-          </select>
-
-          <input
-            name="cantidad_consumida"
-            type="number"
-            min="1"
-            step="1"
-            placeholder="Cantidad consumida"
-            value={form.cantidad_consumida}
-            onChange={handleFormChange}
-            style={styles.input}
-            disabled={!filtros.oficina_id}
-          />
-
-          <input
-            name="observaciones"
-            type="text"
-            placeholder="Observaciones"
-            value={form.observaciones}
-            onChange={handleFormChange}
-            style={styles.input}
-            disabled={!filtros.oficina_id}
-          />
-
-          <button
-            type="submit"
-            style={styles.primaryButton}
-            disabled={registrando || !filtros.oficina_id}
-          >
-            {registrando ? "Registrando..." : "Registrar consumo"}
-          </button>
-        </form>
-      </div>
-
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Consumos registrados</h2>
-
-        {!filtros.oficina_id ? (
-          <div style={styles.emptyBox}>Seleccioná una oficina.</div>
-        ) : cargando ? (
-          <div style={styles.emptyBox}>Cargando consumos...</div>
-        ) : consumos.length === 0 ? (
-          <div style={styles.emptyBox}>
-            No hay consumos registrados para este período.
-          </div>
-        ) : (
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Insumo</th>
-                  <th style={styles.th}>Categoría</th>
-                  <th style={styles.th}>Mes/Año</th>
-                  <th style={styles.thRight}>Cantidad</th>
-                  <th style={styles.th}>Usuario</th>
-                  <th style={styles.th}>Observaciones</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {consumos.map((item) => (
-                  <tr key={item.id} style={styles.tr}>
-                    <td style={styles.td}>
-                      <strong>{item.Insumo?.nombre || "-"}</strong>
-                    </td>
-
-                    <td style={styles.td}>
-                      {item.Insumo?.categoria ||
-                        item.Insumo?.Categoria?.nombre ||
-                        "-"}
-                    </td>
-
-                    <td style={styles.td}>
-                      {item.mes}/{item.anio}
-                    </td>
-
-                    <td style={styles.tdRight}>
-                      {item.cantidad_consumida}
-                    </td>
-
-                    <td style={styles.td}>
-                      {item.Usuario
-                        ? `${item.Usuario.nombre} ${item.Usuario.apellido}`
-                        : "-"}
-                    </td>
-
-                    <td style={styles.td}>{item.observaciones || "-"}</td>
+          ) : cargando ? (
+            <div className="ops-card__body" role="status">
+              Cargando consumos...
+            </div>
+          ) : consumos.length === 0 ? (
+            <EmptyState
+              className="ops-empty"
+              title="Sin consumos en este período"
+              description="No hay registros de consumo para la oficina, mes y año seleccionados."
+            />
+          ) : (
+            <TableFrame label={`Consumos de ${nombreOficina}`}>
+              <table className="ui-table ops-table">
+                <caption className="sr-only">Consumos de {nombreOficina}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Insumo</th>
+                    <th scope="col">Categoría</th>
+                    <th scope="col">Período</th>
+                    <th scope="col">Cantidad</th>
+                    <th scope="col">Usuario</th>
+                    <th scope="col">Observaciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {consumos.map((item) => (
+                    <tr key={item.id}>
+                      <td className="ops-cell-primary">
+                        <div className="ops-primary">
+                          <span className="ops-primary__name">
+                            {item.Insumo?.nombre || "-"}
+                          </span>
+                          <span className="ops-primary__meta">Registro #{item.id}</span>
+                        </div>
+                      </td>
+                      <td className="ops-muted">
+                        {item.Insumo?.categoria ||
+                          item.Insumo?.Categoria?.nombre ||
+                          "-"}
+                      </td>
+                      <td>
+                        <span className="ops-period">
+                          {item.mes}/{item.anio}
+                        </span>
+                      </td>
+                      <td className="ops-number">
+                        <strong>{formatearNumero(item.cantidad_consumida)}</strong>
+                      </td>
+                      <td className="ops-muted">
+                        {item.Usuario
+                          ? `${item.Usuario.nombre} ${item.Usuario.apellido}`
+                          : "-"}
+                      </td>
+                      <td className="ops-muted">{item.observaciones || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableFrame>
+          )}
+        </Card>
       </div>
     </Layout>
   );
 }
-
-const styles = {
-  pageHeader: {
-    marginBottom: 24,
-  },
-
-  titulo: {
-    margin: 0,
-    fontSize: 34,
-    fontWeight: 700,
-    color: "#1f2937",
-    letterSpacing: "-0.03em",
-  },
-
-  subtitulo: {
-    margin: "6px 0 0 0",
-    fontSize: 15,
-    color: "#6b7280",
-    fontWeight: 500,
-  },
-
-  card: {
-    background: "#fff",
-    border: "1px solid #dde3ea",
-    borderRadius: 18,
-    padding: 22,
-    boxShadow: "0 2px 8px rgba(31,41,55,0.04)",
-    marginBottom: 20,
-  },
-
-  cardTitle: {
-    margin: "0 0 16px 0",
-    fontSize: 20,
-    fontWeight: 700,
-    color: "#1f2937",
-  },
-
-  filters: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 14,
-    marginBottom: 18,
-  },
-
-  formGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 14,
-    alignItems: "center",
-  },
-
-  input: {
-    width: "100%",
-    padding: "12px 14px",
-    border: "1px solid #d9dee5",
-    borderRadius: 12,
-    background: "#fff",
-    color: "#1f2937",
-    fontSize: 14,
-    outline: "none",
-    boxSizing: "border-box",
-  },
-
-  primaryButton: {
-    padding: "12px 16px",
-    border: "none",
-    borderRadius: 12,
-    background: "#16345d",
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-
-  summaryGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-    gap: 14,
-  },
-
-  summaryCard: {
-    background: "#f8fafc",
-    border: "1px solid #e2e8f0",
-    borderRadius: 14,
-    padding: 16,
-  },
-
-  summaryLabel: {
-    display: "block",
-    fontSize: 13,
-    color: "#6b7280",
-    fontWeight: 600,
-    marginBottom: 6,
-  },
-
-  summaryValue: {
-    fontSize: 18,
-    color: "#1f2937",
-    fontWeight: 700,
-  },
-
-  tableWrapper: {
-    overflowX: "auto",
-    border: "1px solid #e2e8f0",
-    borderRadius: 14,
-  },
-
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: 14,
-  },
-
-  th: {
-    textAlign: "left",
-    padding: "14px 16px",
-    background: "#f8fafc",
-    color: "#475569",
-    fontWeight: 700,
-    borderBottom: "1px solid #e2e8f0",
-  },
-
-  thRight: {
-    textAlign: "right",
-    padding: "14px 16px",
-    background: "#f8fafc",
-    color: "#475569",
-    fontWeight: 700,
-    borderBottom: "1px solid #e2e8f0",
-  },
-
-  tr: {
-    borderBottom: "1px solid #edf2f7",
-  },
-
-  td: {
-    padding: "14px 16px",
-    color: "#334155",
-  },
-
-  tdRight: {
-    padding: "14px 16px",
-    color: "#334155",
-    textAlign: "right",
-    fontWeight: 700,
-  },
-
-  emptyBox: {
-    border: "1px dashed #cbd5e1",
-    borderRadius: 14,
-    padding: 24,
-    color: "#64748b",
-    background: "#f8fafc",
-    textAlign: "center",
-    fontWeight: 600,
-  },
-};

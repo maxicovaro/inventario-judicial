@@ -1,7 +1,19 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import {
+  Alert,
+  Badge,
+  Card,
+  EmptyState,
+  Field,
+  PageHeader,
+  SectionHeader,
+  StatCard,
+  TableFrame,
+} from "../components/ui";
 import { esAdminGeneral } from "../utils/permisos";
+import "../styles/admin-flows.css";
 
 const meses = [
   { value: 1, label: "Enero" },
@@ -20,17 +32,22 @@ const meses = [
 
 const fechaActual = new Date();
 
+const pedidoTone = (estado) => {
+  if (estado === "ENTREGADO" || estado === "APROBADO") return "success";
+  if (estado === "EN_REVISION") return "warning";
+  if (estado === "RECHAZADO") return "danger";
+  if (estado === "ENVIADO") return "info";
+  return "neutral";
+};
 
 export default function ReporteConsumoOficina() {
   const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-
   const esDireccion = esAdminGeneral(usuario);
 
   const [oficinas, setOficinas] = useState([]);
   const [reporte, setReporte] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
-
   const [filtros, setFiltros] = useState({
     oficina_id: usuario.oficina_id || "",
     mes: fechaActual.getMonth() + 1,
@@ -40,16 +57,9 @@ export default function ReporteConsumoOficina() {
   const cargarOficinas = async () => {
     try {
       if (!esDireccion) {
-        setOficinas([
-          {
-            id: usuario.oficina_id,
-            nombre: usuario.oficina_nombre || "Mi oficina",
-          },
-        ]);
-
+        setOficinas([{ id: usuario.oficina_id, nombre: usuario.oficina_nombre || "Mi oficina" }]);
         return;
       }
-
       const res = await api.get("/oficinas");
       setOficinas(res.data || []);
     } catch (err) {
@@ -59,7 +69,10 @@ export default function ReporteConsumoOficina() {
   };
 
   const cargarReporte = async () => {
-    if (!filtros.oficina_id || !filtros.mes || !filtros.anio) return;
+    if (!filtros.oficina_id || !filtros.mes || !filtros.anio) {
+      setReporte(null);
+      return;
+    }
 
     setError("");
     setCargando(true);
@@ -69,15 +82,10 @@ export default function ReporteConsumoOficina() {
         ...filtros,
         oficina_id: esDireccion ? filtros.oficina_id : usuario.oficina_id,
       };
-
-      const res = await api.get("/reportes/consumo-oficina", {
-        params,
-      });
-
+      const res = await api.get("/reportes/consumo-oficina", { params });
       setReporte(res.data);
     } catch (err) {
       setReporte(null);
-
       setError(
         err.response?.data?.mensaje ||
           err.response?.data?.error ||
@@ -94,10 +102,7 @@ export default function ReporteConsumoOficina() {
 
   useEffect(() => {
     if (!esDireccion) {
-      setFiltros((prev) => ({
-        ...prev,
-        oficina_id: usuario.oficina_id || "",
-      }));
+      setFiltros((prev) => ({ ...prev, oficina_id: usuario.oficina_id || "" }));
     }
   }, [esDireccion, usuario.oficina_id]);
 
@@ -107,381 +112,111 @@ export default function ReporteConsumoOficina() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    if (name === "oficina_id" && !esDireccion) {
-      return;
-    }
-
-    setFiltros((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    if (name === "oficina_id" && !esDireccion) return;
+    setFiltros((prev) => ({ ...prev, [name]: value }));
   };
 
   return (
     <Layout>
-      <div style={styles.pageHeader}>
-        <div>
-          <h1 style={styles.titulo}>Reporte mensual por oficina</h1>
-          <p style={styles.subtitulo}>
-            Comparación entre insumos solicitados, provistos, consumidos y stock
-            actual.
-          </p>
-        </div>
-      </div>
+      <div className="ui-page admin-page">
+        <PageHeader
+          eyebrow="Reportes"
+          title="Reporte mensual por oficina"
+          description="Compará lo solicitado, provisto, consumido y disponible para entender el ciclo completo de abastecimiento."
+        />
 
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Filtros</h2>
-
-        <div style={styles.filters}>
-          {esDireccion ? (
-            <select
-              name="oficina_id"
-              value={filtros.oficina_id}
-              onChange={handleChange}
-              style={styles.input}
-            >
-              <option value="">Seleccionar oficina</option>
-
-              {oficinas.map((oficina) => (
-                <option key={oficina.id} value={oficina.id}>
-                  {oficina.nombre}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              value={usuario.oficina_nombre || "Mi oficina"}
-              style={styles.input}
-              disabled
-              readOnly
-            />
-          )}
-
-          <select
-            name="mes"
-            value={filtros.mes}
-            onChange={handleChange}
-            style={styles.input}
-          >
-            {meses.map((mes) => (
-              <option key={mes.value} value={mes.value}>
-                {mes.label}
-              </option>
-            ))}
-          </select>
-
-          <input
-            name="anio"
-            type="number"
-            value={filtros.anio}
-            onChange={handleChange}
-            style={styles.input}
-          />
-        </div>
-      </div>
-
-      {error && <p style={styles.error}>{error}</p>}
-
-      {cargando ? (
-        <div style={styles.emptyBox}>Cargando reporte...</div>
-      ) : !reporte ? (
-        <div style={styles.emptyBox}>Seleccioná una oficina para consultar.</div>
-      ) : (
-        <>
-          <div style={styles.card}>
-            <div style={styles.reportHeader}>
-              <div>
-                <h2 style={styles.cardTitle}>
-                  {reporte.oficina?.nombre || usuario.oficina_nombre || "Oficina"}
-                </h2>
-
-                <p style={styles.cardSubtitle}>
-                  Período: {reporte.periodo?.mes}/{reporte.periodo?.anio}
-                </p>
-              </div>
-
-              <span style={getEstadoBadgeStyle(reporte.pedido?.estado)}>
-                {reporte.pedido
-                  ? `Pedido ${reporte.pedido.estado}`
-                  : "Sin pedido mensual"}
-              </span>
-            </div>
-
-            <div style={styles.summaryGrid}>
-              <SummaryCard
-                label="Solicitado"
-                value={reporte.totales?.total_solicitado || 0}
-              />
-
-              <SummaryCard
-                label="Provisto"
-                value={reporte.totales?.total_provisto || 0}
-              />
-
-              <SummaryCard
-                label="Consumido"
-                value={reporte.totales?.total_consumido || 0}
-              />
-
-              <SummaryCard
-                label="Stock actual"
-                value={reporte.totales?.total_stock_actual || 0}
-              />
-            </div>
-          </div>
-
-          <div style={styles.card}>
-            <h2 style={styles.cardTitle}>Detalle por insumo</h2>
-
-            {!reporte.detalle || reporte.detalle.length === 0 ? (
-              <div style={styles.emptyBox}>
-                No hay datos para este período.
-              </div>
+        <Card className="report-card">
+          <SectionHeader title="Período y dependencia" description="Seleccioná el alcance del análisis mensual." />
+          <div className="report-filters">
+            {esDireccion ? (
+              <Field label="Oficina" htmlFor="reporte-oficina">
+                <select id="reporte-oficina" name="oficina_id" className="ui-control" value={filtros.oficina_id} onChange={handleChange}>
+                  <option value="">Seleccionar oficina</option>
+                  {oficinas.map((oficina) => <option key={oficina.id} value={oficina.id}>{oficina.nombre}</option>)}
+                </select>
+              </Field>
             ) : (
-              <div style={styles.tableWrapper}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Insumo</th>
-                      <th style={styles.th}>Categoría</th>
-                      <th style={styles.th}>Unidad</th>
-                      <th style={styles.thRight}>Solicitado</th>
-                      <th style={styles.thRight}>Provisto</th>
-                      <th style={styles.thRight}>Consumido</th>
-                      <th style={styles.thRight}>Stock actual</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {reporte.detalle.map((item) => (
-                      <tr key={item.insumo_id} style={styles.tr}>
-                        <td style={styles.td}>
-                          <strong>{item.nombre}</strong>
-                        </td>
-
-                        <td style={styles.td}>{item.categoria || "-"}</td>
-
-                        <td style={styles.td}>{item.unidad_medida || "-"}</td>
-
-                        <td style={styles.tdRight}>
-                          {item.cantidad_solicitada}
-                        </td>
-
-                        <td style={styles.tdRight}>
-                          {item.cantidad_provista}
-                        </td>
-
-                        <td style={styles.tdRight}>
-                          {item.cantidad_consumida}
-                        </td>
-
-                        <td style={styles.tdRight}>
-                          {item.stock_actual_oficina}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Field label="Oficina" htmlFor="reporte-oficina-fija">
+                <input id="reporte-oficina-fija" className="ui-control" value={usuario.oficina_nombre || "Mi oficina"} disabled readOnly />
+              </Field>
             )}
+            <Field label="Mes" htmlFor="reporte-mes">
+              <select id="reporte-mes" name="mes" className="ui-control" value={filtros.mes} onChange={handleChange}>
+                {meses.map((mes) => <option key={mes.value} value={mes.value}>{mes.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Año" htmlFor="reporte-anio">
+              <input id="reporte-anio" name="anio" type="number" className="ui-control" value={filtros.anio} onChange={handleChange} />
+            </Field>
           </div>
-        </>
-      )}
+        </Card>
+
+        {error && <Alert tone="danger">{error}</Alert>}
+
+        {cargando ? (
+          <Card className="report-card"><p className="ui-help">Cargando reporte...</p></Card>
+        ) : !reporte ? (
+          <EmptyState title="Seleccioná una oficina" description="Elegí una dependencia y un período para consultar su ciclo de abastecimiento." />
+        ) : (
+          <>
+            <Card className="report-card">
+              <div className="report-header-inline">
+                <div>
+                  <h2 className="ui-section-title">{reporte.oficina?.nombre || usuario.oficina_nombre || "Oficina"}</h2>
+                  <p className="ui-section-description">Período: {reporte.periodo?.mes}/{reporte.periodo?.anio}</p>
+                </div>
+                <Badge tone={pedidoTone(reporte.pedido?.estado)}>
+                  {reporte.pedido ? `Pedido ${reporte.pedido.estado}` : "Sin pedido mensual"}
+                </Badge>
+              </div>
+
+              <section className="admin-summary-grid" aria-label="Resumen mensual de abastecimiento">
+                <StatCard label="Solicitado" value={reporte.totales?.total_solicitado || 0} detail="Unidades requeridas" />
+                <StatCard label="Provisto" value={reporte.totales?.total_provisto || 0} detail="Unidades entregadas" tone="info" />
+                <StatCard label="Consumido" value={reporte.totales?.total_consumido || 0} detail="Consumo registrado" tone="warning" />
+                <StatCard label="Stock actual" value={reporte.totales?.total_stock_actual || 0} detail="Disponible en oficina" tone="success" />
+              </section>
+            </Card>
+
+            <Card className="report-card">
+              <SectionHeader title="Detalle por insumo" description="Lectura comparativa entre demanda, entrega, consumo y disponibilidad actual." />
+              {!reporte.detalle || reporte.detalle.length === 0 ? (
+                <EmptyState title="Sin datos para este período" description="No hay movimientos de abastecimiento para mostrar." />
+              ) : (
+                <TableFrame label="Detalle de consumo mensual por insumo">
+                  <table className="ui-table report-table">
+                    <caption className="sr-only">Detalle mensual por insumo</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Insumo</th>
+                        <th scope="col">Categoría</th>
+                        <th scope="col">Unidad</th>
+                        <th scope="col">Solicitado</th>
+                        <th scope="col">Provisto</th>
+                        <th scope="col">Consumido</th>
+                        <th scope="col">Stock actual</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reporte.detalle.map((item) => (
+                        <tr key={item.insumo_id}>
+                          <td><strong>{item.nombre}</strong></td>
+                          <td>{item.categoria || "-"}</td>
+                          <td>{item.unidad_medida || "-"}</td>
+                          <td>{item.cantidad_solicitada}</td>
+                          <td>{item.cantidad_provista}</td>
+                          <td>{item.cantidad_consumida}</td>
+                          <td><strong>{item.stock_actual_oficina}</strong></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </TableFrame>
+              )}
+            </Card>
+          </>
+        )}
+      </div>
     </Layout>
   );
 }
-
-function SummaryCard({ label, value }) {
-  return (
-    <div style={styles.summaryCard}>
-      <span style={styles.summaryLabel}>{label}</span>
-      <strong style={styles.summaryValue}>{value}</strong>
-    </div>
-  );
-}
-
-function getEstadoBadgeStyle(estado) {
-  const base = {
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "7px 12px",
-    borderRadius: 999,
-    fontSize: 12,
-    fontWeight: 700,
-  };
-
-  switch (estado) {
-    case "ENTREGADO":
-      return { ...base, background: "#dff3e4", color: "#256f3a" };
-    case "APROBADO":
-      return { ...base, background: "#e3ecff", color: "#3456a8" };
-    case "EN_REVISION":
-      return { ...base, background: "#fff1d6", color: "#a56a00" };
-    case "RECHAZADO":
-      return { ...base, background: "#fde4e4", color: "#a33a3a" };
-    case "ENVIADO":
-      return { ...base, background: "#e8edf3", color: "#526273" };
-    default:
-      return { ...base, background: "#eef2f8", color: "#5b636d" };
-  }
-}
-
-const styles = {
-  pageHeader: {
-    marginBottom: 24,
-  },
-
-  titulo: {
-    margin: 0,
-    fontSize: 34,
-    fontWeight: 700,
-    color: "#1f2937",
-    letterSpacing: "-0.03em",
-  },
-
-  subtitulo: {
-    margin: "6px 0 0 0",
-    fontSize: 15,
-    color: "#6b7280",
-    fontWeight: 500,
-  },
-
-  card: {
-    background: "#fff",
-    border: "1px solid #dde3ea",
-    borderRadius: 18,
-    padding: 22,
-    boxShadow: "0 2px 8px rgba(31,41,55,0.04)",
-    marginBottom: 20,
-  },
-
-  cardTitle: {
-    margin: "0 0 16px 0",
-    fontSize: 20,
-    fontWeight: 700,
-    color: "#1f2937",
-  },
-
-  cardSubtitle: {
-    margin: 0,
-    color: "#6b7280",
-    fontWeight: 500,
-  },
-
-  reportHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 16,
-    flexWrap: "wrap",
-    marginBottom: 18,
-  },
-
-  filters: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 14,
-  },
-
-  input: {
-    width: "100%",
-    padding: "12px 14px",
-    border: "1px solid #d9dee5",
-    borderRadius: 12,
-    background: "#fff",
-    color: "#1f2937",
-    fontSize: 14,
-    outline: "none",
-    boxSizing: "border-box",
-  },
-
-  summaryGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-    gap: 14,
-  },
-
-  summaryCard: {
-    background: "#f8fafc",
-    border: "1px solid #e2e8f0",
-    borderRadius: 14,
-    padding: 16,
-  },
-
-  summaryLabel: {
-    display: "block",
-    fontSize: 13,
-    color: "#6b7280",
-    fontWeight: 600,
-    marginBottom: 6,
-  },
-
-  summaryValue: {
-    fontSize: 26,
-    color: "#1f2937",
-    fontWeight: 700,
-  },
-
-  tableWrapper: {
-    overflowX: "auto",
-    border: "1px solid #e2e8f0",
-    borderRadius: 14,
-  },
-
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: 14,
-  },
-
-  th: {
-    textAlign: "left",
-    padding: "14px 16px",
-    background: "#f8fafc",
-    color: "#475569",
-    fontWeight: 700,
-    borderBottom: "1px solid #e2e8f0",
-  },
-
-  thRight: {
-    textAlign: "right",
-    padding: "14px 16px",
-    background: "#f8fafc",
-    color: "#475569",
-    fontWeight: 700,
-    borderBottom: "1px solid #e2e8f0",
-  },
-
-  tr: {
-    borderBottom: "1px solid #edf2f7",
-  },
-
-  td: {
-    padding: "14px 16px",
-    color: "#334155",
-  },
-
-  tdRight: {
-    padding: "14px 16px",
-    color: "#334155",
-    textAlign: "right",
-    fontWeight: 700,
-  },
-
-  emptyBox: {
-    border: "1px dashed #cbd5e1",
-    borderRadius: 14,
-    padding: 24,
-    color: "#64748b",
-    background: "#f8fafc",
-    textAlign: "center",
-    fontWeight: 600,
-    marginBottom: 20,
-  },
-
-  error: {
-    color: "#b03a3a",
-    fontWeight: 600,
-  },
-};
