@@ -27,7 +27,11 @@ assert.match(stagingExample, /AUTH_TOKEN_TRANSPORT=cookie/);
 assert.match(frontendAxios, /import\.meta\.env\.VITE_API_URL/);
 assert.doesNotMatch(frontendAxios, /localhost:3000/);
 assert.match(frontendExample, /VITE_API_URL=/);
-assert.match(frontendStagingExample, /VITE_API_URL=https:\/\//);
+assert.match(
+  frontendStagingExample,
+  /VITE_API_URL=(?:https:\/\/[^\s]+|\/api)/,
+  "staging debe usar una API HTTPS absoluta o /api detrás de un proxy same-origin",
+);
 assert.match(envConfig, /Falta la variable de entorno requerida/);
 assert.match(envConfig, /CORS_ORIGIN/);
 assert.match(envConfig, /DEPLOY_ENV/);
