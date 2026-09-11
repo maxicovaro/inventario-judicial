@@ -58,7 +58,14 @@ const loginRateLimit = createFixedWindowRateLimiter({
   max: env.LOGIN_RATE_LIMIT_MAX,
 });
 
+const mfaRateLimit = createFixedWindowRateLimiter({
+  prefix: "auth-mfa",
+  windowMs: env.MFA_RATE_LIMIT_WINDOW_MS,
+  max: env.MFA_RATE_LIMIT_MAX,
+});
+
 module.exports = {
   createFixedWindowRateLimiter,
   loginRateLimit,
+  mfaRateLimit,
 };

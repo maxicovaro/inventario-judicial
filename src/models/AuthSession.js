@@ -27,6 +27,11 @@ const AuthSession = sequelize.define(
       allowNull: true,
       defaultValue: null,
     },
+    mfa_verified_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+    },
   },
   {
     tableName: "auth_sessions",
