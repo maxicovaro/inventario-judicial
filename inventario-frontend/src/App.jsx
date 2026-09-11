@@ -4,6 +4,7 @@ import "react-toastify/dist/ReactToastify.css";
 import "@fontsource/inter";
 import "./styles/design-system.css";
 import "./styles/ui-kit.css";
+import "./styles/admina-refresh.css";
 
 export default function App() {
   return (
