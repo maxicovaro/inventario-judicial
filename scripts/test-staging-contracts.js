@@ -109,13 +109,31 @@ assert.throws(
 );
 
 const gitignore = fs.readFileSync(".gitignore", "utf8");
+const dockerignore = fs.readFileSync(".dockerignore", "utf8");
 const stagingExample = fs.readFileSync(".env.staging.example", "utf8");
 const frontendStagingExample = fs.readFileSync(
   "inventario-frontend/.env.staging.example",
   "utf8",
 );
+const backendDockerfile = fs.readFileSync("Dockerfile", "utf8");
+const frontendDockerfile = fs.readFileSync(
+  "inventario-frontend/Dockerfile",
+  "utf8",
+);
+const caddyfile = fs.readFileSync("inventario-frontend/Caddyfile", "utf8");
+const envConfig = fs.readFileSync("src/config/env.js", "utf8");
+const uploadStorage = fs.readFileSync("src/utils/uploadStorage.js", "utf8");
+const uploadMiddleware = fs.readFileSync(
+  "src/middlewares/uploadMiddleware.js",
+  "utf8",
+);
+const adjuntoController = fs.readFileSync(
+  "src/controllers/adjuntoController.js",
+  "utf8",
+);
 const operations = fs.readFileSync("docs/OPERATIONS.md", "utf8");
 const stagingDoc = fs.readFileSync("docs/STAGING.md", "utf8");
+const railwayDoc = fs.readFileSync("docs/RAILWAY_STAGING.md", "utf8");
 const migrateScript = fs.readFileSync("scripts/deploy-migrate.js", "utf8");
 const smokeScript = fs.readFileSync("scripts/deploy-smoke.js", "utf8");
 
@@ -126,7 +144,37 @@ assert.match(stagingExample, /DEPLOY_ENV=staging/);
 assert.match(stagingExample, /AUTH_TOKEN_TRANSPORT=cookie/);
 assert.match(stagingExample, /REQUIRE_ADMIN_MFA=true/);
 assert.match(stagingExample, /PRODUCTION_DB_NAME=/);
-assert.match(frontendStagingExample, /VITE_API_URL=https:\/\//);
+assert.match(frontendStagingExample, /VITE_API_URL=\/api/);
+
+assert.match(backendDockerfile, /FROM node:22-bookworm-slim/);
+assert.match(backendDockerfile, /repo\.mysql\.com\/apt\/debian/);
+assert.match(backendDockerfile, /mysql-8\.0/);
+assert.match(backendDockerfile, /mysql-community-client/);
+assert.doesNotMatch(backendDockerfile, /mariadb-client/);
+assert.match(backendDockerfile, /CMD \["npm", "start"\]/);
+assert.doesNotMatch(backendDockerfile, /db:migrate/);
+assert.match(dockerignore, /^storage\/uploads$/m);
+assert.match(dockerignore, /^backups$/m);
+
+assert.match(frontendDockerfile, /FROM node:22-alpine AS build/);
+assert.match(frontendDockerfile, /ARG VITE_API_URL=\/api/);
+assert.match(frontendDockerfile, /FROM caddy:2-alpine/);
+assert.match(caddyfile, /handle \/api\/\*/);
+assert.match(caddyfile, /handle \/health\/\*/);
+assert.match(caddyfile, /BACKEND_INTERNAL_URL/);
+assert.match(caddyfile, /handle \/frontend-health/);
+assert.match(caddyfile, /try_files \{path\} \/index\.html/);
+assert.match(caddyfile, /trusted_proxies static private_ranges 100\.0\.0\.0\/8/);
+
+assert.match(envConfig, /UPLOAD_DIR:/);
+assert.match(uploadStorage, /env\.UPLOAD_DIR/);
+assert.match(uploadStorage, /\.\.\/\.\.\/storage\/uploads/);
+assert.match(uploadStorage, /ensureUploadsDir/);
+assert.match(uploadStorage, /resolveUploadPath/);
+assert.match(uploadMiddleware, /ensureUploadsDir/);
+assert.match(uploadMiddleware, /uploadsDir/);
+assert.match(adjuntoController, /resolveUploadPath/);
+
 assert.match(migrateScript, /verifyBackupFile/);
 assert.match(migrateScript, /backupDatabase !== currentDatabase/);
 assert.match(smokeScript, /health\/live/);
@@ -137,5 +185,8 @@ assert.match(operations, /STAGING\.md/);
 assert.match(stagingDoc, /npm run deploy:preflight/);
 assert.match(stagingDoc, /npm run deploy:migrate/);
 assert.match(stagingDoc, /npm run deploy:smoke/);
+assert.match(railwayDoc, /railway ssh --service backend/);
+assert.match(railwayDoc, /\/data\/uploads/);
+assert.match(railwayDoc, /BACKEND_INTERNAL_URL/);
 
-console.log("✓ Contratos P7.1 de staging y despliegue validados.");
+console.log("✓ Contratos P7.1/P7.2 de staging y Railway validados.");

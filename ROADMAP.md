@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 11/09/2026 para registrar P7.1 integrado y validado, y fijar P7.2 — staging real — como continuidad activa.
+> Actualizada al 11/09/2026 para registrar P7.2 validado sobre staging real en Railway y dejar su integración a `main` como único paso pendiente antes de abrir P8.
 
 Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión completa, Quality Gate y validación local cuando involucra base de datos o entorno de ejecución. Los PR documentan la evidencia de cada cambio, pero este archivo define **el estado consolidado y el próximo punto de continuidad**.
 
@@ -20,8 +20,8 @@ Cada bloque se trabaja en rama propia, con commits lógicos, PR, revisión compl
 | Frontend Bloques A–E | ✅ Integrado a `main` | Merge `0cb1f528...` |
 | P6.1 seguridad pre-staging | ✅ Integrado y cerrado | PR #13; merge `3ec6492...`; Gate #151/#153 verde |
 | P7.1 contrato/guardas staging | ✅ Integrado y cerrado | PR #20; squash `eaad8dae...`; Gate #158/#159 verde |
-| P7.2 staging real | 🟡 En curso | Rama `ops/p7-staging-real`; falta infraestructura real validada |
-| P8 rendimiento/escalabilidad | ⏳ Pendiente | Después de staging estable |
+| P7.2 staging real | ✅ Validado, integración pendiente | PR #22 draft; Railway real + Gate #165 verde |
+| P8 rendimiento/escalabilidad | ⏳ Pendiente | Abrir solo después de integrar P7.2 y validar `main` |
 | P9 piloto | ⏳ Pendiente | Después de P7/P8 |
 
 ## Backend, calidad y seguridad
@@ -154,15 +154,11 @@ Detalles de frontend: `docs/frontend-design-system.md`.
 
 ## Bloque activo
 
-### P7 — Staging y despliegue controlado 🟡
+### P7 — Staging y despliegue controlado 🟡 integración final pendiente
 
-**Rama activa de continuidad:** `ops/p7-staging-real`.
+**Rama de continuidad:** `ops/p7-staging-real`.
 
-Condiciones de apertura de P7 verificadas el 11/09/2026:
-- P6.1 integrado y documentado;
-- `main` de apertura de P7: `0cbfcd0e83f9cae95e5a6a8e3859202ac366d6b9`;
-- Quality Gate #153 sobre ese `main`: **verde**, incluido Chromium E2E;
-- `ROADMAP.md` releído antes de iniciar P7.
+P7.1 quedó integrado en `main`. P7.2 ya fue validado sobre infraestructura real; P7 completo se cerrará formalmente cuando PR #22 se integre y el Quality Gate post-merge sobre `main` quede verde.
 
 #### P7.1 — contrato y guardas reproducibles ✅
 
@@ -187,25 +183,44 @@ Evidencia de P7.1:
 - squash en `main`: `eaad8daeb101f988e00310c408554e66affde1d4`;
 - Quality Gate post-merge #159: **verde**, incluido Chromium E2E.
 
-P7.1 queda cerrado, pero **P7 completo continúa abierto** hasta validar P7.2.
+#### P7.2 — staging real ✅ validado; integración pendiente
 
-#### P7.2 — staging real 🟡
+Rama: `ops/p7-staging-real`. PR: #22.
 
-Rama de continuidad: `ops/p7-staging-real`.
+Infraestructura validada el 11/09/2026:
+- proyecto Railway privado `inventario-judicial-staging`;
+- servicios permanentes: `frontend`, `backend`, `mysql`;
+- `frontend` como único servicio público mediante HTTPS Railway;
+- `backend` y `mysql` únicamente en red privada;
+- MySQL 8 de staging sin datos judiciales reales;
+- volumen `backend-data` de 500 MB montado en `/data`;
+- volumen `mysql-data` de 500 MB montado en `/var/lib/mysql`;
+- `UPLOAD_DIR=/data/uploads`;
+- same-origin `/api` y `/health` mediante Caddy;
+- `TRUST_PROXY_HOPS=1` validado por preflight sobre la topología real;
+- secretos exclusivos de staging cargados fuera de Git.
 
-Para cerrar P7 todavía se deberá:
-- aprovisionar un entorno de staging físicamente/lógicamente separado;
-- crear/configurar MySQL de staging sin datos reales de producción;
-- definir dominios/orígenes HTTPS reales;
-- cargar secretos exclusivos del entorno;
-- verificar `TRUST_PROXY_HOPS` contra la topología efectiva;
-- ejecutar preflight, backup, migración y deploy desde un commit identificado;
-- ejecutar `/health/live`, `/health/ready` y smoke post-deploy sobre el host real;
-- comprobar acceso a logs/observabilidad mínima;
-- probar o simular rollback de forma controlada;
-- registrar evidencia en `docs/STAGING.md`, `docs/OPERATIONS.md` y este `ROADMAP.md` antes del cierre.
+Evidencia técnica:
+- revisión de código validada: `d5933555d99d8f7dece3d9fc915e2e8704a710d0`;
+- Quality Gate #165: **verde completo**, incluido Chromium E2E, MySQL, auth hardening, MFA, P6, health y backup/restore;
+- cliente de runtime corregido a `mysql-community-client` 8.0.46 para compatibilidad con `caching_sha2_password`, sin degradar autenticación MySQL;
+- `deploy:preflight`: verde;
+- backup real `/data/backups/pre-migrate-p7.sql` creado y verificado por SHA-256;
+- migraciones 001–005 aplicadas mediante `deploy:migrate` únicamente después del backup verificado;
+- `db:status`: todas las migraciones `[x]`;
+- `/health/live` y `/health/ready`: verdes con identidad exacta `staging@d5933555...`;
+- smoke post-deploy ejecutado desde runner externo temporal: verde para frontend, health, `/api/auth/me` sin sesión y CORS con credenciales;
+- runner temporal eliminado después de la validación;
+- backup y metadata permanecieron en `/data/backups` después de redeploys posteriores, demostrando persistencia física del volumen;
+- contrato de adjuntos apunta al mismo volumen mediante `UPLOAD_DIR=/data/uploads` y está protegido por `test:upload-storage` en Quality Gate;
+- logs/build/deploy accesibles y utilizados durante diagnóstico real;
+- rollback inspeccionado/simulado en modo read-only: volúmenes preservados, migraciones no se revierten automáticamente y cualquier incompatibilidad de esquema exige restore seguro o corrección hacia adelante según `docs/OPERATIONS.md`.
 
-No iniciar P8 mientras P7 permanezca en curso.
+El entorno real y los detalles de operación están documentados en `docs/STAGING.md` y `docs/RAILWAY_STAGING.md`.
+
+**Paso pendiente para cerrar P7 completo:** integrar PR #22 a `main`, ejecutar/verificar Quality Gate post-merge y actualizar esta continuidad únicamente si el estado real de `main` difiere de lo documentado.
+
+No iniciar P8 antes de ese cierre.
 
 ### P8 — Escalabilidad y rendimiento ⏳
 - Medición de consultas y endpoints críticos.
@@ -240,6 +255,7 @@ No abrir estos puntos como bloques paralelos mientras P7 esté en curso, salvo q
 - **Backend / autenticación / autorización / P6.1:** `docs/backend-security-architecture.md`.
 - **Operación, backup, restore e incidentes:** `docs/OPERATIONS.md`.
 - **Staging, preflight, deploy, smoke y rollback:** `docs/STAGING.md`.
+- **Staging Railway real:** `docs/RAILWAY_STAGING.md`.
 - **Evidencia de implementación:** commits, PRs y Quality Gates.
 
 Si existe contradicción entre un PR histórico y esta hoja de ruta, debe verificarse el estado real de `main` y actualizarse este documento en el siguiente PR de continuidad.
