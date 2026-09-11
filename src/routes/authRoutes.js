@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { login, logout } = require("../controllers/authController");
+const { login, me, logout } = require("../controllers/authController");
 const {
   status: mfaStatus,
   setup: mfaSetup,
@@ -17,6 +17,7 @@ const { loginRateLimit, mfaRateLimit } = require("../middlewares/rateLimit");
 const { loginTransport, logoutTransport } = require("../middlewares/authTransport");
 
 router.post("/login", loginRateLimit, loginTransport, login);
+router.get("/me", verificarSesionMfa, me);
 router.post("/logout", logoutTransport, verificarSesionMfa, logout);
 
 router.get("/mfa/status", verificarSesionMfa, mfaStatus);

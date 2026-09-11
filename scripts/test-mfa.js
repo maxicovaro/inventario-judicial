@@ -111,6 +111,14 @@ const main = async () => {
     assert.strictEqual(firstAdmin.body?.mfa_setup_required, true);
     assert.strictEqual(firstAdmin.body?.mfa_required, false);
 
+    const meBeforeSetup = expectStatus(
+      await request(base, "/api/auth/me", { cookie: firstAdmin.cookie }),
+      202,
+      "auth/me restaura sesión pendiente de configurar MFA",
+    );
+    assert.strictEqual(meBeforeSetup.body?.mfa_setup_required, true);
+    assert.strictEqual(meBeforeSetup.body?.usuario?.role, "ADMIN");
+
     const blockedBeforeSetup = expectStatus(
       await request(base, "/api/usuarios", { cookie: firstAdmin.cookie }),
       403,
@@ -155,6 +163,13 @@ const main = async () => {
       new RegExp(recoveryCodes[0].replace(/-/g, ""), "i"),
     );
     console.log("OK - códigos de recuperación no se almacenan en texto plano");
+
+    const meAfterSetup = expectStatus(
+      await request(base, "/api/auth/me", { cookie: firstAdmin.cookie }),
+      200,
+      "auth/me confirma sesión MFA habilitada",
+    );
+    assert.strictEqual(meAfterSetup.body?.mfa_verified, true);
 
     expectStatus(
       await request(base, "/api/usuarios", { cookie: firstAdmin.cookie }),
@@ -234,6 +249,13 @@ const main = async () => {
 
     const normalUser = await login(TEST_USERS.usuario1, TEST_PASSWORD, 200);
     assert.strictEqual(normalUser.body?.mfa_required, undefined);
+    const meNormal = expectStatus(
+      await request(base, "/api/auth/me", { cookie: normalUser.cookie }),
+      200,
+      "auth/me restaura sesión de usuario sin MFA obligatorio",
+    );
+    assert.strictEqual(meNormal.body?.usuario?.email, TEST_USERS.usuario1);
+
     expectStatus(
       await request(base, "/api/activos", { cookie: normalUser.cookie }),
       200,

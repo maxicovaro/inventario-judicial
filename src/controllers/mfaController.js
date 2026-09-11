@@ -22,6 +22,14 @@ const codeValidInput = (code) =>
   code.trim().length > 0 &&
   code.trim().length <= MAX_CODE_LENGTH;
 
+const registrarEventoMfa = async (evento) => {
+  try {
+    await registrarBitacora(evento);
+  } catch (errorBitacora) {
+    console.error("Error al registrar bitácora MFA:", errorBitacora);
+  }
+};
+
 const recoveryHashesFromUser = (usuario) => {
   try {
     const parsed = JSON.parse(usuario.mfa_recovery_codes || "[]");
@@ -139,7 +147,7 @@ const confirm = async (req, res) => {
     await transaction.commit();
     transaction = null;
 
-    await registrarBitacora({
+    await registrarEventoMfa({
       usuario_id: req.usuario.id,
       accion: "MFA_HABILITADO",
       modulo: "AUTH",
@@ -206,7 +214,7 @@ const verify = async (req, res) => {
     await transaction.commit();
     transaction = null;
 
-    await registrarBitacora({
+    await registrarEventoMfa({
       usuario_id: req.usuario.id,
       accion: "MFA_VERIFICADO",
       modulo: "AUTH",
@@ -271,7 +279,7 @@ const disable = async (req, res) => {
     await transaction.commit();
     transaction = null;
 
-    await registrarBitacora({
+    await registrarEventoMfa({
       usuario_id: req.usuario.id,
       accion: "MFA_DESHABILITADO",
       modulo: "AUTH",

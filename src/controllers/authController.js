@@ -226,6 +226,21 @@ const login = async (req, res) => {
   }
 };
 
+const me = (req, res) => {
+  const mfaVerified = Boolean(req.auth?.mfa_verified);
+  const adminMfaRequired = env.REQUIRE_ADMIN_MFA && req.usuario.role === "ADMIN";
+  const secondFactorRequired = Boolean(req.usuario.mfa_enabled) || adminMfaRequired;
+  const pending = secondFactorRequired && !mfaVerified;
+
+  res.setHeader("Cache-Control", "no-store");
+  return res.status(pending ? 202 : 200).json({
+    usuario: req.usuario,
+    mfa_required: pending && Boolean(req.usuario.mfa_enabled),
+    mfa_setup_required: pending && !req.usuario.mfa_enabled,
+    mfa_verified: mfaVerified,
+  });
+};
+
 const logout = async (req, res) => {
   try {
     await revocarSesionPorJti({
@@ -248,4 +263,4 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { login, logout };
+module.exports = { login, me, logout };

@@ -13,10 +13,7 @@ const securityHeaders = (req, res, next) => {
   );
 
   if (env.IS_PRODUCTION) {
-    res.setHeader(
-      "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains",
-    );
+    res.setHeader("Strict-Transport-Security", "max-age=31536000");
   }
 
   next();

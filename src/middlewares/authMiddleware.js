@@ -102,6 +102,8 @@ const crearVerificadorSesion = ({ exigirMfa }) => async (req, res, next) => {
 
     req.usuario = {
       id: usuario.id,
+      nombre: usuario.nombre,
+      apellido: usuario.apellido,
       email: usuario.email,
       role: usuario.Role?.nombre || "",
       role_id: usuario.role_id,
