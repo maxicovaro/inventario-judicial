@@ -2,6 +2,11 @@ import AppRouter from "./router/AppRouter";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "@fontsource/inter";
+import "./styles/design-system.css";
+import "./styles/ui-kit.css";
+import "./styles/admina-refresh.css";
+import "./styles/admina-modules.css";
+import "./styles/admina-premerge-fixes.css";
 
 export default function App() {
   return (
@@ -15,7 +20,7 @@ export default function App() {
         newestOnTop
         closeOnClick
         pauseOnHover
-        theme="colored"
+        theme="light"
       />
     </>
   );

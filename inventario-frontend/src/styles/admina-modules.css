@@ -1,0 +1,512 @@
+/*
+ * Bloque E — propagación del refresh visual inspirado en Admina.
+ * Esta capa reutiliza las clases existentes de operaciones y administración.
+ * No modifica lógica, permisos, endpoints ni contratos de backend.
+ */
+
+/* KPI cards compartidas */
+.app-shell .ops-summary .ui-stat-card,
+.app-shell .admin-summary-grid .ui-stat-card,
+.app-shell .admin-summary .ui-stat-card {
+  position: relative;
+  min-height: 120px;
+  padding: 19px 20px;
+  overflow: hidden;
+  border-color: var(--admina-border);
+  background: #fff;
+  box-shadow: var(--admina-shadow);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.app-shell .ops-summary .ui-stat-card::before,
+.app-shell .admin-summary-grid .ui-stat-card::before,
+.app-shell .admin-summary .ui-stat-card::before {
+  inset: auto 20px 0 20px;
+  width: auto;
+  height: 3px;
+  border-radius: 6px 6px 0 0;
+  opacity: 0.82;
+}
+
+.app-shell .ops-summary .ui-stat-card::after,
+.app-shell .admin-summary-grid .ui-stat-card::after,
+.app-shell .admin-summary .ui-stat-card::after {
+  content: "";
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--ui-stat-accent, var(--admina-primary)) 11%, white);
+}
+
+.app-shell .ops-summary .ui-stat-card:hover,
+.app-shell .admin-summary-grid .ui-stat-card:hover,
+.app-shell .admin-summary .ui-stat-card:hover {
+  border-color: #dddfea;
+  box-shadow: var(--admina-shadow-hover);
+  transform: translateY(-2px);
+}
+
+.app-shell .ops-summary .ui-stat-card-label,
+.app-shell .admin-summary-grid .ui-stat-card-label,
+.app-shell .admin-summary .ui-stat-card-label {
+  max-width: calc(100% - 46px);
+  color: #7b8294;
+  font-size: 0.74rem;
+  font-weight: 660;
+}
+
+.app-shell .ops-summary .ui-stat-card-value,
+.app-shell .admin-summary-grid .ui-stat-card-value,
+.app-shell .admin-summary .ui-stat-card-value {
+  margin-top: 12px;
+  color: #252a3b;
+  font-weight: 760;
+}
+
+.app-shell .ops-summary .ui-stat-card-detail,
+.app-shell .admin-summary-grid .ui-stat-card-detail,
+.app-shell .admin-summary .ui-stat-card-detail {
+  color: #9aa0b0;
+  font-size: 0.71rem;
+}
+
+/* Operaciones: Insumos, Stock, Consumos, Movimientos y Adjuntos */
+.app-shell .ops-card {
+  border-color: var(--admina-border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--admina-shadow);
+  transition: box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.app-shell .ops-card:hover {
+  border-color: #dfe1eb;
+  box-shadow: var(--admina-shadow-hover);
+}
+
+.app-shell .ops-card__header {
+  padding: 19px 20px 0;
+}
+
+.app-shell .ops-card__title {
+  color: #2b3041;
+  font-size: 0.95rem;
+  font-weight: 730;
+}
+
+.app-shell .ops-card__description {
+  color: #8b92a4;
+  font-size: 0.82rem;
+}
+
+.app-shell .ops-card__body {
+  padding: 20px;
+}
+
+.app-shell .ops-toolbar,
+.app-shell .ops-toolbar--two,
+.app-shell .ops-toolbar--three {
+  padding: 18px 20px;
+  border-bottom-color: #eceef4;
+  background: #fff;
+}
+
+.app-shell .ops-meta {
+  padding: 12px 20px;
+  border-bottom-color: #eceef4;
+  background: #fafafd;
+}
+
+.app-shell .ops-meta__count {
+  color: #3b4051;
+  font-size: 0.81rem;
+  font-weight: 700;
+}
+
+.app-shell .ops-meta__scope,
+.app-shell .ops-muted,
+.app-shell .ops-primary__meta {
+  color: #8a91a3;
+}
+
+.app-shell .ops-primary__name {
+  color: #313648;
+  font-weight: 690;
+}
+
+.app-shell .ops-detail-row td {
+  background: #fafafd;
+}
+
+.app-shell .ops-detail {
+  border-top-color: #eceef4;
+}
+
+.app-shell .ops-detail__note,
+.app-shell .ops-upload-note {
+  border-color: #e5e3fb;
+  background: #f8f7ff;
+  color: #5750b8;
+}
+
+.app-shell .ops-stock__track {
+  height: 7px;
+  background: #eceef4;
+}
+
+.app-shell .ops-stock__bar {
+  background: var(--admina-cyan);
+}
+
+.app-shell .ops-form-section + .ops-form-section {
+  border-top-color: #eceef4;
+}
+
+/* Flujos administrativos: Solicitudes */
+.app-shell .admin-request {
+  border-color: var(--admina-border);
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.02);
+  transition: border-color 170ms ease, box-shadow 170ms ease, transform 170ms ease;
+}
+
+.app-shell .admin-request:hover {
+  border-color: #dfe1eb;
+  box-shadow: var(--admina-shadow);
+  transform: translateY(-1px);
+}
+
+.app-shell .admin-request--urgent {
+  border-left: 3px solid #d92d20;
+}
+
+.app-shell .admin-request-title {
+  color: #303547;
+  font-weight: 710;
+}
+
+.app-shell .admin-request-id,
+.app-shell .admin-data-label {
+  color: #949aac;
+}
+
+.app-shell .admin-description {
+  border: 1px solid #eef0f5;
+  background: #fafafd;
+}
+
+.app-shell .admin-response {
+  border-color: #dfe6ff;
+  background: #f4f6ff;
+}
+
+.app-shell .admin-callout {
+  border-color: #e5e7ef;
+  background: #fafafd;
+}
+
+.app-shell .admin-callout--urgent {
+  border-color: #f6ced0;
+  background: #fff5f5;
+}
+
+/* Pedido mensual */
+.app-shell .order-period-card,
+.app-shell .order-group-card,
+.app-shell .order-extra-card,
+.app-shell .order-history-card,
+.app-shell .report-card {
+  border-color: var(--admina-border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--admina-shadow);
+}
+
+.app-shell .order-group-card,
+.app-shell .order-history-card,
+.app-shell .report-card {
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+.app-shell .order-group-card:hover,
+.app-shell .order-history-card:hover,
+.app-shell .report-card:hover {
+  box-shadow: var(--admina-shadow-hover);
+}
+
+.app-shell .order-footer {
+  border-color: #e1e3ec;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 30px rgba(31, 35, 48, 0.1);
+}
+
+.app-shell .order-history-title {
+  color: #2e3344;
+  font-weight: 720;
+}
+
+.app-shell .order-history-meta {
+  color: #898fa1;
+}
+
+.app-shell .order-history-stat {
+  border-color: #eceef4;
+  background: #fafafd;
+}
+
+.app-shell .order-history-stat strong {
+  color: #292e3f;
+  font-weight: 740;
+}
+
+.app-shell .order-state-actions,
+.app-shell .order-detail {
+  border-top-color: #eceef4;
+}
+
+/* Notificaciones */
+.app-shell .notifications-toolbar {
+  border-bottom-color: #eceef4;
+}
+
+.app-shell .notifications-tab {
+  min-height: 36px;
+  border-color: #e1e3ec;
+  border-radius: 9px;
+  background: #fff;
+  color: #6f7689;
+  font-size: 0.78rem;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.app-shell .notifications-tab:hover {
+  border-color: #d7d9e5;
+  background: #f8f8fb;
+  color: var(--admina-primary);
+}
+
+.app-shell .notifications-tab[aria-pressed="true"] {
+  border-color: var(--admina-primary);
+  background: var(--admina-primary-soft);
+  color: var(--admina-primary);
+  box-shadow: none;
+}
+
+.app-shell .notification-item {
+  border-bottom-color: #eef0f5;
+  transition: background-color 150ms ease;
+}
+
+.app-shell .notification-item:hover {
+  background: #fafafd;
+}
+
+.app-shell .notification-item--unread::before {
+  background: var(--admina-primary);
+  box-shadow: 0 0 0 4px var(--admina-primary-soft);
+}
+
+.app-shell .notification-title {
+  color: #34394a;
+  font-weight: 700;
+}
+
+.app-shell .notification-message,
+.app-shell .notification-date {
+  color: #8a91a3;
+}
+
+/* Reportes */
+.app-shell .report-row {
+  border-bottom-color: #eef0f5;
+}
+
+.app-shell .report-row-label {
+  color: #858c9e;
+}
+
+.app-shell .report-row-value {
+  color: #2c3142;
+  font-weight: 740;
+}
+
+.app-shell .report-header-inline {
+  border-bottom: 1px solid #eef0f5;
+  padding-bottom: 14px;
+}
+
+/* Usuarios y Bitácora */
+.app-shell .admin-card {
+  border-color: var(--admina-border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--admina-shadow);
+}
+
+.app-shell .admin-toolbar,
+.app-shell .admin-toolbar--audit,
+.app-shell .admin-toolbar-row-secondary {
+  border-bottom-color: #eceef4;
+  background: #fff;
+}
+
+.app-shell .admin-list-meta,
+.app-shell .admin-pagination {
+  border-color: #eceef4;
+  background: #fafafd;
+}
+
+.app-shell .admin-result-count {
+  color: #3b4051;
+}
+
+.app-shell .admin-scope-note,
+.app-shell .admin-primary-subtitle,
+.app-shell .admin-muted,
+.app-shell .admin-security-detail,
+.app-shell .admin-date-cell,
+.app-shell .admin-pagination-copy {
+  color: #8a91a3;
+}
+
+.app-shell .admin-primary-name {
+  color: #303547;
+  font-weight: 700;
+}
+
+.app-shell .admin-form-panel {
+  border-radius: 14px;
+  box-shadow: var(--admina-shadow-hover);
+}
+
+.app-shell .admin-form-header {
+  border-bottom-color: #eceef4;
+  background: #fafafd;
+}
+
+.app-shell .admin-form-eyebrow {
+  color: var(--admina-primary);
+}
+
+.app-shell .admin-form-section + .admin-form-section {
+  border-top-color: #eceef4;
+}
+
+.app-shell .admin-checkbox,
+.app-shell .admin-password-policy {
+  border-color: #e8eaf1;
+  background: #fafafd;
+}
+
+.app-shell .admin-checkbox input {
+  accent-color: var(--admina-primary);
+}
+
+/* Adjuntos embebidos */
+.app-shell .attachment-panel {
+  border-color: #e5e7ef;
+  border-radius: 12px;
+  background: #fafafd;
+}
+
+.app-shell .attachment-panel__title {
+  color: #303547;
+  font-weight: 700;
+}
+
+.app-shell .attachment-panel__subtitle,
+.app-shell .attachment-panel__meta {
+  color: #8b92a4;
+}
+
+.app-shell .attachment-panel__selected,
+.app-shell .attachment-panel__item {
+  border-color: #e7e9f1;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.app-shell .attachment-panel__item {
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.app-shell .attachment-panel__item:hover {
+  border-color: #dbdde8;
+  box-shadow: 0 7px 18px rgba(31, 35, 48, 0.055);
+  transform: translateY(-1px);
+}
+
+.app-shell .attachment-panel__name {
+  color: #333849;
+  font-weight: 690;
+}
+
+/* Dialogs y feedback */
+.app-shell .ui-dialog {
+  border-color: #e3e5ed;
+  border-radius: 14px;
+  box-shadow: 0 28px 70px rgba(31, 35, 48, 0.22);
+}
+
+.app-shell .ui-dialog-form-header,
+.app-shell .ui-dialog-actions {
+  border-color: #eceef4;
+}
+
+.app-shell .ui-dialog-actions {
+  background: #fafafd;
+}
+
+.app-shell .ui-empty-state {
+  border-color: #dfe1ea;
+  border-radius: 12px;
+  background: #fafafd;
+}
+
+.app-shell .ui-empty-state-mark {
+  background: var(--admina-primary-soft);
+  color: var(--admina-primary);
+}
+
+.app-shell .ui-alert {
+  border-radius: 10px;
+}
+
+@media (max-width: 760px) {
+  .app-shell .ops-summary .ui-stat-card,
+  .app-shell .admin-summary-grid .ui-stat-card,
+  .app-shell .admin-summary .ui-stat-card {
+    min-height: auto;
+  }
+
+  .app-shell .ops-card__header,
+  .app-shell .ops-card__body,
+  .app-shell .ops-toolbar,
+  .app-shell .admin-toolbar,
+  .app-shell .admin-toolbar-row-secondary {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .ops-summary .ui-stat-card,
+  .app-shell .admin-summary-grid .ui-stat-card,
+  .app-shell .admin-summary .ui-stat-card,
+  .app-shell .ops-card,
+  .app-shell .admin-request,
+  .app-shell .order-group-card,
+  .app-shell .order-history-card,
+  .app-shell .report-card,
+  .app-shell .notifications-tab,
+  .app-shell .attachment-panel__item {
+    transition: none !important;
+    transform: none !important;
+  }
+}
