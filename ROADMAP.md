@@ -50,7 +50,7 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 - permisos sensibles validados en backend;
 - historial transaccional de altas, traslados, cambios de estado y bajas.
 
-## P3 — Resiliencia operativa ✅
+## P3 — Resiliencia operativa y recuperación ✅
 
 - backup MySQL con checksum;
 - restore drill en CI;
