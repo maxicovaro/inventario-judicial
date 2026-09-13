@@ -242,3 +242,59 @@ P7.1 aporta las guardas reproducibles dentro del repositorio; P7.2 debe conectar
 - ubicación autorizada del backup fuera del host cuando corresponda.
 
 No marcar P7 como terminado si solo existe la configuración en Git y todavía no se desplegó un staging real.
+
+## 16. P9.1 — Operación de incidentes del piloto
+
+El procedimiento detallado del piloto está en `P9_1_INCIDENT_RESPONSE.md` y es vinculante para P9.
+
+P9.1 amplía la clasificación anterior con:
+- roles operativos explícitos e Incident Commander;
+- objetivos de reconocimiento y actualización;
+- stop conditions;
+- plantilla versionada de incidente;
+- evidencia mínima;
+- métricas MTTA/MTTR;
+- criterios de reapertura y postmortem.
+
+La clasificación detallada de `P9_1_INCIDENT_RESPONSE.md` prevalece durante el piloto cuando agrega condiciones más estrictas que esta sección general.
+
+## 17. Guardas durante un incidente
+
+Incluso en SEV-1 está prohibido:
+- **no debilitar autenticación**, MFA, autorización por oficina, CORS/origin o rate limiting para recuperar servicio;
+- **no retirar locks de stock**, transacciones o idempotencia para mejorar latencia;
+- no hacer cambios directos en `main`;
+- no restaurar sobre la base activa como primera opción;
+- no borrar logs o evidencia útil;
+- no compartir secretos o dumps por canales no autorizados.
+
+La seguridad e integridad prevalecen sobre la disponibilidad.
+
+## 18. Escalamiento y stop conditions
+
+Ante cualquiera de estas condiciones se debe tratar el incidente como SEV-1 y detener el flujo afectado; si no puede aislarse, detener escrituras o sacar la aplicación temporalmente de tráfico:
+- pérdida/corrupción de datos;
+- stock negativo o doble operación;
+- bypass de autorización;
+- secreto comprometido;
+- duplicación física pese a idempotencia;
+- restore requerido sin backup verificado;
+- riesgo razonable de agravar datos si continúan las escrituras.
+
+Para SEV-2 se mantiene el servicio únicamente si hacerlo es seguro y existe un workaround que no compromete datos, permisos ni trazabilidad.
+
+## 19. Evidencia y validación de recuperación
+
+Antes de declarar recuperado un SEV-1/SEV-2, registrar y validar según corresponda:
+- SHA/revisión desplegada;
+- `/health/live` y `/health/ready`;
+- Request IDs relevantes;
+- estado de MySQL y `db:status`;
+- backup/checksum utilizado;
+- login y permisos por rol/oficina;
+- flujo afectado;
+- invariantes de stock/concurrencia;
+- RPO/RTO reales;
+- acción preventiva vinculada a issue/roadmap.
+
+La plantilla oficial de registro es `.github/ISSUE_TEMPLATE/incident.md` cuando GitHub esté disponible y el contenido pueda registrarse sin exponer información sensible.
