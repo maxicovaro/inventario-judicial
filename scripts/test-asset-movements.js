@@ -6,7 +6,15 @@ const routes = fs.readFileSync("src/routes/movimientoRoutes.js", "utf8");
 const controller = fs.readFileSync("src/controllers/movimientoController.js", "utf8");
 const activos = fs.readFileSync("src/controllers/activoController.js", "utf8");
 const activosFrontend = fs.readFileSync(
-  "inventario-frontend/src/pages/Activos.jsx",
+  "inventario-frontend/src/pages/ActivosPaginados.jsx",
+  "utf8",
+);
+const activosTable = fs.readFileSync(
+  "inventario-frontend/src/components/activos/ActivosTable.jsx",
+  "utf8",
+);
+const activoForm = fs.readFileSync(
+  "inventario-frontend/src/components/activos/ActivoForm.jsx",
   "utf8",
 );
 
@@ -53,17 +61,13 @@ assert.match(
 );
 assert.doesNotMatch(activos, /error:\s*error\.message/);
 
-assert.match(
-  activosFrontend,
-  /La baja debe realizarse con la acción formal Dar de baja/,
-);
-assert.match(
-  activosFrontend,
-  /puedeGestionar && puedeVerAdjuntos && !estaDadoDeBaja/,
-);
+assert.match(activosFrontend, /api\.patch\(`\/activos\/\$\{bajaPendiente\.id\}\/baja`\)/);
+assert.match(activosTable, /const estaDeBaja/);
+assert.match(activosTable, /const puedeEditar = gestiona && puedeVer && !estaDeBaja/);
+assert.match(activosTable, /direccion && !estaDeBaja/);
 assert.doesNotMatch(
-  activosFrontend,
-  /<option value="Dado de baja">Dado de baja<\/option>[\s\S]{0,120}<\/select>[\s\S]{0,120}register\("estado"\)/,
+  activoForm,
+  /<option[^>]*value=["']Dado de baja["'][^>]*>/,
 );
 
 assert.match(
