@@ -60,7 +60,8 @@ Contiene:
 - shutdown;
 - clasificación de incidentes;
 - recuperación y rollback;
-- checklist previo a migración/deploy.
+- checklist previo a migración/deploy;
+- enlace operativo a P9.1.
 
 ### 5. Staging y despliegue
 
@@ -120,6 +121,24 @@ Contiene:
 
 Complemento específico de P8.6: `P8_6_CLOSURE.md`.
 
+### 9. P9.1 — Soporte e incident response del piloto
+
+`P9_1_INCIDENT_RESPONSE.md`
+
+Contiene:
+- roles operativos e Incident Commander;
+- clasificación SEV-1/SEV-2/SEV-3;
+- objetivos de reconocimiento y actualización;
+- stop conditions;
+- ciclo detectar → contener → evidenciar → diagnosticar → recuperar → validar → cerrar;
+- guardas que impiden debilitar seguridad, permisos, MFA, locks o idempotencia;
+- evidencia mínima y plantilla de incidente;
+- MTTA/MTTR, RPO/RTO y métricas de soporte;
+- tabletop exercise previo a ampliar el piloto;
+- criterios de cierre de P9.1 y bloqueo de P9.2 hasta completar Gate/merge/post-merge.
+
+Plantilla operativa: `../.github/ISSUE_TEMPLATE/incident.md`.
+
 ## Evidencia técnica
 
 La documentación anterior define el estado consolidado. La evidencia detallada de que un cambio fue implementado/validado vive en:
@@ -142,7 +161,8 @@ Para retomar el proyecto después de una pausa:
 5. Para P7/staging, consultar `STAGING.md`.
 6. Si el proveedor activo es Railway, leer también `RAILWAY_STAGING.md`.
 7. Para P8, leer `PERFORMANCE.md`, `P8_6_CLOSURE.md` y `P8_CLOSURE.md`.
-8. Verificar el último Quality Gate antes de modificar/integrar.
+8. Para P9.1/incidentes, leer `P9_1_INCIDENT_RESPONSE.md` y la plantilla versionada.
+9. Verificar el último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
 
