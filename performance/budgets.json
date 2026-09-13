@@ -26,5 +26,16 @@
     "hard_initial_js_gzip_kb": 300,
     "target_font_gzip_kb": 60,
     "hard_font_gzip_kb": 80
+  },
+  "load": {
+    "auth_me_admin": { "target_p95_ms": 500, "hard_p95_ms": 2000, "target_error_rate_pct": 0, "hard_error_rate_pct": 0 },
+    "dashboard_admin": { "target_p95_ms": 1000, "hard_p95_ms": 4000, "target_error_rate_pct": 0, "hard_error_rate_pct": 0 },
+    "activos_admin": { "target_p95_ms": 750, "hard_p95_ms": 3000, "target_error_rate_pct": 0, "hard_error_rate_pct": 0 },
+    "pedidos_responsable": { "target_p95_ms": 1000, "hard_p95_ms": 4000, "target_error_rate_pct": 0, "hard_error_rate_pct": 0 },
+    "stock_responsable": { "target_p95_ms": 750, "hard_p95_ms": 3000, "target_error_rate_pct": 0, "hard_error_rate_pct": 0 },
+    "operational_read_mix": { "target_p95_ms": 1000, "hard_p95_ms": 4000, "target_error_rate_pct": 0, "hard_error_rate_pct": 0 },
+    "login_success": { "target_p95_ms": 1200, "hard_p95_ms": 4000, "target_error_rate_pct": 0, "hard_error_rate_pct": 0 },
+    "stock_write_unique": { "target_p95_ms": 1500, "hard_p95_ms": 5000, "target_error_rate_pct": 0, "hard_error_rate_pct": 0 },
+    "stock_write_idempotent": { "target_p95_ms": 1500, "hard_p95_ms": 5000, "target_error_rate_pct": 0, "hard_error_rate_pct": 0 }
   }
 }
