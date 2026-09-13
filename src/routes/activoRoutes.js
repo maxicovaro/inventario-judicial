@@ -8,6 +8,9 @@ const {
   actualizarActivo,
   darDeBajaActivo,
 } = require("../controllers/activoController");
+const {
+  listarCatalogoActivos,
+} = require("../controllers/activoCatalogoController");
 
 const {
   verificarToken,
@@ -16,6 +19,7 @@ const {
 } = require("../middlewares/authMiddleware");
 
 router.get("/", verificarToken, listarActivos);
+router.get("/catalogo", verificarToken, listarCatalogoActivos);
 router.get("/:id", verificarToken, obtenerActivo);
 router.post("/", verificarToken, verificarGestionOficina, crearActivo);
 router.put("/:id", verificarToken, verificarGestionOficina, actualizarActivo);
