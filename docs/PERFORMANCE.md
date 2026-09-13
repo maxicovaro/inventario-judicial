@@ -310,3 +310,120 @@ performance-results/backend-profile.json
 ## Continuidad
 
 P8.2 debe optimizar únicamente los hallazgos anteriores y volver a ejecutar P8.0 + P8.1 para comparar antes/después. No se considera mejora si reduce tiempos pero rompe permisos, MFA, consistencia, E2E o aumenta payloads.
+
+---
+
+## P8.2 — Índices, queries y paginación ✅
+
+P8.2 aplica únicamente las optimizaciones justificadas por P8.0/P8.1 y conserva intactos permisos, MFA, alcance por oficina, concurrencia e idempotencia. La primera ejecución completamente verde de la implementación fue el **Quality Gate #184** sobre la rama `performance/p8-query-pagination`.
+
+### Cambios implementados
+
+- `GET /api/activos` soporta contrato paginado con `page`, `page_size`, `q`, `estado` y `oficina_id`;
+- tamaño por defecto 25 filas y máximo 100;
+- búsqueda y filtros se resuelven en MySQL, no sobre 6000 objetos en el navegador;
+- el listado proyecta únicamente las columnas necesarias para la tabla;
+- `GET /api/activos/:id` carga el detalle completo solo al editar y conserva el mismo alcance por rol/oficina;
+- los KPI de Activos se obtienen mediante agregación SQL independiente del contenido de la página;
+- la pantalla React usa debounce de 300 ms, paginación accesible y tamaños 25/50/100;
+- el middleware de autenticación proyecta solo atributos de usuario requeridos por autorización/MFA;
+- Dashboard reutiliza la agregación agrupada de pedidos y elimina tres `COUNT` redundantes por estado;
+- `scripts/performance-baseline.js` y `scripts/performance-profile.js` miden explícitamente el contrato `page=1&page_size=25`;
+- la paginación y el aislamiento por oficina tienen prueba HTTP sobre MySQL real dentro de `test:integration`;
+- los contratos estáticos P8.2 se ejecutan en `npm test` antes de preparar la base.
+
+### Antes/después — Gate #172 vs Gate #184
+
+Dataset idéntico: 6000 activos + 300 insumos.
+
+| Escenario | Antes p95 | Después p95 | Antes payload | Después payload |
+| --- | ---: | ---: | ---: | ---: |
+| `activos_admin` | 224,09 ms | **11,35 ms** | 3331,35 KB | **9,16 KB** |
+| `activos_responsable` | 13,11 ms | **7,81 ms** | 123,34 KB | **9,09 KB** |
+| `dashboard_admin` | 10,97 ms | **8,80 ms** | 0,73 KB | 0,73 KB |
+
+Resultados derivados:
+
+- Activos Dirección: p95 reducido ~**94,9 %** (~19,7× más rápido en esta muestra);
+- Activos Dirección: payload reducido ~**99,7 %** (~363× menor);
+- Activos de oficina: p95 reducido ~40,4 %;
+- Activos de oficina: payload reducido ~92,6 %;
+- 0 errores HTTP en todos los escenarios del baseline.
+
+Los milisegundos de GitHub Actions siguen siendo comparativos, no un SLA; la reducción de payload sí es estructural y directamente atribuible a la paginación/proyección.
+
+### Perfil SQL después de P8.2
+
+En Gate #184:
+
+- `dashboard_admin`: **13 queries/request**, contra 16 en P8.1; desaparecieron los tres `COUNT(pedidos_insumos) WHERE estado=?` redundantes;
+- `activos_admin`: el profiler registró 4 queries/request y ~9,69 ms HTTP promedio;
+- `activos_responsable`: 4 queries registradas/request y ~8,06 ms HTTP promedio;
+- auth conserva 2 queries indexadas/request y no se debilitaron controles de sesión/MFA.
+
+Nota de instrumentación: la agregación SQL de resumen de Activos se ejecuta actualmente con `logging: false`, por lo que no aparece en el contador del profiler; el valor de 4 corresponde a queries capturadas por la instrumentación, no a un conteo absoluto de round-trips del endpoint. El rendimiento HTTP completo sí incluye esa agregación. Esta diferencia no altera la comparación de p95/payload y debe tenerse presente al interpretar el artifact P8.1.
+
+### Decisión de índices
+
+**P8.2 no agrega índices nuevos.** La decisión es deliberada y basada en evidencia:
+
+- RESPONSABLE continúa usando el índice existente `oficina_id` (`ref` + backward index scan);
+- autenticación usa índices/PK y mantiene costo bajo;
+- el orden global paginado no mostró un cuello de botella que justifique un índice adicional;
+- `activo=true` tiene baja selectividad y un índice simple sobre el booleano no ofrece evidencia suficiente de beneficio;
+- full scans restantes del Dashboard ocurren sobre ~300 insumos o tablas transaccionales con volumen insuficiente para justificar índices por intuición.
+
+Agregar índices sin selectividad ni mejora medida aumentaría costo de escritura/mantenimiento sin una ganancia demostrada. Cualquier índice futuro debe volver a pasar `EXPLAIN` y baseline antes/después.
+
+### Compatibilidad transitoria hacia P8.3
+
+Por compatibilidad con los selectores existentes de Solicitudes y Adjuntos, `GET /api/activos` **sin parámetros de consulta** conserva temporalmente la respuesta legacy completa. La pantalla principal de Activos y las mediciones oficiales usan siempre el contrato paginado.
+
+Esta compatibilidad queda como deuda explícita de **P8.3 — Payloads, uploads y reportes**, donde esos consumidores deberán migrarse a un catálogo ligero/búsqueda específica antes de retirar el modo legacy. No se considera una excusa para volver a utilizar el listado global completo en nuevas pantallas.
+
+### Presupuestos después de la optimización
+
+Tras demostrar la mejora, los presupuestos de Activos se endurecen para prevenir regresiones:
+
+- p95 objetivo: **150 ms**; techo duro: **1000 ms**;
+- payload objetivo: **100 KB**; techo duro: **500 KB**;
+- aplica tanto a Dirección como a RESPONSABLE en el escenario paginado de 25 filas.
+
+La finalidad es impedir que una futura modificación vuelva silenciosamente a respuestas de varios MB.
+
+### Frontend
+
+El cambio no aumentó el bundle:
+
+- JS gzip: 266,50 KB → **264,85 KB**;
+- CSS gzip: 16,41 KB → **16,41 KB**;
+- total gzip: 500,91 KB → **499,26 KB**.
+
+### Seguridad y regresión
+
+Quality Gate #184 quedó verde completo con:
+
+- lint/build frontend;
+- `npm test`;
+- MySQL real + migraciones;
+- prueba dinámica P8.2 de paginación/búsqueda/filtros/alcance;
+- auth hardening y MFA;
+- P6 concurrencia/idempotencia;
+- backup/restore;
+- baseline P8.0;
+- profiler P8.1;
+- Chromium E2E.
+
+### Criterios de salida P8.2
+
+- paginación server-side ✅;
+- búsqueda/filtros server-side ✅;
+- proyección de columnas + detalle bajo demanda ✅;
+- aislamiento por rol/oficina preservado ✅;
+- Dashboard sin counts redundantes ✅;
+- minimización de atributos de auth ✅;
+- índices evaluados con `EXPLAIN` y no agregados sin evidencia ✅;
+- mejora antes/después cuantificada ✅;
+- presupuestos endurecidos ✅;
+- Quality Gate de implementación #184 verde ✅;
+- siguiente bloque: **P8.3 — Payloads, uploads y reportes**.
