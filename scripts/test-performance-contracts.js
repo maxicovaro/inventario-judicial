@@ -15,11 +15,21 @@ const profileUtilsTest = fs.readFileSync("scripts/test-performance-profile-utils
 assert.strictEqual(budgets.dataset.activos, 6000);
 assert.strictEqual(budgets.dataset.insumos, 300);
 assert.ok(budgets.api.activos_admin.hard_p95_ms > budgets.api.activos_admin.target_p95_ms);
+assert.ok(
+  budgets.api.activos_catalogo_admin.hard_payload_kb >
+    budgets.api.activos_catalogo_admin.target_payload_kb,
+);
+assert.ok(
+  budgets.api.activos_catalogo_responsable.hard_payload_kb >
+    budgets.api.activos_catalogo_responsable.target_payload_kb,
+);
 assert.ok(budgets.frontend.hard_total_gzip_kb > budgets.frontend.target_total_gzip_kb);
 assert.match(fixtures, /NODE_ENV=test|resetIntegrationData/);
 assert.match(fixtures, /PERF_DATASET/);
 assert.match(apiBaseline, /p95_ms/);
 assert.match(apiBaseline, /budget_status/);
+assert.match(apiBaseline, /activos_catalogo_admin/);
+assert.match(apiBaseline, /activos_catalogo_responsable/);
 assert.match(frontendBaseline, /gzipSync/);
 assert.match(backendProfile, /sequelize\.options\.benchmark = true/);
 assert.match(backendProfile, /EXPLAIN/);
@@ -45,4 +55,4 @@ assert.match(docs, /p50\/p95\/p99/);
 assert.match(docs, /techo duro/i);
 assert.match(docs, /P8\.1/);
 
-console.log("Contratos de rendimiento P8.0/P8.1 validados correctamente.");
+console.log("Contratos de rendimiento P8.0/P8.1/P8.3 validados correctamente.");
