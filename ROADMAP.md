@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 13/09/2026 con el cierre técnico-operativo de **P8.7 — Cierre documental y criterios de piloto**. P8 queda completo a nivel de implementación y staging. **P9 — Operación de piloto** es el siguiente bloque, pero solo se considera habilitado después de Quality Gate verde sobre este cierre, merge a `main` y Quality Gate post-merge verde.
+> Actualizada al 13/09/2026 con el cierre técnico-operativo de **P8.7 — Cierre documental y criterios de piloto**. P8 está completo a nivel de implementación y staging. PR #31 se encuentra en integración final. **P9 — Operación de piloto** es el siguiente bloque, pero solo se considera habilitado después de Quality Gate verde sobre el HEAD final del PR, merge a `main`, Quality Gate post-merge verde y relectura de este archivo desde `main`.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -23,14 +23,14 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | P7.2 Staging real | ✅ Completo | PR #22; merge `6872095e...`; Gate #168 |
 | P8.0 Baseline y metodología | ✅ Completo | PR #24; Gate #172/#174 |
 | P8.1 Perfilado backend/MySQL | ✅ Completo | PR #25; perfil inicial Gate #175 |
-| P8.2 Índices, queries y paginación | ✅ Completo | PR #26; Gate de implementación #184 |
-| P8.3 Payloads, uploads y reportes | ✅ Completo | PR #27; Gate de implementación #201 |
-| P8.4 Rendimiento frontend | ✅ Completo | PR #28; Gate de implementación #206 |
-| P8.5 Pruebas de carga | ✅ Completo | PR #29; Gate de implementación #211 |
+| P8.2 Índices, queries y paginación | ✅ Completo | PR #26; Gate #184 |
+| P8.3 Payloads, uploads y reportes | ✅ Completo | PR #27; Gate #201 |
+| P8.4 Rendimiento frontend | ✅ Completo | PR #28; Gate #206 |
+| P8.5 Pruebas de carga | ✅ Completo | PR #29; Gate #211 |
 | P8.6 Optimización + regresión | ✅ Completo | PR #30; Gate #218; `docs/P8_6_CLOSURE.md` |
-| **P8.7 Cierre documental y criterios de piloto** | ✅ **Cierre técnico-operativo completo** | Gate operativo staging verde; `docs/P8_CLOSURE.md`; falta solo Gate/PR/merge/post-merge de este cierre |
-| **P8 Rendimiento y escalabilidad** | ✅ **Completo** | Se formaliza después del Gate post-merge de P8.7 |
-| P9 Piloto | ⏳ Próximo | Habilitar solo después del Gate post-merge P8.7 |
+| **P8.7 Cierre documental y criterios de piloto** | 🟢 **Integración final** | Gate operativo staging verde; PR #31; Gate #222 verde sobre HEAD documental previo; HEAD final debe revalidarse |
+| **P8 Rendimiento y escalabilidad** | ✅ **Cierre técnico-operativo completo** | Se formaliza al quedar verde el Gate post-merge de PR #31 |
+| P9 Piloto | ⏳ Próximo | Abrir solo después del cierre formal de P8.7 |
 
 ---
 
@@ -197,31 +197,27 @@ Arquitectura validada:
 - `backend` privado;
 - `mysql` privado;
 - Caddy same-origin para `/api/*` y `/health/*`;
-- volumen `backend-data` de 500 MB en `/data`;
-- volumen `mysql-data` de 500 MB en `/var/lib/mysql`;
-- `UPLOAD_DIR=/data/uploads`;
-- MySQL 8 con `caching_sha2_password`;
-- cliente runtime `mysql-community-client` 8.0;
+- volumen backend `/data`;
+- volumen MySQL `/var/lib/mysql`;
+- MySQL 8;
 - secretos exclusivos fuera de Git.
 
 Validaciones reales:
 - preflight verde;
-- backup + SHA-256 en `/data/backups`;
-- migraciones 001–005 aplicadas con backup verificado;
+- backup + SHA-256;
+- migraciones 001–005;
 - `/health/live` y `/health/ready` verdes;
 - smoke externo verde;
-- persistencia del volumen comprobada entre redeploys;
+- persistencia de volúmenes;
 - rollback simulado read-only;
-- logs y observabilidad mínima disponibles;
-- runner temporal de smoke eliminado.
+- observabilidad mínima.
 
 Evidencia definitiva:
-- PR #22: **mergeado**;
-- HEAD pre-merge: `3836cd828359fc0500453e2bfb4bdeb729a9c95d`;
-- Gate pre-merge #167: verde completo;
-- merge commit en `main`: `6872095e3f4e6d11bf097c6254e83104a2a5e394`;
-- Gate post-merge #168: **verde completo**, incluido Chromium E2E;
-- detalle de cierre: `docs/P7_CLOSURE.md`;
+- PR #22 mergeado;
+- Gate pre-merge #167 verde;
+- merge `6872095e3f4e6d11bf097c6254e83104a2a5e394`;
+- Gate post-merge #168 verde;
+- detalle: `docs/P7_CLOSURE.md`;
 - runbooks: `docs/STAGING.md`, `docs/RAILWAY_STAGING.md`, `docs/OPERATIONS.md`.
 
 ---
@@ -230,212 +226,145 @@ Evidencia definitiva:
 
 ### P8.0 — Baseline y metodología ✅
 
-Implementado en `performance/p8-baseline` / PR #24.
+PR #24.
 
-Base reproducible:
-- 6000 activos sintéticos;
-- 300 insumos sintéticos;
+- dataset 6000 activos + 300 insumos;
 - métricas API p50/p95/p99, errores y payload;
-- métricas de bundle frontend raw/gzip;
-- presupuestos objetivo + techo duro versionados;
-- artifacts `performance-backend-baseline` y `performance-frontend-baseline` en CI;
-- `test:performance-contracts` protege la metodología.
+- frontend raw/gzip;
+- presupuestos objetivo + techo duro;
+- artifacts y contratos CI.
 
-Baseline inicial — Gate #172:
-- 0 errores HTTP en todos los escenarios medidos;
-- `activos_admin`: p95 224,09 ms y payload 3331,35 KB;
-- `activos_responsable`: p95 13,11 ms y payload 123,34 KB;
-- bundle frontend: 266,50 KB JS gzip, 16,41 KB CSS gzip, 500,91 KB gzip total.
-
-Hallazgo prioritario:
-- el listado global de activos entregaba ~3,33 MB por request a escala piloto;
-- quedó marcado como `target=warn` por payload;
-- P8.0 no cambió contratos ni aplicó optimizaciones.
-
-Evidencia:
-- PR #24 mergeado;
-- merge `18e3bb9dafb2f07b03856ab863b3c9df4064641b`;
-- Gate PR #173 verde;
-- Gate post-merge #174 verde.
+Baseline inicial:
+- `activos_admin`: 224,09 ms p95 / 3331,35 KB;
+- `activos_responsable`: 13,11 ms / 123,34 KB;
+- JS frontend: 266,50 KB gzip.
 
 Detalle: `docs/PERFORMANCE.md`.
 
 ### P8.1 — Perfilado backend/MySQL ✅
 
-Implementado en `performance/p8-backend-profile` / PR #25.
+PR #25 / Gate #175.
 
-Hallazgos principales — Gate #175:
-- no hay N+1 clásico en Activos;
-- Dirección: 3 queries/request (2 auth + 1 activos), ~219,89 ms HTTP promedio antes de P8.2;
-- principal costo: materializar/serializar 6000 filas + payload de 3,33 MB;
-- RESPONSABLE usa índice `oficina_id`;
-- auth usa consultas indexadas y de costo bajo;
-- dashboard ejecutaba 16 queries/request y repetía counts por estado;
-- no se justificaron índices por intuición sobre tablas pequeñas o baja selectividad.
-
-Decisiones derivadas:
-1. paginación + proyección + filtros server-side;
-2. consolidación de counts redundantes;
-3. minimización de atributos en auth sin debilitar seguridad;
-4. índices solo con mejora demostrable.
-
-Detalle completo: `docs/PERFORMANCE.md`.
+- sin N+1 clásico en Activos;
+- costo dominante: materialización/serialización del listado global;
+- auth indexada y de costo bajo;
+- Dashboard con counts redundantes;
+- sin índices especulativos.
 
 ### P8.2 — Índices, queries y paginación ✅
 
-Implementado en `performance/p8-query-pagination` / PR #26.
+PR #26 / Gate #184.
 
-Cambios principales:
-- listado de Activos con paginación server-side;
-- búsqueda/filtros server-side;
-- proyección de columnas + detalle protegido por ID;
-- resumen KPI mediante agregación SQL;
-- UI 25/50/100 con debounce y paginación accesible;
-- permisos y alcance por oficina preservados;
-- Dashboard elimina counts redundantes.
-
-Evidencia Gate #184:
-- `activos_admin`: p95 224,09 → **11,35 ms**; payload 3331,35 → **9,16 KB**;
-- `activos_responsable`: p95 13,11 → **7,81 ms**; payload 123,34 → **9,09 KB**;
-- `dashboard_admin`: 16 → **13 queries/request**;
-- 0 errores;
-- frontend sin crecimiento material;
-- Chromium E2E verde.
-
-No se agregaron índices nuevos sin evidencia de beneficio.
+- paginación/filtros server-side;
+- proyección reducida;
+- aislamiento por oficina preservado;
+- Dashboard elimina counts redundantes;
+- `activos_admin`: 224,09 → 11,35 ms p95;
+- payload: 3331,35 → 9,16 KB;
+- sin índices nuevos sin evidencia.
 
 ### P8.3 — Payloads, uploads y reportes ✅
 
-Implementado en `performance/p8-payloads-uploads-reports` / PR #27.
+PR #27 / Gate #201.
 
-Cambios principales:
-- `GET /api/activos/catalogo` con proyección mínima y búsqueda server-side;
+- catálogo ligero de activos;
 - Solicitudes/Adjuntos dejan de consumir listado global;
-- `ruta_archivo` no se expone en payloads;
-- límites MIME/tamaño, compresión y autorización preservados;
-- reportes comparten preparación de datos y paralelizan lecturas seguras.
-
-Evidencia — Gate #201:
-- catálogo admin: 8,89 ms p95 / 4,71 KB;
-- catálogo responsable: 5,73 ms p95 / 4,73 KB;
-- 0 errores;
-- auth/MFA, P6, backup/restore y 10/10 Chromium E2E verdes.
+- `ruta_archivo` no se expone;
+- límites/seguridad de uploads preservados;
+- reportes optimizados sin alterar reglas.
 
 ### P8.4 — Rendimiento frontend ✅
 
-Implementado en `performance/p8-frontend` / PR #28.
+PR #28 / Gate #206.
 
-Cambios principales:
-- 15 pantallas protegidas con `React.lazy` + `Suspense`;
-- `PrivateRoute` preserva sesión/rol;
-- Recharts queda fuera de la carga inicial;
-- Inter limitado a Latin 400;
-- contratos de rendimiento frontend versionados.
-
-Evidencia — Gate #206:
-- JS inicial: **265,15 → 129,79 KB gzip**;
-- carga inicial JS+CSS: **281,56 → 139,57 KB gzip**;
-- total `dist`: **499,56 → 358,43 KB gzip**;
-- fuentes: **52,98 KB gzip**;
-- seguridad y Chromium E2E verdes.
+- 15 pantallas protegidas con lazy loading;
+- seguridad de `PrivateRoute` preservada;
+- Recharts fuera de carga inicial;
+- JS inicial: 265,15 → 129,79 KB gzip;
+- carga inicial JS+CSS: 281,56 → 139,57 KB gzip;
+- fuentes 52,98 KB gzip.
 
 ### P8.5 — Pruebas de carga ✅
 
-Implementado en `performance/p8-load-tests` / PR #29.
+PR #29 / Gate #211.
 
-Metodología:
-- dataset 6000 activos + 300 insumos;
 - lecturas c1/5/10/20;
-- login c1/3/5;
-- Stock con escrituras únicas e idempotentes;
-- métricas p50/p95/p99, throughput, errores e invariantes P6.
-
-Evidencia — Gate #211:
 - 0 errores HTTP;
-- `auth_me_admin` c20: 68,90 ms p95;
-- Dashboard c20: 92,56 ms;
-- Activos c20: 80,91 ms;
-- Pedidos c20: 59,82 ms;
-- Stock lectura c20: 49,24 ms;
-- mix c20: 76,65 ms;
-- login c5: 34,31 ms;
-- Stock unique c20: 275,71 ms, invariantes correctas;
-- Stock idempotente: 20 HTTP / 10 operaciones lógicas, 10 replays y exactamente 10 escrituras.
+- `auth_me_admin` c20 68,90 ms p95;
+- Dashboard c20 92,56 ms;
+- Activos c20 80,91 ms;
+- Pedidos c20 59,82 ms;
+- Stock lectura c20 49,24 ms;
+- mix c20 76,65 ms;
+- Stock unique c20 275,71 ms con invariantes correctas;
+- replay idempotente exacto.
 
-Interpretación:
-- lecturas holgadas hasta c20;
-- primera zona sensible: serialización de escrituras de Stock;
-- integridad P6 preservada;
-- sin justificación para caches, índices o relajación de locks.
+Conclusión: primera zona sensible = serialización de Stock; integridad P6 intacta.
 
 ### P8.6 — Optimización + regresión ✅
 
-Implementado en `performance/p8-optimization-regression` / PR #30.
+PR #30 / Gate #218.
 
-Evidencia — Gate #218:
-- c1: 26,03 ms p95, 0 errores, invariantes `true`;
-- c20: 270,17 ms p95, 0 errores, invariantes `true`;
-- lock central `Insumo ... FOR UPDATE`: 68,28 % del tiempo SQL;
-- espera promedio lock central: 40,25 ms;
-- lock `StockOficina`: 0,5 ms promedio;
-- `central_stock_lock_is_dominant_candidate=true`;
-- `production_change_required=false`.
-
-Decisión versionada:
-- `preserve_consistency_locks_and_regression_guards`;
-- no se eliminan/reordenan locks;
-- no se agregan índices/caches/complejidad sin evidencia material.
+- perfil c1/c20 de contención;
+- lock central `Insumo ... FOR UPDATE` = 68,28 % del tiempo SQL medido en c20;
+- c20 270,17 ms p95, 0 errores, invariantes true;
+- `production_change_required=false`;
+- decisión `preserve_consistency_locks_and_regression_guards`;
+- sin cambios productivos especulativos.
 
 Detalle: `docs/P8_6_CLOSURE.md`.
 
-### P8.7 — Cierre documental y criterios de piloto ✅
-
-Rama: `performance/p8-closure-pilot-criteria`.
+### P8.7 — Cierre documental y criterios de piloto 🟢 INTEGRACIÓN FINAL
 
 Cierre técnico-operativo verificado el 13/09/2026:
-- revisión staging: `cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044`;
-- backend y frontend Railway sobre `main` y esa revisión;
-- `deploy:preflight` ✅ (`staging`, DB correcta, `trust proxy hops=1`);
-- migraciones 001–005 aplicadas; `db:status` al día ✅;
-- backup `/data/backups/pre-pilot.sql` creado y verificado ✅;
+- staging en `cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044`;
+- backend/frontend Railway sobre `main`;
+- `deploy:preflight` ✅;
+- migraciones 001–005 al día ✅;
+- backup `/data/backups/pre-pilot.sql` verificado ✅;
 - SHA-256 `604f27ccf2b954cd363e77276bf16911047c9515c1d73b77c458ab455beeb18d`;
-- tamaño 23746 bytes;
-- `/health/live` y `/health/ready` 200 con revisión esperada ✅;
-- frontend 200 y raíz React presente ✅;
-- `/api/auth/me` sin sesión devuelve 401 esperado;
-- CORS/origin con credenciales coincide exactamente con frontend de staging ✅;
-- smoke externo completo ✅;
-- volúmenes backend/MySQL persistentes ✅.
+- 23746 bytes;
+- `/health/live` y `/health/ready` 200 ✅;
+- frontend 200 ✅;
+- `/api/auth/me` anónimo 401 esperado;
+- CORS exacto con credenciales ✅;
+- smoke externo ✅;
+- volúmenes persistentes ✅.
 
 Desviación registrada:
-- el deployment fue aplicado antes del nuevo backup específico de P8.7;
+- deployment realizado antes del nuevo backup específico;
 - no hubo migraciones P8 nuevas;
-- después se confirmó schema al día y se creó/verificó backup pre-piloto;
-- próximos deploys deben respetar nuevamente el orden del runbook.
+- luego se confirmó schema al día y backup pre-piloto verificado;
+- próximos deploys deben volver al orden del runbook.
 
 Criterios de piloto definidos:
 - GO de seguridad, integridad, recuperación y rendimiento;
-- hard limits de `performance/budgets.json` como techo técnico, no SLA;
-- SEV-1 para corrupción, stock negativo/doble gasto, idempotencia rota, acceso no autorizado, secreto comprometido o recuperación inconsistente;
-- SEV-2 para readiness persistente, auth/MFA repetidamente fallido, flujo crítico indisponible, 5xx repetidos o degradación sostenida;
-- observabilidad mínima de health, revisión, 5xx, auth/MFA, latencias, incidentes, capacidad, backups y escrituras de Stock.
+- presupuestos P8 como techos técnicos, no SLA;
+- SEV-1 y SEV-2 definidos;
+- observabilidad mínima definida.
 
-Detalle completo: `docs/P8_CLOSURE.md`.
+Integración:
+- `docs/P8_CLOSURE.md` ✅;
+- `docs/README.md` ✅;
+- PR #31 abierto ✅;
+- diff documental revisado ✅;
+- Quality Gate #222 verde completo sobre el HEAD documental anterior ✅;
+- la sincronización final de estado modifica el HEAD, por lo que **el HEAD final debe pasar nuevamente el Quality Gate antes del merge**.
 
-### Cierre formal pendiente exclusivamente de integración
+Detalle: `docs/P8_CLOSURE.md`.
 
-Antes de iniciar P9 todavía deben ocurrir, en este orden:
-1. Quality Gate completo sobre el HEAD final de esta rama;
-2. revisión del diff;
-3. PR y merge a `main`;
-4. Quality Gate post-merge verde sobre el SHA final de `main`;
-5. releer este `ROADMAP.md` desde `main`.
+### Pasos restantes para cerrar formalmente P8.7
+
+1. Quality Gate completo verde sobre el HEAD final de PR #31.
+2. Merge de PR #31 a `main`.
+3. Quality Gate post-merge verde sobre el SHA resultante de `main`.
+4. Releer este `ROADMAP.md` desde `main`.
 
 No iniciar P9 antes de esos pasos.
 
 ## P9 — Operación de piloto ⏳ PRÓXIMO BLOQUE
 
-Abrir únicamente después del cierre formal de integración P8.7.
+Abrir únicamente después del cierre formal de P8.7.
 
 Alcance previsto:
 - soporte e incident response;
@@ -450,7 +379,6 @@ Alcance previsto:
 ## Deuda técnica / decisiones diferidas
 
 No abrir como frentes paralelos salvo que bloqueen P9:
-
 - reemplazar diálogos nativos restantes por componente accesible definitivo;
 - decidir adopción frontend explícita de `Idempotency-Key` en operaciones críticas;
 - evaluar primitivas especializadas solo por necesidad concreta;
