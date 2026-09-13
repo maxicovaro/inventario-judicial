@@ -158,6 +158,18 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      - name: Run P8.1 backend/MySQL profile
+        run: npm run perf:profile
+
+      - name: Upload P8.1 backend profile artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-backend-profile
+          path: performance-results/backend-profile.json
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Prepare isolated E2E fixtures
         run: npm run test:integration:fixtures
 

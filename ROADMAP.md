@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 13/09/2026 después del cierre técnico de **P8.0 — Baseline y metodología**. El bloque activo pasa a ser **P8.1 — Perfilado backend/MySQL**.
+> Actualizada al 13/09/2026 después del cierre técnico de **P8.1 — Perfilado backend/MySQL**. El bloque activo pasa a ser **P8.2 — Índices, queries y paginación**.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -21,9 +21,10 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | Frontend Bloques A–E | ✅ Completo | PR #11; merge `0cb1f528...` |
 | P7.1 Contrato/guardas staging | ✅ Completo | PR #20; Gate #158/#159 |
 | P7.2 Staging real | ✅ Completo | PR #22; merge `6872095e...`; Gate #168 |
-| P8.0 Baseline y metodología | ✅ Completo | PR #24; baseline inicial Gate #172 |
-| **P8.1 Perfilado backend/MySQL** | 🟡 **Activo** | Siguiente bloque autorizado |
-| P8.2–P8.7 | ⏳ Pendiente | Después de P8.1 |
+| P8.0 Baseline y metodología | ✅ Completo | PR #24; Gate #172/#174 |
+| P8.1 Perfilado backend/MySQL | ✅ Completo | PR #25; perfil inicial Gate #175 |
+| **P8.2 Índices, queries y paginación** | 🟡 **Activo** | Siguiente bloque autorizado |
+| P8.3–P8.7 | ⏳ Pendiente | Después de P8.2 |
 | P9 Piloto | ⏳ Pendiente | Después de P8 completo |
 
 ---
@@ -243,29 +244,68 @@ Baseline inicial — Gate #172:
 
 Hallazgo prioritario:
 - el listado global de activos entrega ~3,33 MB por request a escala piloto;
-- queda marcado como `target=warn` por payload y es prioridad de P8.1/P8.2;
+- queda marcado como `target=warn` por payload;
 - P8.0 no cambia contratos ni aplica optimizaciones.
+
+Evidencia:
+- PR #24 mergeado;
+- merge `18e3bb9dafb2f07b03856ab863b3c9df4064641b`;
+- Gate PR #173 verde;
+- Gate post-merge #174 verde.
 
 Detalle: `docs/PERFORMANCE.md`.
 
-### BLOQUE ACTIVO — P8.1 Perfilado backend/MySQL 🟡
+### P8.1 — Perfilado backend/MySQL ✅
+
+Implementado en `performance/p8-backend-profile` / PR #25.
+
+Instrumentación:
+- benchmark Sequelize activado solo dentro del profiler de test;
+- SQL normalizado sin persistir literales;
+- conteo/duración de queries por escenario;
+- detección de firmas repetidas;
+- `EXPLAIN` de consultas dominantes;
+- revisión de tablas/índices con `information_schema`;
+- artifact `performance-backend-profile`;
+- prueba unitaria y contratos CI.
+
+Hallazgos — Gate #175:
+- **no hay N+1 clásico en Activos**;
+- Dirección: 3 queries/request (2 auth + 1 activos), ~219,89 ms HTTP promedio;
+- la query global de activos promedia ~35 ms SQL, usa `PRIMARY` con backward index scan y recorre ~5686 filas estimadas;
+- el principal costo restante es materializar/serializar 6000 filas + payload de 3,33 MB;
+- RESPONSABLE usa índice `oficina_id`, ~223 filas estimadas y ~12,75 ms HTTP;
+- auth agrega 2 queries indexadas por request y su costo es bajo/esperado;
+- dashboard ejecuta 16 queries/request y repite 3 veces el mismo patrón `COUNT(pedidos_insumos) WHERE estado=?` además de una agregación agrupada;
+- varios full scans del dashboard ocurren sobre 300 insumos o tablas transaccionales casi vacías; no justifican índices por intuición;
+- la cardinalidad de `information_schema.STATISTICS` quedó desactualizada tras la carga masiva, por lo que no se usa sola para decidir índices.
+
+Decisiones para P8.2:
+1. paginación + proyección + filtros server-side en Activos Dirección;
+2. consolidar counts redundantes del dashboard;
+3. reducir atributos cargados por auth middleware sin tocar seguridad;
+4. agregar/ajustar índices solo con mejora demostrable por `EXPLAIN` y baseline antes/después;
+5. no indexar tablas pequeñas/vacías únicamente porque aparezca `ALL`.
+
+Detalle completo: `docs/PERFORMANCE.md`.
+
+### BLOQUE ACTIVO — P8.2 Índices, queries y paginación 🟡
 
 Objetivos autorizados:
-1. instrumentar cantidad/duración de queries en escenarios P8.0;
-2. identificar rutas y consultas dominantes;
-3. detectar N+1;
-4. capturar `EXPLAIN`/planes para consultas críticas;
-5. revisar cardinalidad/selectividad de filtros y joins;
-6. priorizar cambios para P8.2 sin introducir índices prematuramente;
-7. mantener seguridad, permisos, aislamiento por oficina y consistencia.
-
-No aplicar todavía paginación, nuevos índices o cambios de contrato API sin la evidencia de P8.1.
+1. implementar paginación server-side del listado global de activos preservando alcance por rol/oficina;
+2. definir contrato de búsqueda/filtros compatible con paginación y actualizar frontend/E2E donde corresponda;
+3. proyectar únicamente columnas necesarias en listados y autorización;
+4. consolidar agregaciones redundantes del dashboard sin alterar su respuesta pública;
+5. evaluar índices existentes/nuevos con `EXPLAIN` antes/después y selectividad real cuando sea necesario;
+6. no agregar índices de baja utilidad ni basados en tablas sin volumen representativo;
+7. comparar P8.0/P8.1 antes y después;
+8. mantener seguridad, MFA, permisos, P6, E2E y consistencia completamente verdes.
 
 ### Continuidad P8
 
 - **P8.0 Baseline y metodología ✅**
-- **P8.1 Perfilado backend/MySQL 🟡 ACTIVO**
-- **P8.2 Índices, queries y paginación ⏳**
+- **P8.1 Perfilado backend/MySQL ✅**
+- **P8.2 Índices, queries y paginación 🟡 ACTIVO**
 - **P8.3 Payloads, uploads y reportes ⏳**
 - **P8.4 Rendimiento frontend ⏳**
 - **P8.5 Pruebas de carga ⏳**
