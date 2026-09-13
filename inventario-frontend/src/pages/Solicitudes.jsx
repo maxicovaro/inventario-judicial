@@ -89,16 +89,14 @@ export default function Solicitudes() {
   const cargarDatos = useCallback(async () => {
     try {
       setError("");
-      const promesas = [api.get("/solicitudes"), api.get("/activos")];
+      const promesas = [api.get("/solicitudes")];
       if (esDireccion) promesas.push(api.get("/oficinas"));
 
       const respuestasApi = await Promise.all(promesas);
       const resSolicitudes = respuestasApi[0];
-      const resActivos = respuestasApi[1];
-      const resOficinas = respuestasApi[2];
+      const resOficinas = respuestasApi[1];
 
       setSolicitudes(resSolicitudes.data || []);
-      setActivos(resActivos.data || []);
       setOficinas(esDireccion && resOficinas ? resOficinas.data || [] : []);
 
       const respuestasIniciales = {};
@@ -111,9 +109,30 @@ export default function Solicitudes() {
     }
   }, [esDireccion]);
 
+  const cargarActivosCatalogo = useCallback(async () => {
+    if (esDireccion && !oficinaFormulario) {
+      setActivos([]);
+      return;
+    }
+
+    try {
+      const params = { limit: 500 };
+      if (esDireccion) params.oficina_id = oficinaFormulario;
+      const response = await api.get("/activos/catalogo", { params });
+      setActivos(response.data?.items || []);
+    } catch (err) {
+      setActivos([]);
+      setError(err.response?.data?.mensaje || "Error al cargar el catálogo de activos");
+    }
+  }, [esDireccion, oficinaFormulario]);
+
   useEffect(() => {
     cargarDatos();
   }, [cargarDatos]);
+
+  useEffect(() => {
+    cargarActivosCatalogo();
+  }, [cargarActivosCatalogo]);
 
   useEffect(() => {
     if (!esDireccion) {
@@ -122,13 +141,7 @@ export default function Solicitudes() {
     }
   }, [esDireccion, usuario.oficina_id, setValue]);
 
-  const activosDisponibles = useMemo(() => {
-    if (!esDireccion) return activos;
-    if (!oficinaFormulario) return [];
-    return activos.filter(
-      (activo) => String(activo.oficina_id) === String(oficinaFormulario),
-    );
-  }, [activos, esDireccion, oficinaFormulario]);
+  const activosDisponibles = useMemo(() => activos, [activos]);
 
   const resumen = useMemo(() => ({
     total: solicitudes.length,
