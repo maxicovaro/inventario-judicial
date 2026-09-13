@@ -367,7 +367,7 @@ Nota de instrumentación: la agregación SQL de resumen de Activos se ejecuta ac
 
 **P8.2 no agrega índices nuevos.** La decisión es deliberada y basada en evidencia:
 
-- RESPONSABLE continúa usando el índice existente `oficina_id` (`ref` + backward index scan);
+- RESPONSABLE continúa usando el índice existente `oficina_id` (`ref` + backward index scan`);
 - autenticación usa índices/PK y mantiene costo bajo;
 - el orden global paginado no mostró un cuello de botella que justifique un índice adicional;
 - `activo=true` tiene baja selectividad y un índice simple sobre el booleano no ofrece evidencia suficiente de beneficio;
@@ -427,3 +427,122 @@ Quality Gate #184 quedó verde completo con:
 - presupuestos endurecidos ✅;
 - Quality Gate de implementación #184 verde ✅;
 - siguiente bloque: **P8.3 — Payloads, uploads y reportes**.
+
+---
+
+## P8.3 — Payloads, uploads y reportes ✅
+
+P8.3 elimina la deuda transitoria de P8.2 en los consumidores de activos y revisa payloads, adjuntos y reportes sin debilitar permisos, MFA, persistencia ni controles de archivos. La implementación quedó completamente verde en el **Quality Gate #201** sobre la rama `performance/p8-payloads-uploads-reports` / PR #27.
+
+### Catálogo ligero de activos
+
+Se agregó `GET /api/activos/catalogo` con estas propiedades:
+
+- proyección mínima: `id`, `nombre`, `codigo_interno`, `oficina_id`;
+- solo activos vigentes y no dados de baja;
+- búsqueda server-side por nombre, código interno o número de serie;
+- límite 50 por defecto y máximo 500;
+- ADMIN puede acotar por `oficina_id`;
+- RESPONSABLE/usuario de oficina queda forzado a su propia oficina aunque intente enviar otra;
+- contratos MySQL reales validan proyección, búsqueda, límites, exclusión de bajas y aislamiento por oficina.
+
+Migración de consumidores:
+
+- **Solicitudes** deja de descargar el listado global de ~6000 activos; Dirección selecciona primero la oficina y carga un catálogo acotado a esa dependencia, con máximo 500. El escenario de referencia continúa siendo ~300 bienes por oficina.
+- **Adjuntos** deja de descargar el listado global; usa búsqueda server-side con debounce de 250 ms, cancelación de requests anteriores y máximo 50 coincidencias.
+- los contratos estáticos P8.3 impiden reintroducir `api.get("/activos")` en esas pantallas.
+
+### Medición oficial del catálogo — Gate #201
+
+Dataset idéntico de referencia: 6000 activos + 300 insumos.
+
+| Escenario | p95 | Payload | Errores | Presupuesto |
+| --- | ---: | ---: | ---: | --- |
+| `activos_catalogo_admin` | **8,89 ms** | **4,71 KB** | 0 | pass |
+| `activos_catalogo_responsable` | **5,73 ms** | **4,73 KB** | 0 | pass |
+
+Presupuesto protegido para ambos escenarios:
+
+- p95 objetivo **150 ms**, techo duro **1000 ms**;
+- payload objetivo **25 KB**, techo duro **100 KB**.
+
+Los tiempos de runner son comparativos y no un SLA. El tamaño del payload sí demuestra estructuralmente que los selectores ya no necesitan transportar el inventario global.
+
+### Adjuntos y uploads
+
+La revisión detectó que el listado y la respuesta de subida podían exponer `ruta_archivo`, dato interno del almacenamiento que la UI no necesita. P8.3 lo elimina de ambos payloads.
+
+Se preservan deliberadamente los controles existentes porque ya son adecuados para el piloto:
+
+- tamaño máximo **10 MB**;
+- allowlist MIME del middleware;
+- imágenes redimensionadas hasta 1600 px sin agrandar originales;
+- conversión JPEG con calidad 75;
+- almacenamiento persistente compartido y cubierto por prueba;
+- descarga y eliminación siguen resolviendo la ruta únicamente en backend después de verificar autorización;
+- `res.download` continúa siendo el mecanismo de entrega del archivo autorizado.
+
+No se elevan límites ni se relajan tipos para obtener rendimiento aparente.
+
+### Reportes
+
+Reporte general de pedidos:
+
+- JSON y PDF reutilizan `obtenerDatosResumenPedidos`;
+- las agregaciones independientes se ejecutan en paralelo con `Promise.all`;
+- se evita duplicar la preparación de datos entre salida JSON y PDF;
+- el PDF continúa transmitiéndose con `doc.pipe(res)`, sin acumular todo el documento en memoria antes de responder;
+- el contrato dinámico verifica métricas JSON, restricción exclusiva ADMIN y un PDF válido `%PDF` con `Content-Disposition`.
+
+Reporte mensual por oficina:
+
+- proyecta solo atributos usados de pedido, detalle, insumo y oficina;
+- pedido, consumos y stock actual se cargan en paralelo;
+- se mantiene el mismo contrato de respuesta y el aislamiento por oficina.
+
+### Revisión de insumos, pedidos y solicitudes
+
+No se introducen paginaciones o cambios de contrato solo por intuición:
+
+- `insumos_admin` en Gate #201 quedó en **13,97 ms p95**, payload **111,53 KB** y 0 errores, dentro del presupuesto actual;
+- Solicitudes conserva su payload funcional; la carga de activos asociada, que era la deuda concreta, ya fue eliminada;
+- Pedidos conserva sus contratos; se optimiza la preparación de sus reportes sin alterar reglas de negocio;
+- cualquier presión por crecimiento concurrente o cardinalidad transaccional se medirá en P8.5 con pruebas de carga antes de cambiar contratos.
+
+### Protección contra regresiones
+
+P8.3 incorpora:
+
+- `test:p8-payload-contracts` para catálogo, frontend consumidor, uploads y reportes;
+- `test:p8-payload-catalog` sobre MySQL real;
+- `test:p8-report-contracts` sobre MySQL real;
+- catálogo ligero dentro del baseline oficial P8.0;
+- presupuestos versionados para sus dos perfiles de autorización.
+
+Quality Gate #201 quedó verde completo con:
+
+- lint/build frontend y baseline de bundle;
+- sintaxis backend y `npm test`;
+- migraciones y MySQL descartable;
+- integración P4/P8.2/P8.3;
+- auth hardening y MFA;
+- P6 concurrencia/idempotencia;
+- health checks;
+- backup/restore;
+- baseline P8.0;
+- profiler P8.1;
+- **10/10 recorridos Chromium E2E**.
+
+### Criterios de salida P8.3
+
+- Solicitudes sin listado global legacy de activos ✅;
+- Adjuntos sin listado global legacy de activos ✅;
+- catálogo ligero/búsqueda server-side con aislamiento por oficina ✅;
+- payload interno `ruta_archivo` eliminado de respuestas ✅;
+- límites, MIME, compresión, persistencia y autorización de uploads preservados ✅;
+- reportes con proyección/reutilización/paralelización donde existe evidencia ✅;
+- PDF transmitido por stream ✅;
+- catálogo medido sobre 6000 activos y presupuestado ✅;
+- contratos estáticos + MySQL real agregados al Quality Gate ✅;
+- Quality Gate de implementación #201 verde completo ✅;
+- siguiente bloque: **P8.4 — Rendimiento frontend**.
