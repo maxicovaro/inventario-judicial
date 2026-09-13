@@ -21,6 +21,10 @@
     "target_css_gzip_kb": 120,
     "hard_css_gzip_kb": 400,
     "target_total_gzip_kb": 800,
-    "hard_total_gzip_kb": 2200
+    "hard_total_gzip_kb": 2200,
+    "target_initial_js_gzip_kb": 180,
+    "hard_initial_js_gzip_kb": 300,
+    "target_font_gzip_kb": 60,
+    "hard_font_gzip_kb": 80
   }
 }

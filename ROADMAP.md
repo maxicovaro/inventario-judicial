@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 13/09/2026 después del cierre técnico de **P8.3 — Payloads, uploads y reportes**. El bloque activo pasa a ser **P8.4 — Rendimiento frontend**.
+> Actualizada al 13/09/2026 después del cierre técnico de **P8.4 — Rendimiento frontend**. El bloque activo pasa a ser **P8.5 — Pruebas de carga**.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -25,8 +25,9 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | P8.1 Perfilado backend/MySQL | ✅ Completo | PR #25; perfil inicial Gate #175 |
 | P8.2 Índices, queries y paginación | ✅ Completo | PR #26; Gate de implementación #184 |
 | P8.3 Payloads, uploads y reportes | ✅ Completo | PR #27; Gate de implementación #201 |
-| **P8.4 Rendimiento frontend** | 🟡 **Activo** | Siguiente bloque autorizado |
-| P8.5–P8.7 | ⏳ Pendiente | Después de P8.4 |
+| P8.4 Rendimiento frontend | ✅ Completo | PR #28; Gate de implementación #206 |
+| **P8.5 Pruebas de carga** | 🟡 **Activo** | Siguiente bloque autorizado |
+| P8.6–P8.7 | ⏳ Pendiente | Después de P8.5 |
 | P9 Piloto | ⏳ Pendiente | Después de P8 completo |
 
 ---
@@ -363,17 +364,44 @@ Decisiones:
 
 Detalle completo: `docs/PERFORMANCE.md`.
 
-### BLOQUE ACTIVO — P8.4 Rendimiento frontend 🟡
+### P8.4 — Rendimiento frontend ✅
+
+Implementado en `performance/p8-frontend` / PR #28.
+
+Cambios principales:
+- Login permanece eager y las 15 pantallas protegidas usan `React.lazy` + `Suspense`;
+- `PrivateRoute` conserva exactamente el control de sesión/rol alrededor de cada pantalla;
+- fallback de carga accesible con `role="status"` y `aria-live="polite"`;
+- Recharts queda aislado en el chunk de Dashboard y deja de formar parte del JS inicial;
+- Inter se limita al subset Latin 400;
+- baseline frontend v2 mide JS inicial, assets iniciales, chunks y fuentes además del peso global;
+- presupuestos específicos protegen JS inicial y fuentes;
+- `test:p8-frontend-contracts` evita volver a imports estáticos masivos o al import genérico de Inter.
+
+Evidencia — Gate #206:
+- JS inicial: **265,15 → 129,79 KB gzip** (~51 % menor);
+- carga inicial JS + CSS: **281,56 → 139,57 KB gzip** (~50 % menor);
+- total `dist`: **499,56 → 358,43 KB gzip** (~28 % menor);
+- JS total: 265,15 → 282,16 KB gzip por overhead de separación, dentro del presupuesto;
+- 18 chunks JS frente al bundle monolítico anterior;
+- fuentes: **52,98 KB gzip**, Latin 400, objetivo 60 KB / techo 80 KB;
+- assets públicos revisados: solo dos SVG pequeños, sin optimización adicional justificada;
+- no se agregó memoización especulativa; Dashboard ya usa `useMemo`/`useCallback` y no hubo evidencia reproducible de otro cuello de botella de renders;
+- auth/MFA, P6, backup/restore, baseline, profiler y Chromium E2E verdes.
+
+Detalle completo: `docs/PERFORMANCE.md`.
+
+### BLOQUE ACTIVO — P8.5 Pruebas de carga 🟡
 
 Objetivos autorizados:
-1. releer el baseline frontend vigente y medir el costo real del bundle/rutas antes de optimizar;
-2. identificar dependencias, módulos o pantallas que justifiquen separación de código o carga diferida;
-3. revisar renders/re-renders y trabajo innecesario del navegador en recorridos críticos con evidencia reproducible;
-4. evaluar lazy loading/code splitting por rutas o componentes pesados sin degradar navegación, permisos ni estados de carga/error;
-5. revisar imágenes, fuentes y assets estáticos por peso y estrategia de carga;
-6. mantener accesibilidad, UX y comportamiento responsive ya validados;
-7. ampliar scripts/presupuestos del baseline frontend cuando la métrica sea estable y accionable;
-8. mantener `npm test`, MySQL, auth/MFA, P6, backup/restore y Chromium E2E completamente verdes.
+1. definir una metodología reproducible de carga sobre entorno descartable/controlado, nunca sobre producción ni datos judiciales reales;
+2. modelar concurrencia representativa del piloto para lectura y escritura, incluyendo login/sesión, Dashboard, Activos paginados, catálogos, pedidos y stock;
+3. medir throughput, latencia p50/p95/p99, tasa de error y saturación bajo niveles crecientes de concurrencia;
+4. identificar el primer punto de degradación real antes de proponer nuevos índices, caches, paginaciones o cambios de contrato;
+5. incluir escenarios de operaciones transaccionales sensibles sin duplicar escrituras ni debilitar P6/idempotencia;
+6. separar límites del runner/infraestructura de los límites de aplicación y documentar esa distinción;
+7. dejar artifacts y presupuestos de regresión cuando una métrica resulte estable y accionable;
+8. mantener `npm test`, integración MySQL, auth/MFA, P6, backup/restore, baseline/profile y Chromium E2E completamente verdes.
 
 ### Continuidad P8
 
@@ -381,8 +409,8 @@ Objetivos autorizados:
 - **P8.1 Perfilado backend/MySQL ✅**
 - **P8.2 Índices, queries y paginación ✅**
 - **P8.3 Payloads, uploads y reportes ✅**
-- **P8.4 Rendimiento frontend 🟡 ACTIVO**
-- **P8.5 Pruebas de carga ⏳**
+- **P8.4 Rendimiento frontend ✅**
+- **P8.5 Pruebas de carga 🟡 ACTIVO**
 - **P8.6 Optimización + regresión ⏳**
 - **P8.7 Cierre documental y criterios de piloto ⏳**
 

@@ -51,8 +51,9 @@
     "test:p8-payload-contracts": "node scripts/test-p8-payload-contracts.js",
     "test:p8-payload-catalog": "node scripts/test-p8-payload-catalog.js",
     "test:p8-report-contracts": "node scripts/test-p8-report-contracts.js",
+    "test:p8-frontend-contracts": "node scripts/test-p8-frontend-contracts.js",
     "test:mfa": "node scripts/test-mfa.js",
-    "test": "npm run test:pedido-rules && npm run test:security-rules && npm run test:env-config && npm run test:safe-errors && npm run test:db-lifecycle && npm run test:quality-baseline && npm run test:dependencies && npm run test:authorization-scope && npm run test:asset-movements && npm run test:operational-contracts && npm run test:recovery-runbook && npm run test:integration-e2e-contracts && npm run test:ci-config && npm run test:prestage-security && npm run test:staging-contracts && npm run test:upload-storage && npm run test:performance-contracts && npm run test:performance-profiler && npm run test:p8-query-contracts && npm run test:p8-payload-contracts",
+    "test": "npm run test:pedido-rules && npm run test:security-rules && npm run test:env-config && npm run test:safe-errors && npm run test:db-lifecycle && npm run test:quality-baseline && npm run test:dependencies && npm run test:authorization-scope && npm run test:asset-movements && npm run test:operational-contracts && npm run test:recovery-runbook && npm run test:integration-e2e-contracts && npm run test:ci-config && npm run test:prestage-security && npm run test:staging-contracts && npm run test:upload-storage && npm run test:performance-contracts && npm run test:performance-profiler && npm run test:p8-query-contracts && npm run test:p8-payload-contracts && npm run test:p8-frontend-contracts",
     "check": "npm run check:backend && npm test && npm run check:frontend"
   },
   "keywords": [],
