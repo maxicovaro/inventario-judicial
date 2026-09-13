@@ -159,9 +159,12 @@ const subirAdjunto = async (req, res) => {
 
     archivoFinalParaBorrar = null;
 
+    const adjuntoPublico = nuevoAdjunto.toJSON();
+    delete adjuntoPublico.ruta_archivo;
+
     return res.status(201).json({
       mensaje: "Adjunto subido correctamente",
-      adjunto: nuevoAdjunto,
+      adjunto: adjuntoPublico,
     });
   } catch (error) {
     if (archivoFinalParaBorrar) {
@@ -210,6 +213,7 @@ const listarAdjuntos = async (req, res) => {
 
     const adjuntos = await Adjunto.findAll({
       where,
+      attributes: { exclude: ["ruta_archivo"] },
       include: [
         {
           model: Activo,
