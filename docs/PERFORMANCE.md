@@ -1,8 +1,8 @@
 # P8 — Rendimiento y escalabilidad
 
-## P8.0 — Baseline y metodología
+## P8.0 — Baseline y metodología ✅
 
-Este documento define la línea base reproducible de rendimiento del Sistema de Inventario Judicial. P8.0 **no optimiza** todavía: mide el comportamiento actual con un dataset sintético representativo del piloto, fija presupuestos y deja evidencia comparable para P8.1–P8.7.
+P8.0 establece la línea base reproducible de rendimiento del Sistema de Inventario Judicial. Este bloque **no optimiza** el sistema: mide el comportamiento actual con un dataset sintético representativo del piloto, fija presupuestos y deja evidencia comparable para P8.1–P8.7.
 
 ## Objetivos
 
@@ -23,15 +23,13 @@ El baseline prepara automáticamente:
 - activos distribuidos entre todas las oficinas disponibles en el catálogo;
 - usuarios sintéticos ADMIN, RESPONSABLE y USUARIO ya utilizados por integración/E2E.
 
-El dataset se genera con `scripts/performance-fixtures.js`, que reutiliza las guardas de `integration-fixtures.js`. Por diseño solo puede operar sobre una base de test/CI.
+El dataset se genera con `scripts/performance-fixtures.js`, reutilizando las guardas de `integration-fixtures.js`. Por diseño solo opera sobre una base de test/CI.
 
 ## Escenarios API
 
-El baseline HTTP mide:
-
 | Escenario | Propósito |
 | --- | --- |
-| `health_ready` | costo de readiness con comprobación de DB |
+| `health_ready` | readiness con comprobación de DB |
 | `login_admin` | autenticación + bcrypt + creación de sesión |
 | `auth_me_admin` | validación de sesión autenticada |
 | `activos_admin` | listado global de activos a escala piloto |
@@ -41,17 +39,45 @@ El baseline HTTP mide:
 
 Para cada escenario se registran muestras, errores, códigos HTTP, promedio, p50/p95/p99, máximo y payload máximo en KB.
 
-## Frontend
+## Baseline inicial — Quality Gate #172
 
-Después de `vite build`, `scripts/performance-frontend.js` registra:
+Evidencia capturada el 13/09/2026 sobre la rama `performance/p8-baseline`, dataset de 6000 activos + 300 insumos, Node 22 y MySQL 8.4 en GitHub Actions.
 
-- JS gzip total;
-- CSS gzip total;
-- peso gzip total del `dist`;
-- peso raw total;
-- cinco/diez archivos más pesados.
+| Escenario | p50 | p95 | p99 | Payload | Errores |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `health_ready` | 3,14 ms | 5,74 ms | 5,74 ms | 0,07 KB | 0 |
+| `login_admin` | 10,15 ms | 12,76 ms | 12,76 ms | 0,75 KB | 0 |
+| `auth_me_admin` | 4,43 ms | 5,09 ms | 5,09 ms | 0,31 KB | 0 |
+| `activos_admin` | 205,27 ms | **224,09 ms** | 224,09 ms | **3331,35 KB** | 0 |
+| `activos_responsable` | 12,14 ms | 13,11 ms | 13,11 ms | 123,34 KB | 0 |
+| `dashboard_admin` | 9,19 ms | 10,97 ms | 10,97 ms | 0,73 KB | 0 |
+| `insumos_admin` | 10,44 ms | 15,85 ms | 15,85 ms | 111,53 KB | 0 |
 
-No se usa Lighthouse como gate en P8.0 porque su variabilidad en runners compartidos puede generar falsos positivos. Las métricas de experiencia y carga de navegador podrán incorporarse en P8.4 con una metodología específica.
+### Hallazgo prioritario
+
+El listado global de activos es el primer candidato claro de P8:
+
+- el tiempo p95 de ~224 ms no supera el techo duro;
+- el payload de **3,33 MB por respuesta** es excesivo para una consulta interactiva;
+- el mismo endpoint acotado a una oficina baja a ~123 KB y ~13 ms p95;
+- el controlador actual usa un `findAll` global sin paginación para Dirección.
+
+Por lo tanto, P8.1/P8.2 deben estudiar primero el listado global de activos: plan de ejecución, cantidad de filas/columnas transferidas, paginación y contrato de búsqueda. P8.0 **no cambia todavía** ese contrato.
+
+El objetivo de payload de `activos_admin` queda fijado en 1000 KB; el baseline actual debe aparecer como `target=warn`, pero continúa debajo del techo duro de 15 MB. Esto hace visible la deuda sin bloquear la línea base.
+
+## Frontend — baseline inicial
+
+Resultado del artifact `performance-frontend-baseline` del mismo Gate #172:
+
+| Métrica | Valor | Objetivo | Estado |
+| --- | ---: | ---: | --- |
+| JavaScript gzip | 266,50 KB | ≤ 650 KB | pass |
+| CSS gzip | 16,41 KB | ≤ 120 KB | pass |
+| Total `dist` gzip | 500,91 KB | ≤ 800 KB | pass |
+| Total `dist` raw | 1254,13 KB | informativo | — |
+
+El bundle JS principal representa 266,50 KB gzip (932,69 KB raw) y será un punto de observación de P8.4, pero no incumple el presupuesto inicial.
 
 ## Presupuestos
 
@@ -62,7 +88,19 @@ Cada métrica tiene dos niveles:
 1. **Objetivo:** si se supera, el resultado queda en `warn` y se convierte en candidato de P8.1–P8.6.
 2. **Techo duro:** si se supera, el Quality Gate falla porque indica una regresión extrema o un escenario no operativo.
 
-La línea base inicial no debe cambiarse para “hacer pasar” una optimización. Si un presupuesto necesita revisión, debe justificarse en PR con evidencia.
+La línea base no debe modificarse para “hacer pasar” una optimización. Si un presupuesto necesita revisión, debe justificarse en PR con evidencia.
+
+## Frontend
+
+Después de `vite build`, `scripts/performance-frontend.js` registra:
+
+- JS gzip total;
+- CSS gzip total;
+- peso gzip total del `dist`;
+- peso raw total;
+- archivos más pesados.
+
+No se usa Lighthouse como gate en P8.0 porque su variabilidad en runners compartidos puede generar falsos positivos. Las métricas de experiencia de navegador se tratarán en P8.4 con metodología específica.
 
 ## Ejecución local
 
@@ -83,41 +121,37 @@ performance-results/api-baseline.json
 performance-results/frontend-baseline.json
 ```
 
-`performance-results/` es evidencia efímera de ejecución y no debe contener datos personales ni secretos.
+`performance-results/` es evidencia efímera y está excluido de Git.
 
 ## Quality Gate
 
-P8.0 añade dos mediciones automáticas:
+P8.0 incorpora:
 
-- **Run P8.0 API baseline:** recrea el dataset sintético, arranca el backend, mide la API y publica `performance-backend-baseline`.
-- **Measure P8.0 frontend baseline:** analiza el build y publica `performance-frontend-baseline`.
+- **Run P8.0 API baseline:** recrea dataset, arranca backend, mide API y publica `performance-backend-baseline`;
+- **Measure P8.0 frontend baseline:** analiza el build y publica `performance-frontend-baseline`;
+- `test:performance-contracts`: protege dataset, scripts, budgets, workflow y esta metodología.
 
-Después del baseline API, el Quality Gate vuelve a cargar los fixtures E2E normales, por lo que las pruebas posteriores siguen aisladas.
+Después del baseline API, CI vuelve a cargar los fixtures E2E normales para mantener aislamiento.
 
-## Interpretación
+## Interpretación y límites
 
-- `target=pass`: dentro del objetivo inicial.
-- `target=warn`: no bloquea P8.0; pasa a la cola de análisis/optimización.
+- `target=pass`: dentro del objetivo.
+- `target=warn`: candidato de optimización; no bloquea por sí solo.
 - `hard=fail`: bloquea CI.
 - cualquier error HTTP en una medición: bloquea CI.
 
-No se comparan milisegundos de runners diferentes como si fueran benchmarks absolutos de hardware. La utilidad principal es detectar órdenes de magnitud, payloads excesivos y tendencias sobre una metodología estable.
+Los milisegundos del runner compartido **no son un SLA de producción**. Sirven para comparar órdenes de magnitud y tendencias bajo una metodología estable. Los payloads y tamaños de bundle sí son comparables de forma más directa.
 
-## Evidencia inicial
+## Criterios de salida P8.0
 
-Los valores numéricos de referencia se completan con el primer Quality Gate de la rama `performance/p8-baseline`. Ese run será la evidencia autoritativa del baseline inicial; los artifacts JSON quedan asociados al workflow.
-
-## Salida de P8.0
-
-P8.0 se considera cerrado cuando:
-
-- dataset y scripts son reproducibles;
-- presupuestos están versionados;
-- API y frontend generan artifacts en CI;
-- existe un baseline numérico inicial documentado;
-- Quality Gate completo está verde;
-- `ROADMAP.md` marca P8.0 ✅ y habilita **P8.1 — Perfilado backend/MySQL**.
+- dataset y scripts reproducibles ✅;
+- presupuestos versionados ✅;
+- artifacts API/frontend en CI ✅;
+- baseline numérico documentado ✅;
+- Quality Gate #172 completo verde ✅;
+- hallazgo prioritario identificado ✅;
+- siguiente bloque: **P8.1 — Perfilado backend/MySQL**.
 
 ## Continuidad
 
-P8.1 usará esta línea base para estudiar consultas, cantidad de queries, N+1, `EXPLAIN`, índices y rutas críticas. P8.0 no incorpora todavía índices ni cambia paginación o contratos de API.
+P8.1 utilizará este baseline para instrumentar y estudiar consultas, cantidad de queries, N+1, `EXPLAIN` y rutas críticas. P8.2 abordará índices, paginación y contratos de listado con evidencia de P8.1.

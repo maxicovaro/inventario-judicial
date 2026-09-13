@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 11/09/2026 después del cierre formal de P7. El bloque activo pasa a ser **P8 — rendimiento y escalabilidad**.
+> Actualizada al 13/09/2026 después del cierre técnico de **P8.0 — Baseline y metodología**. El bloque activo pasa a ser **P8.1 — Perfilado backend/MySQL**.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -21,8 +21,10 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | Frontend Bloques A–E | ✅ Completo | PR #11; merge `0cb1f528...` |
 | P7.1 Contrato/guardas staging | ✅ Completo | PR #20; Gate #158/#159 |
 | P7.2 Staging real | ✅ Completo | PR #22; merge `6872095e...`; Gate #168 |
-| **P8 Rendimiento/escalabilidad** | 🟡 **Activo** | Siguiente bloque autorizado |
-| P9 Piloto | ⏳ Pendiente | Después de P8 |
+| P8.0 Baseline y metodología | ✅ Completo | PR #24; baseline inicial Gate #172 |
+| **P8.1 Perfilado backend/MySQL** | 🟡 **Activo** | Siguiente bloque autorizado |
+| P8.2–P8.7 | ⏳ Pendiente | Después de P8.1 |
+| P9 Piloto | ⏳ Pendiente | Después de P8 completo |
 
 ---
 
@@ -218,32 +220,57 @@ Evidencia definitiva:
 
 ---
 
-## BLOQUE ACTIVO — P8 Rendimiento y escalabilidad 🟡
+## P8 — Rendimiento y escalabilidad 🟡
 
-**P8 es el único bloque nuevo autorizado después del cierre de P7.**
+### P8.0 — Baseline y metodología ✅
 
-Objetivos:
-1. establecer baseline medible de rendimiento;
-2. identificar endpoints/queries críticas;
-3. detectar N+1 y payloads excesivos;
-4. revisar índices y planes de ejecución MySQL;
-5. asegurar paginación y límites razonables;
-6. medir uploads/reportes y operaciones pesadas;
-7. definir pruebas de carga representativas del piloto;
-8. fijar presupuestos de rendimiento frontend/backend;
-9. verificar que optimizaciones no rompan permisos, seguridad ni consistencia;
-10. documentar resultados y criterios de salida antes de P9.
+Implementado en `performance/p8-baseline` / PR #24.
 
-### Orden sugerido P8
+Base reproducible:
+- 6000 activos sintéticos;
+- 300 insumos sintéticos;
+- métricas API p50/p95/p99, errores y payload;
+- métricas de bundle frontend raw/gzip;
+- presupuestos objetivo + techo duro versionados;
+- artifacts `performance-backend-baseline` y `performance-frontend-baseline` en CI;
+- `test:performance-contracts` protege la metodología.
 
-- **P8.0 Baseline y metodología**
-- **P8.1 Perfilado backend/MySQL**
-- **P8.2 Índices, queries y paginación**
-- **P8.3 Payloads, uploads y reportes**
-- **P8.4 Rendimiento frontend**
-- **P8.5 Pruebas de carga**
-- **P8.6 Optimización + regresión**
-- **P8.7 Cierre documental y criterios de piloto**
+Baseline inicial — Gate #172:
+- 0 errores HTTP en todos los escenarios medidos;
+- `activos_admin`: p95 224,09 ms y payload 3331,35 KB;
+- `activos_responsable`: p95 13,11 ms y payload 123,34 KB;
+- bundle frontend: 266,50 KB JS gzip, 16,41 KB CSS gzip, 500,91 KB gzip total.
+
+Hallazgo prioritario:
+- el listado global de activos entrega ~3,33 MB por request a escala piloto;
+- queda marcado como `target=warn` por payload y es prioridad de P8.1/P8.2;
+- P8.0 no cambia contratos ni aplica optimizaciones.
+
+Detalle: `docs/PERFORMANCE.md`.
+
+### BLOQUE ACTIVO — P8.1 Perfilado backend/MySQL 🟡
+
+Objetivos autorizados:
+1. instrumentar cantidad/duración de queries en escenarios P8.0;
+2. identificar rutas y consultas dominantes;
+3. detectar N+1;
+4. capturar `EXPLAIN`/planes para consultas críticas;
+5. revisar cardinalidad/selectividad de filtros y joins;
+6. priorizar cambios para P8.2 sin introducir índices prematuramente;
+7. mantener seguridad, permisos, aislamiento por oficina y consistencia.
+
+No aplicar todavía paginación, nuevos índices o cambios de contrato API sin la evidencia de P8.1.
+
+### Continuidad P8
+
+- **P8.0 Baseline y metodología ✅**
+- **P8.1 Perfilado backend/MySQL 🟡 ACTIVO**
+- **P8.2 Índices, queries y paginación ⏳**
+- **P8.3 Payloads, uploads y reportes ⏳**
+- **P8.4 Rendimiento frontend ⏳**
+- **P8.5 Pruebas de carga ⏳**
+- **P8.6 Optimización + regresión ⏳**
+- **P8.7 Cierre documental y criterios de piloto ⏳**
 
 No iniciar P9 hasta completar P8 y su Quality Gate final.
 
@@ -277,7 +304,8 @@ No abrir como frentes paralelos salvo que bloqueen P8/P9:
 - staging general: `docs/STAGING.md`;
 - Railway staging: `docs/RAILWAY_STAGING.md`;
 - cierre P7: `docs/P7_CLOSURE.md`;
-- evidencia ejecutable: commits, PRs y Quality Gates.
+- rendimiento/escalabilidad: `docs/PERFORMANCE.md`;
+- evidencia ejecutable: commits, PRs, Quality Gates y artifacts.
 
 ## Reglas de trabajo
 
