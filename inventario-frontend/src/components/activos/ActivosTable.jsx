@@ -1,11 +1,155 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Badge, Button, EmptyState, TableFrame } from "../ui";
 import AdjuntosPanel from "../AdjuntosPanel";
-const tone=e=>e==="Excelente estado"?"success":e==="Buen estado"?"info":e==="Regular estado"?"warning":e==="Dado de baja"?"neutral":"danger";
-export default function ActivosTable({activos,loading,usuario,direccion,gestiona,detailId,onEdit,onBaja}){
- const [adjunto,setAdjunto]=useState(null);
- if(loading) return <p aria-live="polite">Cargando activos...</p>;
- if(!activos.length) return <EmptyState title="No hay activos para mostrar" description="Probá cambiar los filtros o la búsqueda."/>;
- return <TableFrame label="Listado de activos"><table className="ui-table assets-table"><caption className="sr-only">Listado de activos</caption><thead><tr><th>Código</th><th>Activo</th><th>Estado</th><th>Oficina</th><th>Categoría</th><th>Acciones</th></tr></thead><tbody>{activos.map(a=>{const own=String(a.oficina_id)===String(usuario.oficina_id),canSee=direccion||own,canEdit=gestiona&&canSee&&a.activo!==false&&a.estado!=="Dado de baja";return <FragmentRow key={a.id} a={a} canSee={canSee} canEdit={canEdit} direccion={direccion} detailId={detailId} adjunto={adjunto} setAdjunto={setAdjunto} onEdit={onEdit} onBaja={onBaja}/>;})}</tbody></table></TableFrame>;
+
+const estadoTone = (estado) => {
+  if (estado === "Excelente estado") return "success";
+  if (estado === "Buen estado") return "info";
+  if (estado === "Regular estado") return "warning";
+  if (estado === "Dado de baja") return "neutral";
+  return "danger";
+};
+
+const formatearNumero = (valor) =>
+  new Intl.NumberFormat("es-AR").format(Number(valor) || 0);
+
+export default function ActivosTable({
+  activos,
+  loading,
+  usuario,
+  direccion,
+  gestiona,
+  detailId,
+  onEdit,
+  onBaja,
+}) {
+  const [adjuntoAbierto, setAdjuntoAbierto] = useState(null);
+
+  if (loading) {
+    return <p aria-live="polite">Cargando activos...</p>;
+  }
+
+  if (!activos.length) {
+    return (
+      <EmptyState
+        title="No hay activos para mostrar"
+        description="Probá cambiar los filtros o la búsqueda."
+      />
+    );
+  }
+
+  return (
+    <TableFrame label="Listado de activos">
+      <table className="ui-table assets-table">
+        <caption className="sr-only">Listado de activos patrimoniales</caption>
+        <thead>
+          <tr>
+            <th scope="col">Activo</th>
+            <th scope="col">Categoría</th>
+            <th scope="col">Oficina</th>
+            <th scope="col">Marca / modelo</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Cantidad</th>
+            <th scope="col">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {activos.map((activo) => {
+            const perteneceAMiOficina =
+              String(activo.oficina_id) === String(usuario.oficina_id);
+            const puedeVer = direccion || perteneceAMiOficina;
+            const estaDeBaja =
+              activo.activo === false || activo.estado === "Dado de baja";
+            const puedeEditar = gestiona && puedeVer && !estaDeBaja;
+            const adjuntosAbiertos = adjuntoAbierto === activo.id;
+
+            return (
+              <Fragment key={activo.id}>
+                <tr className={estaDeBaja ? "assets-row--inactive" : ""}>
+                  <td>
+                    <div className="assets-primary-cell">
+                      <span className="assets-primary-name">{activo.nombre}</span>
+                      <span className="assets-primary-code">
+                        {activo.codigo_interno || `ID #${activo.id}`}
+                        {activo.numero_serie ? ` · Serie ${activo.numero_serie}` : ""}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="assets-muted">
+                    {activo.Categoria?.nombre || activo.Categorium?.nombre || "-"}
+                  </td>
+                  <td className="assets-muted">{activo.Oficina?.nombre || "-"}</td>
+                  <td className="assets-muted">
+                    {[activo.marca, activo.modelo].filter(Boolean).join(" · ") || "-"}
+                  </td>
+                  <td>
+                    <Badge tone={estadoTone(activo.estado)}>
+                      {activo.estado || "Sin estado"}
+                    </Badge>
+                  </td>
+                  <td className="assets-muted">{formatearNumero(activo.cantidad)}</td>
+                  <td>
+                    <div className="assets-row-actions">
+                      {puedeEditar && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={detailId === activo.id}
+                          busy={detailId === activo.id}
+                          onClick={() => onEdit(activo)}
+                          aria-label={`Editar ${activo.nombre}`}
+                        >
+                          Editar
+                        </Button>
+                      )}
+                      {puedeVer && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setAdjuntoAbierto(adjuntosAbiertos ? null : activo.id)
+                          }
+                          aria-expanded={adjuntosAbiertos}
+                          aria-controls={`adjuntos-activo-${activo.id}`}
+                        >
+                          {adjuntosAbiertos ? "Ocultar adjuntos" : "Adjuntos"}
+                        </Button>
+                      )}
+                      {direccion && !estaDeBaja && (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => onBaja(activo)}
+                          aria-label={`Dar de baja ${activo.nombre}`}
+                        >
+                          Dar de baja
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+                {adjuntosAbiertos && puedeVer && (
+                  <tr>
+                    <td colSpan="7" className="assets-inline-detail">
+                      <div
+                        className="assets-detail-shell"
+                        id={`adjuntos-activo-${activo.id}`}
+                      >
+                        <div className="assets-detail-header">
+                          <p className="assets-detail-title">
+                            Adjuntos · {activo.nombre}
+                          </p>
+                        </div>
+                        <AdjuntosPanel activoId={activo.id} />
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </TableFrame>
+  );
 }
-function FragmentRow({a,canSee,canEdit,direccion,detailId,adjunto,setAdjunto,onEdit,onBaja}){return <><tr><td>{a.codigo_interno||"—"}</td><td><strong>{a.nombre}</strong><div className="ops-muted">{[a.marca,a.modelo].filter(Boolean).join(" · ")||"Sin marca/modelo"}</div></td><td><Badge tone={tone(a.estado)}>{a.estado}</Badge></td><td>{a.Oficina?.nombre||"—"}</td><td>{a.Categorium?.nombre||a.Categoria?.nombre||"—"}</td><td><div className="assets-row-actions">{canEdit&&<Button size="sm" variant="secondary" disabled={detailId===a.id} busy={detailId===a.id} onClick={()=>onEdit(a)}>Editar</Button>}{canSee&&<Button size="sm" variant="ghost" onClick={()=>setAdjunto(adjunto===a.id?null:a.id)}>Adjuntos</Button>}{direccion&&a.activo!==false&&a.estado!=="Dado de baja"&&<Button size="sm" variant="danger" onClick={()=>onBaja(a)}>Dar de baja</Button>}</div></td></tr>{adjunto===a.id&&<tr><td colSpan="6"><AdjuntosPanel activoId={a.id}/></td></tr>}</>}
