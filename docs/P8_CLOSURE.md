@@ -2,7 +2,7 @@
 
 ## Estado
 
-**P8.7 cerrado documental y técnicamente el 13/09/2026.**
+**P8.7 en progreso.**
 
 **Estado de entrada a P9/piloto: NO-GO operativo temporal.**
 
@@ -10,7 +10,7 @@ P8.0–P8.6 están integrados en `main@cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044`
 
 El NO-GO no se debe a un defecto de código ni a una regresión de rendimiento. Se debe a que, con las herramientas disponibles en esta sesión, no fue posible ejecutar dentro del contenedor los comandos operativos del runbook que deben preceder/acompañar la promoción (`deploy:preflight`, `db:status`, backup+verify y smoke externo). Además, el deployment ya había sido aplicado antes de crear un nuevo backup pre-deploy; esta desviación queda registrada y no se reescribe como si hubiera ocurrido de otra manera.
 
-P9 no debe iniciarse hasta completar manualmente el checklist operativo final de este documento.
+P8.7 y P9 no deben cerrarse/iniciarse, respectivamente, hasta completar manualmente el checklist operativo final de este documento.
 
 ---
 
@@ -174,11 +174,11 @@ En esta promoción P8.7:
 - no hubo migraciones P8 nuevas aplicadas por esta promoción;
 - Railway sí validó startup, conexión a MySQL y healthcheck `/ready=200`.
 
-Esta desviación **no debe ocultarse**. El siguiente paso operativo antes de P9 es ejecutar manualmente el checklist de abajo mediante Railway CLI/SSH autenticado u otro mecanismo institucional aprobado.
+Esta desviación **no debe ocultarse**. El siguiente paso operativo antes de cerrar P8.7 y habilitar P9 es ejecutar manualmente el checklist de abajo mediante Railway CLI/SSH autenticado u otro mecanismo institucional aprobado.
 
 ---
 
-## Gate obligatorio antes de P9
+## Gate obligatorio antes de cerrar P8.7 / iniciar P9
 
 Ejecutar sobre staging y conservar evidencia sin secretos:
 
@@ -211,7 +211,7 @@ con los origins de staging ya configurados.
 - smoke externo verde;
 - login/MFA y permisos básicos verificados si el smoke no los cubre.
 
-Hasta entonces: **NO-GO para P9**.
+Hasta entonces: **P8.7 activo / NO-GO para P9**.
 
 ---
 
@@ -330,18 +330,16 @@ Estos valores son baseline ocioso, no capacidad máxima ni SLA.
 
 ---
 
-## Criterio de cierre P8.7
+## Criterio de cierre pendiente P8.7
 
-P8.7 se considera cerrado porque:
+Para cerrar P8.7 faltan exclusivamente los checks operativos manuales del gate pre-piloto:
 
-- P8.0–P8.6 fueron consolidados;
-- Quality Gate final de código está verde;
-- staging fue promovido a `main@cb7b9fc...`;
-- deployments backend/frontend quedaron `SUCCESS`;
-- Railway confirmó `environment=staging`, revisión esperada, conexión MySQL y `/ready=200`;
-- persistencia de volúmenes se mantuvo;
-- criterios GO/NO-GO, observabilidad y reglas de escalamiento quedaron documentados;
-- la desviación de backup/preflight/smoke queda registrada;
-- P9 permanece bloqueado hasta completar el gate operativo manual pre-piloto.
+- `deploy:preflight`;
+- `db:status`;
+- backup `pre-pilot.sql` + SHA-256 verde;
+- smoke externo;
+- registro del resultado en este documento y `ROADMAP.md`;
+- Quality Gate del commit documental final;
+- PR, merge y Quality Gate post-merge.
 
-**P8 queda técnicamente cerrado. P9 NO está autorizado todavía.**
+Hasta completar eso, **P8.7 continúa activo y P9 permanece bloqueado**.
