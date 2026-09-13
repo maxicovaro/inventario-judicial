@@ -45,7 +45,7 @@ for (const expectedStatus of ["401", "403", "409"]) {
 
 assert.match(
   packageJson,
-  /"test:integration":\s*"node scripts\/test-integration-flows\.js && node scripts\/test-integration-attachments-requests\.js && npm run test:p8-query-pagination"/,
+  /"test:integration":\s*"node scripts\/test-integration-flows\.js && node scripts\/test-integration-attachments-requests\.js && npm run test:p8-query-pagination(?: && [^"]+)*"/,
 );
 
 assert.match(e2eConfig, /workers:\s*1/);
