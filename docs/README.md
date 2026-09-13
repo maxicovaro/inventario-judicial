@@ -102,7 +102,23 @@ Contiene:
 - baseline de bundle frontend;
 - presupuestos objetivo y techos duros;
 - artifacts de Quality Gate;
-- hallazgos priorizados y continuidad hacia P8.1/P8.2.
+- perfilado, paginación, payloads, frontend, carga y continuidad P8.
+
+### 8. Cierre P8 y gate de piloto
+
+`P8_CLOSURE.md`
+
+Contiene:
+- consolidación de P8.0–P8.6;
+- evidencia de Railway staging y revisión desplegada;
+- gate operativo P8.7 (`preflight`, estado de migraciones, backup verificado y smoke externo);
+- desviación operativa registrada del orden de backup/deployment;
+- criterios GO de piloto;
+- umbrales SEV-1/SEV-2;
+- observabilidad mínima y límites conocidos;
+- condición exacta para habilitar P9.
+
+Complemento específico de P8.6: `P8_6_CLOSURE.md`.
 
 ## Evidencia técnica
 
@@ -125,8 +141,8 @@ Para retomar el proyecto después de una pausa:
 4. Consultar `OPERATIONS.md` si hay base de datos, despliegue o incidente involucrado.
 5. Para P7/staging, consultar `STAGING.md`.
 6. Si el proveedor activo es Railway, leer también `RAILWAY_STAGING.md`.
-7. Para P8, leer `PERFORMANCE.md` y revisar el último artifact de baseline.
-8. Verificar último Quality Gate antes de modificar/integrar.
+7. Para P8, leer `PERFORMANCE.md`, `P8_6_CLOSURE.md` y `P8_CLOSURE.md`.
+8. Verificar el último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
 
