@@ -337,9 +337,35 @@ P9.1 puede considerarse cerrado cuando:
 - existe plantilla de incidente versionada;
 - existe prueba de contrato P9.1 incluida en `npm test` / Quality Gate;
 - `docs/README.md` indexa la documentación;
-- `ROADMAP.md` refleja P9.1 cerrado y P9.2 como siguiente bloque;
-- Quality Gate del PR queda verde;
+- `ROADMAP.md` refleja el cierre técnico y mantiene P9.2 bloqueado hasta post-merge;
+- Quality Gate del HEAD final del PR queda verde;
 - PR se integra a `main`;
 - Quality Gate post-merge queda verde.
 
 No iniciar P9.2 antes de cumplir esos criterios.
+
+---
+
+## 12. Evidencia de implementación y cierre técnico
+
+Implementación realizada en rama `ops/p9-pilot-incident-response` y PR #32.
+
+Evidencia previa a la sincronización documental final:
+- Quality Gate #226: verde completo;
+- HEAD validado: `b832b0756fad0f6efdb3a2ec218c5f319e2825f3`;
+- contrato `test:p9-incident-response-contracts`: incluido en `npm test` y aprobado;
+- MySQL integration: verde;
+- auth hardening y MFA: verdes;
+- P6 concurrencia/idempotencia: verde;
+- health y backup/restore: verdes;
+- P8.0/P8.1/P8.5/P8.6: verdes;
+- Chromium E2E: verde.
+
+La actualización final de `ROADMAP.md` y de este documento cambia el HEAD de la rama. Por lo tanto, #226 es evidencia intermedia y **no habilita por sí sola el merge**. El HEAD final debe ejecutar nuevamente el Quality Gate completo.
+
+Cierre formal pendiente únicamente de:
+1. Quality Gate verde sobre el HEAD final;
+2. revisión final del diff;
+3. merge de PR #32 a `main`;
+4. Quality Gate post-merge verde;
+5. relectura de `ROADMAP.md` desde `main` antes de P9.2.
