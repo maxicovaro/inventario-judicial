@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 13/09/2026 después del cierre técnico de **P8.2 — Índices, queries y paginación**. El bloque activo pasa a ser **P8.3 — Payloads, uploads y reportes**.
+> Actualizada al 13/09/2026 después del cierre técnico de **P8.3 — Payloads, uploads y reportes**. El bloque activo pasa a ser **P8.4 — Rendimiento frontend**.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -24,8 +24,9 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | P8.0 Baseline y metodología | ✅ Completo | PR #24; Gate #172/#174 |
 | P8.1 Perfilado backend/MySQL | ✅ Completo | PR #25; perfil inicial Gate #175 |
 | P8.2 Índices, queries y paginación | ✅ Completo | PR #26; Gate de implementación #184 |
-| **P8.3 Payloads, uploads y reportes** | 🟡 **Activo** | Siguiente bloque autorizado |
-| P8.4–P8.7 | ⏳ Pendiente | Después de P8.3 |
+| P8.3 Payloads, uploads y reportes | ✅ Completo | PR #27; Gate de implementación #201 |
+| **P8.4 Rendimiento frontend** | 🟡 **Activo** | Siguiente bloque autorizado |
+| P8.5–P8.7 | ⏳ Pendiente | Después de P8.4 |
 | P9 Piloto | ⏳ Pendiente | Después de P8 completo |
 
 ---
@@ -332,25 +333,55 @@ Compatibilidad transitoria:
 
 Detalle completo: `docs/PERFORMANCE.md`.
 
-### BLOQUE ACTIVO — P8.3 Payloads, uploads y reportes 🟡
+### P8.3 — Payloads, uploads y reportes ✅
+
+Implementado en `performance/p8-payloads-uploads-reports` / PR #27.
+
+Cambios principales:
+- `GET /api/activos/catalogo` con proyección mínima y búsqueda server-side;
+- Solicitudes deja de consumir el listado global de activos y acota el catálogo por oficina;
+- Adjuntos usa búsqueda server-side con debounce y máximo 50 coincidencias;
+- `ruta_archivo` deja de exponerse en payloads de listado/subida de adjuntos;
+- límites MIME/tamaño, compresión y autorización de uploads se preservan;
+- reporte general de pedidos comparte preparación de datos JSON/PDF y paraleliza agregaciones independientes;
+- PDF continúa transmitiéndose por stream;
+- reporte mensual por oficina reduce columnas y paraleliza lecturas independientes;
+- catálogo ligero se incorpora al baseline oficial con presupuestos propios;
+- pruebas estáticas + MySQL real protegen payloads, permisos y reportes.
+
+Evidencia — Gate #201:
+- `activos_catalogo_admin`: **8,89 ms p95**, **4,71 KB**, 0 errores;
+- `activos_catalogo_responsable`: **5,73 ms p95**, **4,73 KB**, 0 errores;
+- `insumos_admin`: 13,97 ms p95, 111,53 KB, 0 errores; sin evidencia para cambiar contrato en P8.3;
+- presupuesto de catálogo: p95 150/1000 ms objetivo/techo; payload 25/100 KB objetivo/techo;
+- auth/MFA, P6, backup/restore, baseline, profiler y **10/10 Chromium E2E** verdes.
+
+Decisiones:
+- no se relajan límites ni tipos de upload para obtener rendimiento aparente;
+- no se agregan paginaciones a Insumos/Pedidos/Solicitudes sin evidencia;
+- el crecimiento concurrente/cardinalidad transaccional se medirá en P8.5 antes de cambiar contratos.
+
+Detalle completo: `docs/PERFORMANCE.md`.
+
+### BLOQUE ACTIVO — P8.4 Rendimiento frontend 🟡
 
 Objetivos autorizados:
-1. eliminar la dependencia de Solicitudes/Adjuntos del listado legacy completo de `/api/activos` mediante catálogo ligero o búsqueda server-side;
-2. revisar payloads de reportes, pedidos, solicitudes, adjuntos e insumos con tamaños representativos;
-3. evitar transferir columnas o relaciones que la pantalla/reporte no utiliza;
-4. revisar estrategia de uploads, límites, compresión, lectura/descarga y persistencia sin debilitar controles de tipo/tamaño/autorización;
-5. revisar generación/exportación de PDF/Excel para evitar materialización innecesaria o respuestas excesivas;
-6. mantener contratos API compatibles o versionar claramente cualquier transición necesaria;
-7. ampliar baseline/perfilado cuando un flujo P8.3 requiera medición propia;
-8. mantener seguridad, MFA, permisos, P6, backup/restore y E2E completamente verdes.
+1. releer el baseline frontend vigente y medir el costo real del bundle/rutas antes de optimizar;
+2. identificar dependencias, módulos o pantallas que justifiquen separación de código o carga diferida;
+3. revisar renders/re-renders y trabajo innecesario del navegador en recorridos críticos con evidencia reproducible;
+4. evaluar lazy loading/code splitting por rutas o componentes pesados sin degradar navegación, permisos ni estados de carga/error;
+5. revisar imágenes, fuentes y assets estáticos por peso y estrategia de carga;
+6. mantener accesibilidad, UX y comportamiento responsive ya validados;
+7. ampliar scripts/presupuestos del baseline frontend cuando la métrica sea estable y accionable;
+8. mantener `npm test`, MySQL, auth/MFA, P6, backup/restore y Chromium E2E completamente verdes.
 
 ### Continuidad P8
 
 - **P8.0 Baseline y metodología ✅**
 - **P8.1 Perfilado backend/MySQL ✅**
 - **P8.2 Índices, queries y paginación ✅**
-- **P8.3 Payloads, uploads y reportes 🟡 ACTIVO**
-- **P8.4 Rendimiento frontend ⏳**
+- **P8.3 Payloads, uploads y reportes ✅**
+- **P8.4 Rendimiento frontend 🟡 ACTIVO**
 - **P8.5 Pruebas de carga ⏳**
 - **P8.6 Optimización + regresión ⏳**
 - **P8.7 Cierre documental y criterios de piloto ⏳**
