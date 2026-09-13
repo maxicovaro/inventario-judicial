@@ -152,6 +152,161 @@ Los milisegundos del runner compartido **no son un SLA de producción**. Sirven 
 - hallazgo prioritario identificado ✅;
 - siguiente bloque: **P8.1 — Perfilado backend/MySQL**.
 
+---
+
+## P8.1 — Perfilado backend/MySQL ✅
+
+P8.1 agrega perfilado reproducible sobre los mismos escenarios de P8.0 sin modificar todavía consultas, índices, paginación ni contratos API.
+
+### Metodología
+
+`scripts/performance-profile.js` ejecuta la aplicación dentro del proceso de test y activa temporalmente `sequelize.options.benchmark` solo durante el perfilado. `src/config/database.js` continúa con `logging: false`; staging y producción no reciben SQL logging adicional.
+
+Por cada escenario se capturan:
+
+- cantidad de queries por request;
+- duración de cada query según benchmark de Sequelize;
+- firma de SQL normalizado;
+- tablas involucradas;
+- repeticiones de la misma firma dentro del request;
+- `EXPLAIN` de las consultas `SELECT` dominantes;
+- índices visibles en `information_schema`;
+- estimación de filas y flags como full scan, filesort o temporary table.
+
+Los literales se reemplazan por `?` antes de persistir evidencia. El artifact **no guarda SQL crudo ni credenciales**. El resultado vive en `performance-results/backend-profile.json` y CI lo publica como `performance-backend-profile`.
+
+El profiler usa 1 warmup y 3 muestras por escenario. La suma `sql_total_ms` es informativa: puede superar el tiempo HTTP cuando el endpoint ejecuta queries concurrentes con `Promise.all`.
+
+### Evidencia inicial — Quality Gate #175
+
+Dataset: 6000 activos + 300 insumos. Resultado: 0 errores en todos los escenarios y Quality Gate completo verde, incluido Chromium.
+
+| Escenario | Queries/request | HTTP promedio | Observación principal |
+| --- | ---: | ---: | --- |
+| `login_admin` | 7 | 15,09 ms | transacción + usuario + rol + oficina + sesión + bitácora |
+| `auth_me_admin` | 2 | 5,71 ms | validación de sesión + usuario/rol/oficina |
+| `activos_admin` | 3 | **219,89 ms** | 2 auth + 1 query global de activos |
+| `activos_responsable` | 3 | 12,75 ms | 2 auth + 1 query filtrada por oficina |
+| `dashboard_admin` | **16** | 10,34 ms | múltiples agregaciones en paralelo; una firma repetida 3 veces |
+| `insumos_admin` | 3 | 10,92 ms | 2 auth + 1 listado de insumos |
+
+`health_ready` no aparece con SQL capturado porque la comprobación de health utiliza logging deshabilitado explícitamente; el tiempo HTTP sigue cubierto por P8.0.
+
+### Hallazgo 1 — Activos Dirección no tiene N+1
+
+`GET /api/activos` para Dirección ejecutó exactamente **3 queries por request**:
+
+1. sesión válida en `auth_sessions`;
+2. usuario + rol + oficina;
+3. una única consulta de activos con JOIN a categoría y oficina.
+
+No se observó N+1. La consulta funcional de activos promedió ~35 ms de SQL y fue la dominante; `EXPLAIN` mostró:
+
+- `activos`: acceso `index` usando `PRIMARY`;
+- recorrido inverso por `ORDER BY id DESC`;
+- ~5686 filas estimadas;
+- `categorias` y `oficinas`: `eq_ref` por `PRIMARY`.
+
+Por lo tanto, la diferencia entre ~35 ms SQL y ~220 ms HTTP, junto con el payload de 3,33 MB medido en P8.0, indica que el problema principal es **traer/materializar/serializar 6000 registros completos**, no un JOIN N+1 ni la ausencia evidente de un índice para el orden actual.
+
+Prioridad P8.2:
+- paginación server-side;
+- proyección de columnas para listados;
+- filtros/búsqueda server-side compatibles con paginación;
+- conservar aislamiento por oficina y permisos.
+
+### Hallazgo 2 — Activos por oficina usa índice existente
+
+Para RESPONSABLE, `EXPLAIN` mostró:
+
+- `activos`: acceso `ref` usando índice `oficina_id`;
+- ~223 filas estimadas para una oficina;
+- `Using where; Backward index scan`;
+- JOINs de categoría/oficina por clave primaria.
+
+El SQL funcional rondó ~2 ms y el HTTP ~13 ms. No hay evidencia para reemplazar ese índice en P8.1.
+
+### Hallazgo 3 — El costo de autorización es estable y bajo
+
+Todos los endpoints protegidos medidos ejecutan dos consultas de seguridad:
+
+- `auth_sessions` por `jti`/usuario/sesión vigente;
+- usuario con JOIN a rol y oficina.
+
+`EXPLAIN` mostró acceso `const`/índices existentes; cada consulta quedó aproximadamente entre 0,3 y 1 ms en esta muestra. Estas queries son parte deliberada de la seguridad y **no deben eliminarse para ganar rendimiento**.
+
+Sí queda para P8.2 una mejora segura de proyección: el middleware carga actualmente columnas del usuario que no necesita para autorizar (por ejemplo password/secretos MFA). Reducir atributos puede disminuir transferencia DB→Node y aplicar principio de minimización sin cambiar el modelo de seguridad.
+
+### Hallazgo 4 — Dashboard: repetición real, no N+1 de relaciones
+
+`dashboard_admin` ejecutó **16 queries por request**. La única firma repetida detectada fue:
+
+```sql
+SELECT count(*) FROM pedidos_insumos WHERE estado = ?
+```
+
+Se ejecuta **3 veces por request** para ENVIADO, EN_REVISION y ENTREGADO. El mismo endpoint además ejecuta otra consulta agrupada por `estado` para `pedidos_por_estado`.
+
+Esto no es un N+1 de ORM, pero sí una **agregación redundante/consolidable**. P8.2 debe estudiar reemplazar los tres `COUNT` por el resultado agrupado ya disponible, manteniendo exactamente el contrato de respuesta.
+
+### Hallazgo 5 — Full scans detectados y prioridad real
+
+`EXPLAIN` marcó full scans en varias agregaciones del dashboard:
+
+- `COUNT(activos) WHERE activo=true`: ~5686 filas estimadas;
+- counts de `insumos`: 300 filas;
+- stock bajo de insumos: 300 filas;
+- solicitudes/pedidos por estado: tablas prácticamente vacías en el dataset P8.0;
+- detalle de stock bajo: full scan + filesort sobre 300 insumos;
+- agrupación de movimientos de stock: temporary table sobre una tabla vacía en esta muestra.
+
+No todos los full scans justifican un índice. En particular:
+
+- `activo=true` tiene baja selectividad en el dataset (casi todos los activos están activos), por lo que un índice simple sobre `activo` no se debe agregar por reflejo;
+- 300 insumos siguen siendo una cardinalidad pequeña;
+- pedidos, solicitudes y movimientos no tienen volumen representativo en el fixture actual, por lo que no se deben crear índices basándose solo en estos planes.
+
+P8.2 deberá evaluar índices únicamente cuando exista una consulta concreta, selectividad útil y mejora demostrable con `EXPLAIN`/baseline antes-después.
+
+### Cardinalidad e `information_schema`
+
+El snapshot de `information_schema.STATISTICS.CARDINALITY` devolvió 0 en varias tablas recién cargadas masivamente, mientras `EXPLAIN` sí estimó ~5686 filas para `activos`. Esto evidencia que esa cardinalidad de `information_schema` puede estar desactualizada inmediatamente después de los fixtures.
+
+Consecuencia: P8.1 **no usa ese campo como base única para decidir índices**. Las decisiones se apoyan en plan de ejecución, filas estimadas, distribución conocida del dataset y medición antes/después. Si P8.2 necesita selectividad exacta, debe medir `COUNT(DISTINCT ...)` o actualizar estadísticas de forma controlada en la base descartable antes de concluir.
+
+### Prioridades autorizadas para P8.2
+
+1. **Activos Dirección:** paginación + proyección de columnas + filtros server-side; es la mayor ganancia esperable.
+2. **Dashboard:** eliminar los tres counts redundantes por estado reutilizando/agregando una sola consulta agrupada.
+3. **Auth middleware:** limitar atributos del usuario sin alterar validación de sesión/MFA/rol/oficina.
+4. **Índices:** evaluar con evidencia; no crear índice simple `activo` ni índices de tablas vacías por intuición.
+5. Mantener tests negativos de permisos, E2E, P6, MFA y baseline P8.0 en cada cambio.
+
+### Criterios de salida P8.1
+
+- profiler reproducible y sanitizado ✅;
+- cantidad/duración de queries por escenario ✅;
+- consultas dominantes identificadas ✅;
+- candidatos repetidos/N+1 clasificados ✅;
+- `EXPLAIN` capturado ✅;
+- índices/planes revisados ✅;
+- hallazgos documentados ✅;
+- Quality Gate #175 completo verde ✅;
+- siguiente bloque: **P8.2 — Índices, queries y paginación**.
+
+## Ejecución local P8.1
+
+```bash
+npm run perf:fixtures
+npm run perf:profile
+```
+
+Resultado:
+
+```text
+performance-results/backend-profile.json
+```
+
 ## Continuidad
 
-P8.1 utilizará este baseline para instrumentar y estudiar consultas, cantidad de queries, N+1, `EXPLAIN` y rutas críticas. P8.2 abordará índices, paginación y contratos de listado con evidencia de P8.1.
+P8.2 debe optimizar únicamente los hallazgos anteriores y volver a ejecutar P8.0 + P8.1 para comparar antes/después. No se considera mejora si reduce tiempos pero rompe permisos, MFA, consistencia, E2E o aumenta payloads.
