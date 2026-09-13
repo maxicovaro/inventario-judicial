@@ -135,9 +135,26 @@ Contiene:
 - evidencia mínima y plantilla de incidente;
 - MTTA/MTTR, RPO/RTO y métricas de soporte;
 - tabletop exercise previo a ampliar el piloto;
-- criterios de cierre de P9.1 y bloqueo de P9.2 hasta completar Gate/merge/post-merge.
+- criterios de cierre de P9.1.
 
 Plantilla operativa: `../.github/ISSUE_TEMPLATE/incident.md`.
+
+### 10. P9.2 — Alta controlada de oficinas y usuarios
+
+`P9_2_CONTROLLED_ONBOARDING.md`
+
+Contiene:
+- selección y aprobación explícita de la primera ola;
+- manifiesto privado excluido de Git;
+- preflight y verificación read-only;
+- prohibición de crear `ADMIN` desde el manifiesto;
+- control de MFA de administradores en staging;
+- alta real únicamente desde Gestión de Usuarios;
+- validación funcional por rol/oficina;
+- rollback mediante desactivación y conservación de bitácora;
+- evidencia y criterios de cierre de P9.2.
+
+Ejemplo sintético: `../pilot/wave.example.json`.
 
 ## Evidencia técnica
 
@@ -162,7 +179,8 @@ Para retomar el proyecto después de una pausa:
 6. Si el proveedor activo es Railway, leer también `RAILWAY_STAGING.md`.
 7. Para P8, leer `PERFORMANCE.md`, `P8_6_CLOSURE.md` y `P8_CLOSURE.md`.
 8. Para P9.1/incidentes, leer `P9_1_INCIDENT_RESPONSE.md` y la plantilla versionada.
-9. Verificar el último Quality Gate antes de modificar/integrar.
+9. Para P9.2/onboarding, leer `P9_2_CONTROLLED_ONBOARDING.md` y usar un manifiesto privado derivado del ejemplo.
+10. Verificar el último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
 
