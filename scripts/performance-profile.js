@@ -29,9 +29,7 @@ let activeSample = null;
 let baseUrl = "";
 
 const assertPositiveInt = (name, value) => {
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(`${name} debe ser un entero positivo`);
-  }
+  if (!Number.isInteger(value) || value <= 0) throw new Error(`${name} debe ser un entero positivo`);
 };
 
 assertPositiveInt("PERF_PROFILE_SAMPLES", SAMPLES);
@@ -44,7 +42,6 @@ const queryLogger = (sql, timing) => {
   if (!activeSample) return;
   const rawSql = stripSequelizePrefix(sql);
   if (!rawSql) return;
-
   const normalized = normalizeSql(rawSql);
   activeSample.queries.push({
     raw_sql: rawSql,
@@ -83,9 +80,7 @@ const loginToken = async (email) => {
     route: "/api/auth/login",
     body: { email, password: TEST_PASSWORD },
   });
-  if (!response.ok) {
-    throw new Error(`Login de perfilado falló (${email}): HTTP ${response.status}`);
-  }
+  if (!response.ok) throw new Error(`Login de perfilado falló (${email}): HTTP ${response.status}`);
   const parsed = JSON.parse(response.text);
   if (!parsed.token) throw new Error(`Login de perfilado sin token (${email})`);
   return parsed.token;
@@ -96,7 +91,6 @@ const profileCase = async ({ name, makeRequest }) => {
     const warmup = await makeRequest();
     if (!warmup.ok) throw new Error(`Warmup ${name} falló: HTTP ${warmup.status}`);
   }
-
   const samples = [];
   for (let index = 0; index < SAMPLES; index += 1) {
     const sample = { index: index + 1, queries: [] };
@@ -112,7 +106,6 @@ const profileCase = async ({ name, makeRequest }) => {
     sample.bytes = response.bytes;
     samples.push(sample);
   }
-
   const aggregate = aggregateScenario(name, samples);
   const top = aggregate.queries[0];
   console.log(
@@ -146,7 +139,6 @@ const collectGlobalQueries = (scenarios) => {
       if (!item.raw_sql && query._raw_sql) item.raw_sql = query._raw_sql;
     }
   }
-
   return [...map.values()]
     .map((item) => ({
       ...item,
@@ -162,7 +154,6 @@ const explainDominantQueries = async (globalQueries) => {
     .filter((query) => query.type === "SELECT" && query.raw_sql)
     .slice(0, EXPLAIN_LIMIT);
   const explained = [];
-
   for (const query of candidates) {
     try {
       const rows = await sequelize.query(`EXPLAIN ${query.raw_sql}`, {
@@ -194,7 +185,6 @@ const explainDominantQueries = async (globalQueries) => {
       });
     }
   }
-
   return explained;
 };
 
@@ -203,7 +193,6 @@ const collectSchemaStats = async (globalQueries) => {
     .filter((table) => /^[A-Za-z0-9_]+$/.test(table))
     .sort();
   if (tables.length === 0) return { tables: [], indexes: [] };
-
   const quoted = tables.map((table) => sequelize.escape(table)).join(", ");
   const tableRows = await sequelize.query(
     `SELECT TABLE_NAME, TABLE_ROWS, DATA_LENGTH, INDEX_LENGTH
@@ -219,11 +208,7 @@ const collectSchemaStats = async (globalQueries) => {
       ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX`,
     { type: QueryTypes.SELECT, logging: false },
   );
-
-  const byTable = new Map(
-    tableRows.map((row) => [row.TABLE_NAME, Math.max(0, Number(row.TABLE_ROWS || 0))]),
-  );
-
+  const byTable = new Map(tableRows.map((row) => [row.TABLE_NAME, Math.max(0, Number(row.TABLE_ROWS || 0))]));
   return {
     tables: tableRows.map((row) => ({
       table: row.TABLE_NAME,
@@ -260,7 +245,6 @@ const closeServer = (server) =>
 
 const main = async () => {
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
-
   const [activos, insumos] = await Promise.all([Activo.count(), Insumo.count()]);
   if (activos < budgets.dataset.activos || insumos < budgets.dataset.insumos) {
     throw new Error(
@@ -276,53 +260,36 @@ const main = async () => {
     const instance = app.listen(0, "127.0.0.1", () => resolve(instance));
     instance.once("error", reject);
   });
-  const address = server.address();
-  baseUrl = `http://127.0.0.1:${address.port}`;
+  baseUrl = `http://127.0.0.1:${server.address().port}`;
 
   try {
     const adminToken = await loginToken(TEST_USERS.admin);
     const responsableToken = await loginToken(TEST_USERS.responsable1);
-
     const definitions = [
-      {
-        name: "health_ready",
-        makeRequest: () => requestOnce({ route: "/health/ready" }),
-      },
+      { name: "health_ready", makeRequest: () => requestOnce({ route: "/health/ready" }) },
       {
         name: "login_admin",
-        makeRequest: () =>
-          requestOnce({
-            method: "POST",
-            route: "/api/auth/login",
-            body: { email: TEST_USERS.admin, password: TEST_PASSWORD },
-          }),
+        makeRequest: () => requestOnce({
+          method: "POST",
+          route: "/api/auth/login",
+          body: { email: TEST_USERS.admin, password: TEST_PASSWORD },
+        }),
       },
-      {
-        name: "auth_me_admin",
-        makeRequest: () => requestOnce({ route: "/api/auth/me", token: adminToken }),
-      },
+      { name: "auth_me_admin", makeRequest: () => requestOnce({ route: "/api/auth/me", token: adminToken }) },
       {
         name: "activos_admin",
-        makeRequest: () => requestOnce({ route: "/api/activos", token: adminToken }),
+        makeRequest: () => requestOnce({ route: "/api/activos?page=1&page_size=25", token: adminToken }),
       },
       {
         name: "activos_responsable",
-        makeRequest: () => requestOnce({ route: "/api/activos", token: responsableToken }),
+        makeRequest: () => requestOnce({ route: "/api/activos?page=1&page_size=25", token: responsableToken }),
       },
-      {
-        name: "dashboard_admin",
-        makeRequest: () => requestOnce({ route: "/api/dashboard", token: adminToken }),
-      },
-      {
-        name: "insumos_admin",
-        makeRequest: () => requestOnce({ route: "/api/insumos", token: adminToken }),
-      },
+      { name: "dashboard_admin", makeRequest: () => requestOnce({ route: "/api/dashboard", token: adminToken }) },
+      { name: "insumos_admin", makeRequest: () => requestOnce({ route: "/api/insumos", token: adminToken }) },
     ];
 
     const scenariosWithRaw = [];
-    for (const definition of definitions) {
-      scenariosWithRaw.push(await profileCase(definition));
-    }
+    for (const definition of definitions) scenariosWithRaw.push(await profileCase(definition));
 
     const errors = scenariosWithRaw.filter((scenario) => scenario.errors > 0);
     if (errors.length > 0) {
@@ -333,15 +300,10 @@ const main = async () => {
     const explain = await explainDominantQueries(globalQueries);
     const schema = await collectSchemaStats(globalQueries);
     const explainedOk = explain.filter((item) => item.plan.length > 0);
-    if (explainedOk.length === 0) {
-      throw new Error("P8.1 no pudo capturar ningún plan EXPLAIN válido");
-    }
+    if (explainedOk.length === 0) throw new Error("P8.1 no pudo capturar ningún plan EXPLAIN válido");
 
     const repeatedCandidates = scenariosWithRaw.flatMap((scenario) =>
-      scenario.repeated_query_candidates.map((query) => ({
-        scenario: scenario.name,
-        ...query,
-      })),
+      scenario.repeated_query_candidates.map((query) => ({ scenario: scenario.name, ...query })),
     );
 
     const report = {
@@ -351,10 +313,7 @@ const main = async () => {
       environment: process.env.CI ? "ci" : "local",
       node: process.version,
       mysql: "8.x",
-      dataset: {
-        activos,
-        insumos,
-      },
+      dataset: { activos, insumos },
       methodology: {
         warmups: WARMUPS,
         samples: SAMPLES,
