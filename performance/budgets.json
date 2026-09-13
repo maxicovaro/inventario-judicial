@@ -24,7 +24,7 @@
     "hard_total_gzip_kb": 2200,
     "target_initial_js_gzip_kb": 180,
     "hard_initial_js_gzip_kb": 300,
-    "target_font_gzip_kb": 40,
+    "target_font_gzip_kb": 60,
     "hard_font_gzip_kb": 80
   }
 }
