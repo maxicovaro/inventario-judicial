@@ -3,11 +3,19 @@ const fs = require("fs");
 
 const packageJson = require("../package.json");
 const profiler = fs.readFileSync("scripts/performance-stock-contention.js", "utf8");
+const classifier = fs.readFileSync(
+  "scripts/performance-stock-contention-classify.js",
+  "utf8",
+);
 const stockController = fs.readFileSync("src/controllers/stockOficinaController.js", "utf8");
 const consumoController = fs.readFileSync("src/controllers/consumoOficinaController.js", "utf8");
 const workflow = fs.readFileSync(".github/workflows/quality.yml", "utf8");
 
 assert.match(packageJson.scripts["perf:stock-contention"], /performance-stock-contention/);
+assert.match(
+  packageJson.scripts["perf:stock-contention"],
+  /performance-stock-contention-classify/,
+);
 assert.match(
   packageJson.scripts["test:p8-regression-contracts"],
   /test-p8-regression-contracts/,
@@ -23,6 +31,17 @@ assert.match(profiler, /FOR UPDATE/i);
 assert.match(profiler, /invariant_ok/);
 assert.match(profiler, /stock-contention-profile\.json/);
 assert.match(profiler, /production_change_required:\s*false/);
+
+assert.match(classifier, /central_stock_lock_sql_share_pct/);
+assert.match(classifier, /central_stock_lock_avg_wait_multiplier/);
+assert.match(classifier, /http_p95_multiplier_c20_vs_c1/);
+assert.match(classifier, /sqlSharePct\s*>=\s*50/);
+assert.match(classifier, /avgWaitMultiplier\s*>=\s*5/);
+assert.match(classifier, /production_change_required:\s*false/);
+assert.match(
+  classifier,
+  /preserve_consistency_locks_and_regression_guards/,
+);
 
 assert.match(
   stockController,
