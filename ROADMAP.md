@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 13/09/2026. **P8 — Rendimiento y escalabilidad quedó formalmente cerrado** con PR #31, merge `5defc4472105f0da777d5053183f4c352ddfc8d4` y Quality Gate post-merge #225 verde. **P9.1 — Soporte e incident response del piloto** es el bloque activo. P9.2 permanece bloqueado hasta cerrar P9.1 con documentación, Quality Gate, PR, merge y Gate post-merge.
+> Actualizada al 13/09/2026. **P8 — Rendimiento y escalabilidad quedó formalmente cerrado** con PR #31, merge `5defc4472105f0da777d5053183f4c352ddfc8d4` y Quality Gate post-merge #225 verde. **P9.1 — Soporte e incident response del piloto** completó su implementación y está en integración final mediante PR #32. Quality Gate #226 quedó verde sobre el HEAD previo a esta sincronización documental; el HEAD final debe revalidarse antes del merge. P9.2 permanece bloqueado hasta merge, Gate post-merge verde y relectura de este archivo desde `main`.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -30,8 +30,8 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | P8.6 Optimización + regresión | ✅ Completo | PR #30; Gate #218; `docs/P8_6_CLOSURE.md` |
 | P8.7 Cierre documental y criterios de piloto | ✅ Completo | PR #31; merge `5defc447...`; Gate post-merge #225 |
 | **P8 Rendimiento y escalabilidad** | ✅ **Completo** | `docs/P8_CLOSURE.md`; staging y Gate final verdes |
-| **P9.1 Soporte e incident response** | 🟡 **Activo** | rama `ops/p9-pilot-incident-response`; `docs/P9_1_INCIDENT_RESPONSE.md` |
-| P9.2 Alta controlada de oficinas/usuarios | ⏳ Bloqueado | Abrir solo después del cierre formal de P9.1 |
+| **P9.1 Soporte e incident response** | 🟢 **Integración final** | PR #32; Gate #226 verde sobre HEAD previo; revalidar HEAD final |
+| P9.2 Alta controlada de oficinas/usuarios | ⏳ Bloqueado | Habilitar solo después del cierre formal post-merge de P9.1 |
 | P9.3 Procedimiento operativo de administración | ⏳ Pendiente | Después de P9.2 |
 | P9.4 Indicadores reales del piloto | ⏳ Pendiente | Después de P9.3 |
 | P9.5 Backup/restore periódico del piloto | ⏳ Pendiente | Después de P9.4 |
@@ -355,37 +355,42 @@ Detalle: `docs/P8_CLOSURE.md`.
 
 ## P9 — Operación de piloto
 
-### P9.1 — Soporte e incident response 🟡 ACTIVO
+### P9.1 — Soporte e incident response 🟢 INTEGRACIÓN FINAL
 
 Rama: `ops/p9-pilot-incident-response`.
 
-Objetivo: convertir las guardas técnicas existentes en un proceso operativo reproducible para detectar, clasificar, contener, recuperar y cerrar incidentes durante el piloto.
-
-Alcance:
+Implementación completada:
 - Incident Commander y responsabilidades operativas;
 - severidad SEV-1/SEV-2/SEV-3;
 - objetivos de reconocimiento y actualización;
 - stop conditions;
 - evidencia mínima y timeline;
 - rollback/restore seguro;
-- plantilla de incidente;
+- plantilla `.github/ISSUE_TEMPLATE/incident.md`;
 - métricas MTTA/MTTR/RPO/RTO;
 - tabletop exercise;
-- contratos ejecutables P9.1 en `npm test` / Quality Gate.
+- contrato `test:p9-incident-response-contracts` incluido en `npm test`.
 
-Documento técnico: `docs/P9_1_INCIDENT_RESPONSE.md`.
+Documentación alineada:
+- `docs/P9_1_INCIDENT_RESPONSE.md`;
+- `docs/OPERATIONS.md`;
+- `docs/README.md`;
+- este `ROADMAP.md`.
 
-Criterios de cierre:
-1. documentación y plantilla versionadas;
-2. `docs/OPERATIONS.md` y `docs/README.md` alineados;
-3. contrato P9.1 ejecutado por `npm test`;
-4. diff revisado;
-5. Quality Gate del PR verde;
-6. PR mergeado a `main`;
-7. Quality Gate post-merge verde;
-8. `ROADMAP.md` releído antes de abrir P9.2.
+Evidencia de integración:
+- PR #32 abierto ✅;
+- Quality Gate #226 verde completo sobre `b832b0756fad0f6efdb3a2ec218c5f319e2825f3` ✅;
+- esa ejecución incluyó contrato P9.1, MySQL integration, auth hardening, MFA, P6, backup/restore, P8.0/P8.1/P8.5/P8.6 y Chromium E2E ✅;
+- esta sincronización documental modifica el HEAD, por lo que el **HEAD final debe pasar nuevamente el Quality Gate antes del merge**.
 
-No iniciar P9.2 mientras P9.1 permanezca activo.
+Cierre formal restante:
+1. Quality Gate completo verde sobre el HEAD final de PR #32;
+2. revisión final de diff;
+3. merge de PR #32 a `main`;
+4. Quality Gate post-merge verde sobre el SHA resultante;
+5. releer `ROADMAP.md` desde `main`.
+
+No iniciar P9.2 antes de esos pasos.
 
 ### P9.2 — Alta controlada de oficinas y usuarios ⏳
 
