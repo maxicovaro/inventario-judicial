@@ -22,7 +22,7 @@
     "perf:profile": "node scripts/performance-profile.js",
     "perf:frontend": "node scripts/performance-frontend.js",
     "perf:load": "node scripts/performance-load.js",
-    "perf:stock-contention": "node scripts/performance-stock-contention.js",
+    "perf:stock-contention": "node scripts/performance-stock-contention.js && node scripts/performance-stock-contention-classify.js",
     "check:backend": "node scripts/check-backend.js",
     "check:frontend": "npm --prefix inventario-frontend run lint && npm --prefix inventario-frontend run build",
     "test:pedido-rules": "node scripts/test-pedido-rules.js",
