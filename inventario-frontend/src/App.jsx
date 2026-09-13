@@ -2,7 +2,7 @@ import AppRouter from "./router/AppRouter";
 import { ToastContainer } from "react-toastify";
 import { AuthProvider } from "./auth/AuthProvider";
 import "react-toastify/dist/ReactToastify.css";
-import "@fontsource/inter";
+import "@fontsource/inter/latin-400.css";
 import "./styles/design-system.css";
 import "./styles/ui-kit.css";
 import "./styles/admina-refresh.css";
