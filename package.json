@@ -19,6 +19,7 @@
     "deploy:smoke": "node scripts/deploy-smoke.js",
     "perf:fixtures": "node scripts/performance-fixtures.js",
     "perf:baseline": "node scripts/performance-baseline.js",
+    "perf:profile": "node scripts/performance-profile.js",
     "perf:frontend": "node scripts/performance-frontend.js",
     "check:backend": "node scripts/check-backend.js",
     "check:frontend": "npm --prefix inventario-frontend run lint && npm --prefix inventario-frontend run build",
@@ -44,8 +45,9 @@
     "test:staging-contracts": "node scripts/test-staging-contracts.js",
     "test:upload-storage": "node scripts/test-upload-storage.js",
     "test:performance-contracts": "node scripts/test-performance-contracts.js",
+    "test:performance-profiler": "node scripts/test-performance-profile-utils.js",
     "test:mfa": "node scripts/test-mfa.js",
-    "test": "npm run test:pedido-rules && npm run test:security-rules && npm run test:env-config && npm run test:safe-errors && npm run test:db-lifecycle && npm run test:quality-baseline && npm run test:dependencies && npm run test:authorization-scope && npm run test:asset-movements && npm run test:operational-contracts && npm run test:recovery-runbook && npm run test:integration-e2e-contracts && npm run test:ci-config && npm run test:prestage-security && npm run test:staging-contracts && npm run test:upload-storage && npm run test:performance-contracts",
+    "test": "npm run test:pedido-rules && npm run test:security-rules && npm run test:env-config && npm run test:safe-errors && npm run test:db-lifecycle && npm run test:quality-baseline && npm run test:dependencies && npm run test:authorization-scope && npm run test:asset-movements && npm run test:operational-contracts && npm run test:recovery-runbook && npm run test:integration-e2e-contracts && npm run test:ci-config && npm run test:prestage-security && npm run test:staging-contracts && npm run test:upload-storage && npm run test:performance-contracts && npm run test:performance-profiler",
     "check": "npm run check:backend && npm test && npm run check:frontend"
   },
   "keywords": [],
