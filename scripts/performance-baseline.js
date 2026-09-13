@@ -122,6 +122,16 @@ const main = async () => {
       makeRequest: () => requestOnce({ route: "/api/activos?page=1&page_size=25", token: responsable.token }),
     },
     {
+      name: "activos_catalogo_admin",
+      samples: 8,
+      makeRequest: () => requestOnce({ route: "/api/activos/catalogo?limit=50", token: admin.token }),
+    },
+    {
+      name: "activos_catalogo_responsable",
+      samples: 8,
+      makeRequest: () => requestOnce({ route: "/api/activos/catalogo?limit=50", token: responsable.token }),
+    },
+    {
       name: "dashboard_admin",
       makeRequest: () => requestOnce({ route: "/api/dashboard", token: admin.token }),
     },

@@ -24,6 +24,7 @@ const formatearTamanio = (bytes) => {
 export default function Adjuntos() {
   const [archivo, setArchivo] = useState(null);
   const [activoId, setActivoId] = useState("");
+  const [activoBusqueda, setActivoBusqueda] = useState("");
   const [solicitudId, setSolicitudId] = useState("");
   const [activos, setActivos] = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
@@ -35,13 +36,11 @@ export default function Adjuntos() {
   const cargarDatos = async () => {
     try {
       setError("");
-      const [resActivos, resSolicitudes, resAdjuntos] = await Promise.all([
-        api.get("/activos"),
+      const [resSolicitudes, resAdjuntos] = await Promise.all([
         api.get("/solicitudes"),
         api.get("/adjuntos"),
       ]);
 
-      setActivos(resActivos.data || []);
       setSolicitudes(resSolicitudes.data || []);
       setAdjuntos(resAdjuntos.data || []);
     } catch (err) {
@@ -52,6 +51,32 @@ export default function Adjuntos() {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await api.get("/activos/catalogo", {
+          params: {
+            q: activoBusqueda.trim() || undefined,
+            limit: 50,
+          },
+          signal: controller.signal,
+        });
+        setActivos(response.data?.items || []);
+      } catch (err) {
+        if (err.code !== "ERR_CANCELED") {
+          setActivos([]);
+          setError(err.response?.data?.mensaje || "Error al buscar activos");
+        }
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [activoBusqueda]);
 
   const resumen = useMemo(() => {
     const vinculadosActivos = adjuntos.filter((adjunto) => Boolean(adjunto.Activo)).length;
@@ -102,6 +127,7 @@ export default function Adjuntos() {
       setMensaje("Adjunto subido correctamente");
       setArchivo(null);
       setActivoId("");
+      setActivoBusqueda("");
       setSolicitudId("");
       document.getElementById("archivo-input").value = "";
 
@@ -127,7 +153,7 @@ export default function Adjuntos() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (err) {
+    } catch {
       setError("Error al descargar adjunto");
     }
   };
@@ -270,9 +296,27 @@ export default function Adjuntos() {
                 </Field>
 
                 <Field
+                  label="Buscar activo"
+                  htmlFor="adjunto-activo-busqueda"
+                  hint="Buscá por nombre, código interno o número de serie."
+                >
+                  <input
+                    id="adjunto-activo-busqueda"
+                    className="ui-control"
+                    type="search"
+                    value={activoBusqueda}
+                    onChange={(e) => {
+                      setActivoBusqueda(e.target.value);
+                      setActivoId("");
+                    }}
+                    placeholder="Ej.: notebook, INV-001 o número de serie"
+                  />
+                </Field>
+
+                <Field
                   label="Activo"
                   htmlFor="adjunto-activo"
-                  hint="Opcional si el archivo se vincula a una solicitud."
+                  hint="Opcional si el archivo se vincula a una solicitud. Se muestran hasta 50 coincidencias."
                 >
                   <select
                     id="adjunto-activo"
