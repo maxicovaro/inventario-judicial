@@ -9,6 +9,8 @@ const {
 
 const { esAdminGeneral } = require("../utils/permisos");
 
+const INSUMO_REPORT_ATTRIBUTES = ["id", "nombre", "categoria", "unidad_medida"];
+
 const validarMesAnio = (mes, anio) => {
   const mesNum = Number(mes);
   const anioNum = Number(anio);
@@ -72,7 +74,9 @@ const obtenerReporteMensualOficina = async (req, res) => {
       }
     }
 
-    const oficina = await Oficina.findByPk(oficinaPermitida);
+    const oficina = await Oficina.findByPk(oficinaPermitida, {
+      attributes: ["id", "nombre"],
+    });
 
     if (!oficina) {
       return res.status(404).json({
@@ -80,47 +84,54 @@ const obtenerReporteMensualOficina = async (req, res) => {
       });
     }
 
-    const pedido = await PedidoInsumo.findOne({
-      where: {
-        oficina_id: oficinaPermitida,
-        mes: mesNum,
-        anio: anioNum,
-      },
-      include: [
-        {
-          model: PedidoInsumoDetalle,
-          include: [
-            {
-              model: Insumo,
-            },
-          ],
+    const [pedido, consumos, stockActual] = await Promise.all([
+      PedidoInsumo.findOne({
+        attributes: ["id", "estado"],
+        where: {
+          oficina_id: oficinaPermitida,
+          mes: mesNum,
+          anio: anioNum,
         },
-      ],
-    });
-
-    const consumos = await ConsumoOficina.findAll({
-      where: {
-        oficina_id: oficinaPermitida,
-        mes: mesNum,
-        anio: anioNum,
-      },
-      include: [
-        {
-          model: Insumo,
+        include: [
+          {
+            model: PedidoInsumoDetalle,
+            attributes: ["insumo_id", "cantidad_solicitada", "cantidad_provista"],
+            include: [
+              {
+                model: Insumo,
+                attributes: INSUMO_REPORT_ATTRIBUTES,
+              },
+            ],
+          },
+        ],
+      }),
+      ConsumoOficina.findAll({
+        attributes: ["insumo_id", "cantidad_consumida"],
+        where: {
+          oficina_id: oficinaPermitida,
+          mes: mesNum,
+          anio: anioNum,
         },
-      ],
-    });
-
-    const stockActual = await StockOficina.findAll({
-      where: {
-        oficina_id: oficinaPermitida,
-      },
-      include: [
-        {
-          model: Insumo,
+        include: [
+          {
+            model: Insumo,
+            attributes: INSUMO_REPORT_ATTRIBUTES,
+          },
+        ],
+      }),
+      StockOficina.findAll({
+        attributes: ["insumo_id", "cantidad"],
+        where: {
+          oficina_id: oficinaPermitida,
         },
-      ],
-    });
+        include: [
+          {
+            model: Insumo,
+            attributes: INSUMO_REPORT_ATTRIBUTES,
+          },
+        ],
+      }),
+    ]);
 
     const mapa = {};
 
@@ -148,9 +159,7 @@ const obtenerReporteMensualOficina = async (req, res) => {
         const fila = asegurarInsumo(detalle.Insumo);
         if (!fila) return;
 
-        fila.cantidad_solicitada +=
-          Number(detalle.cantidad_solicitada) || 0;
-
+        fila.cantidad_solicitada += Number(detalle.cantidad_solicitada) || 0;
         fila.cantidad_provista += Number(detalle.cantidad_provista) || 0;
       });
     }
@@ -170,7 +179,7 @@ const obtenerReporteMensualOficina = async (req, res) => {
     });
 
     const detalle = Object.values(mapa).sort((a, b) =>
-      a.nombre.localeCompare(b.nombre, "es")
+      a.nombre.localeCompare(b.nombre, "es"),
     );
 
     const totales = detalle.reduce(
@@ -187,7 +196,7 @@ const obtenerReporteMensualOficina = async (req, res) => {
         total_provisto: 0,
         total_consumido: 0,
         total_stock_actual: 0,
-      }
+      },
     );
 
     return res.status(200).json({
