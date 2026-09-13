@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 13/09/2026 con el cierre técnico-operativo de **P8.7 — Cierre documental y criterios de piloto**. P8 está completo a nivel de implementación y staging. PR #31 se encuentra en integración final. **P9 — Operación de piloto** es el siguiente bloque, pero solo se considera habilitado después de Quality Gate verde sobre el HEAD final del PR, merge a `main`, Quality Gate post-merge verde y relectura de este archivo desde `main`.
+> Actualizada al 13/09/2026. **P8 — Rendimiento y escalabilidad quedó formalmente cerrado** con PR #31, merge `5defc4472105f0da777d5053183f4c352ddfc8d4` y Quality Gate post-merge #225 verde. **P9.1 — Soporte e incident response del piloto** completó su implementación y está en integración final mediante PR #32. Quality Gate #226 quedó verde sobre el HEAD previo a esta sincronización documental; el HEAD final debe revalidarse antes del merge. P9.2 permanece bloqueado hasta merge, Gate post-merge verde y relectura de este archivo desde `main`.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -28,9 +28,14 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | P8.4 Rendimiento frontend | ✅ Completo | PR #28; Gate #206 |
 | P8.5 Pruebas de carga | ✅ Completo | PR #29; Gate #211 |
 | P8.6 Optimización + regresión | ✅ Completo | PR #30; Gate #218; `docs/P8_6_CLOSURE.md` |
-| **P8.7 Cierre documental y criterios de piloto** | 🟢 **Integración final** | Gate operativo staging verde; PR #31; Gate #222 verde sobre HEAD documental previo; HEAD final debe revalidarse |
-| **P8 Rendimiento y escalabilidad** | ✅ **Cierre técnico-operativo completo** | Se formaliza al quedar verde el Gate post-merge de PR #31 |
-| P9 Piloto | ⏳ Próximo | Abrir solo después del cierre formal de P8.7 |
+| P8.7 Cierre documental y criterios de piloto | ✅ Completo | PR #31; merge `5defc447...`; Gate post-merge #225 |
+| **P8 Rendimiento y escalabilidad** | ✅ **Completo** | `docs/P8_CLOSURE.md`; staging y Gate final verdes |
+| **P9.1 Soporte e incident response** | 🟢 **Integración final** | PR #32; Gate #226 verde sobre HEAD previo; revalidar HEAD final |
+| P9.2 Alta controlada de oficinas/usuarios | ⏳ Bloqueado | Habilitar solo después del cierre formal post-merge de P9.1 |
+| P9.3 Procedimiento operativo de administración | ⏳ Pendiente | Después de P9.2 |
+| P9.4 Indicadores reales del piloto | ⏳ Pendiente | Después de P9.3 |
+| P9.5 Backup/restore periódico del piloto | ⏳ Pendiente | Después de P9.4 |
+| P9.6 Criterios de salida a producción institucional | ⏳ Pendiente | Después de P9.5 |
 
 ---
 
@@ -222,7 +227,7 @@ Evidencia definitiva:
 
 ---
 
-## P8 — Rendimiento y escalabilidad ✅ CIERRE TÉCNICO-OPERATIVO COMPLETO
+## P8 — Rendimiento y escalabilidad ✅ CERRADO
 
 ### P8.0 — Baseline y metodología ✅
 
@@ -314,10 +319,10 @@ PR #30 / Gate #218.
 
 Detalle: `docs/P8_6_CLOSURE.md`.
 
-### P8.7 — Cierre documental y criterios de piloto 🟢 INTEGRACIÓN FINAL
+### P8.7 — Cierre documental y criterios de piloto ✅
 
 Cierre técnico-operativo verificado el 13/09/2026:
-- staging en `cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044`;
+- staging en `cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044` durante el gate operativo;
 - backend/frontend Railway sobre `main`;
 - `deploy:preflight` ✅;
 - migraciones 001–005 al día ✅;
@@ -337,42 +342,108 @@ Desviación registrada:
 - luego se confirmó schema al día y backup pre-piloto verificado;
 - próximos deploys deben volver al orden del runbook.
 
-Criterios de piloto definidos:
-- GO de seguridad, integridad, recuperación y rendimiento;
-- presupuestos P8 como techos técnicos, no SLA;
-- SEV-1 y SEV-2 definidos;
-- observabilidad mínima definida.
-
-Integración:
-- `docs/P8_CLOSURE.md` ✅;
-- `docs/README.md` ✅;
-- PR #31 abierto ✅;
-- diff documental revisado ✅;
-- Quality Gate #222 verde completo sobre el HEAD documental anterior ✅;
-- la sincronización final de estado modifica el HEAD, por lo que **el HEAD final debe pasar nuevamente el Quality Gate antes del merge**.
+Integración definitiva:
+- PR #31 ✅;
+- merge `5defc4472105f0da777d5053183f4c352ddfc8d4` ✅;
+- Quality Gate de HEAD final #224 ✅;
+- Quality Gate post-merge #225 sobre el SHA de `main` ✅;
+- `ROADMAP.md` releído desde `main` antes de abrir P9 ✅.
 
 Detalle: `docs/P8_CLOSURE.md`.
 
-### Pasos restantes para cerrar formalmente P8.7
+---
 
-1. Quality Gate completo verde sobre el HEAD final de PR #31.
-2. Merge de PR #31 a `main`.
-3. Quality Gate post-merge verde sobre el SHA resultante de `main`.
-4. Releer este `ROADMAP.md` desde `main`.
+## P9 — Operación de piloto
 
-No iniciar P9 antes de esos pasos.
+### P9.1 — Soporte e incident response 🟢 INTEGRACIÓN FINAL
 
-## P9 — Operación de piloto ⏳ PRÓXIMO BLOQUE
+Rama: `ops/p9-pilot-incident-response`.
 
-Abrir únicamente después del cierre formal de P8.7.
+Implementación completada:
+- Incident Commander y responsabilidades operativas;
+- severidad SEV-1/SEV-2/SEV-3;
+- objetivos de reconocimiento y actualización;
+- stop conditions;
+- evidencia mínima y timeline;
+- rollback/restore seguro;
+- plantilla `.github/ISSUE_TEMPLATE/incident.md`;
+- métricas MTTA/MTTR/RPO/RTO;
+- tabletop exercise;
+- contrato `test:p9-incident-response-contracts` incluido en `npm test`.
 
-Alcance previsto:
-- soporte e incident response;
-- alta controlada de oficinas/usuarios;
-- procedimiento operativo de administración;
-- indicadores de uso, errores y tiempos de respuesta;
-- revisión periódica de backups y restore drill;
-- criterios de salida del piloto y paso a producción institucional.
+Documentación alineada:
+- `docs/P9_1_INCIDENT_RESPONSE.md`;
+- `docs/OPERATIONS.md`;
+- `docs/README.md`;
+- este `ROADMAP.md`.
+
+Evidencia de integración:
+- PR #32 abierto ✅;
+- Quality Gate #226 verde completo sobre `b832b0756fad0f6efdb3a2ec218c5f319e2825f3` ✅;
+- esa ejecución incluyó contrato P9.1, MySQL integration, auth hardening, MFA, P6, backup/restore, P8.0/P8.1/P8.5/P8.6 y Chromium E2E ✅;
+- esta sincronización documental modifica el HEAD, por lo que el **HEAD final debe pasar nuevamente el Quality Gate antes del merge**.
+
+Cierre formal restante:
+1. Quality Gate completo verde sobre el HEAD final de PR #32;
+2. revisión final de diff;
+3. merge de PR #32 a `main`;
+4. Quality Gate post-merge verde sobre el SHA resultante;
+5. releer `ROADMAP.md` desde `main`.
+
+No iniciar P9.2 antes de esos pasos.
+
+### P9.2 — Alta controlada de oficinas y usuarios ⏳
+
+Previsto:
+- selección explícita de primera ola de oficinas;
+- alta de responsables/usuarios mínimos;
+- validación de roles, oficina y MFA de administradores;
+- onboarding controlado y reversibilidad;
+- evitar incorporación masiva antes de validar la primera ola.
+
+### P9.3 — Procedimiento operativo de administración ⏳
+
+Previsto:
+- usuarios;
+- bienes;
+- stock;
+- movimientos;
+- solicitudes/pedidos;
+- bajas;
+- adjuntos;
+- backups y tareas rutinarias.
+
+### P9.4 — Indicadores reales del piloto ⏳
+
+Previsto:
+- uso por oficina y flujo;
+- errores/5xx;
+- tiempos de respuesta;
+- health;
+- auth/MFA/permisos;
+- crecimiento MySQL y `/data`;
+- conflictos/replays de stock;
+- MTTA/MTTR e incidentes por severidad.
+
+### P9.5 — Backup y recuperación durante el piloto ⏳
+
+Previsto:
+- backup periódico;
+- checksum;
+- copia fuera del host cuando corresponda;
+- restore drill periódico;
+- seguimiento de RPO/RTO.
+
+### P9.6 — Criterios de salida del piloto ⏳
+
+Previsto:
+- estabilidad;
+- seguridad;
+- integridad;
+- adopción;
+- capacidad operativa;
+- rendimiento;
+- decisión documentada de paso a producción institucional.
 
 ---
 
@@ -397,6 +468,7 @@ No abrir como frentes paralelos salvo que bloqueen P9:
 - rendimiento/escalabilidad: `docs/PERFORMANCE.md`;
 - cierre P8.6: `docs/P8_6_CLOSURE.md`;
 - cierre P8 y gate piloto: `docs/P8_CLOSURE.md`;
+- P9.1 incident response: `docs/P9_1_INCIDENT_RESPONSE.md`;
 - evidencia ejecutable: commits, PRs, Quality Gates y artifacts.
 
 ## Reglas de trabajo
