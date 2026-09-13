@@ -2,15 +2,17 @@
 
 ## Estado
 
-**P8.7 en progreso.**
+**P8.7 listo para cierre formal.**
 
-**Estado de entrada a P9/piloto: NO-GO operativo temporal.**
+**Estado de entrada a P9/piloto: GO técnico, condicionado al Quality Gate final de esta rama, merge y Quality Gate post-merge.**
 
 P8.0–P8.6 están integrados en `main@cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044` y el Quality Gate post-merge #221 quedó verde completo. Railway staging fue promovido a esa misma revisión y backend/frontend quedaron `SUCCESS`.
 
-El NO-GO no se debe a un defecto de código ni a una regresión de rendimiento. Se debe a que, con las herramientas disponibles en esta sesión, no fue posible ejecutar dentro del contenedor los comandos operativos del runbook que deben preceder/acompañar la promoción (`deploy:preflight`, `db:status`, backup+verify y smoke externo). Además, el deployment ya había sido aplicado antes de crear un nuevo backup pre-deploy; esta desviación queda registrada y no se reescribe como si hubiera ocurrido de otra manera.
+El gate operativo final de P8.7 fue ejecutado el 13/09/2026 desde Railway SSH y desde un cliente externo. Quedaron verdes `deploy:preflight`, `db:status`, backup + verificación SHA-256 y `deploy:smoke`.
 
-P8.7 y P9 no deben cerrarse/iniciarse, respectivamente, hasta completar manualmente el checklist operativo final de este documento.
+Existe una desviación operativa real: el deployment de esta revisión se realizó antes de generar el nuevo backup `pre-pilot.sql`. No se oculta ni se reescribe como backup pre-deploy. No hubo migraciones P8 nuevas durante esa promoción; posteriormente se verificó que el schema estaba al día y se generó/verificó el backup pre-piloto.
+
+P9 no se considera iniciado hasta que el commit documental final pase Quality Gate, sea integrado a `main`, el Quality Gate post-merge quede verde y se relea `ROADMAP.md`.
 
 ---
 
@@ -75,7 +77,9 @@ P8.7 y P9 no deben cerrarse/iniciarse, respectivamente, hasta completar manualme
 
 ---
 
-## Evidencia final de CI
+## Evidencia de CI previa al cierre P8.7
+
+Revisión desplegada y previamente validada:
 
 `main@cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044`
 
@@ -99,13 +103,15 @@ Incluye:
 - P8.6 contention profile;
 - Chromium E2E crítico.
 
+El cierre definitivo de P8 exige además Quality Gate completo sobre el HEAD documental de P8.7 y un Gate post-merge sobre el SHA final de `main`.
+
 ---
 
-## Promoción de Railway staging
+## Railway staging promovido
 
 Proyecto Railway: `inventario-judicial-staging`.
 
-El environment de Railway se llama internamente `production`, pero continúa siendo el entorno aislado de staging del proyecto.
+El environment de Railway se llama internamente `production`, pero el proyecto y sus recursos continúan siendo el entorno aislado de staging.
 
 Promoción aplicada el 13/09/2026:
 
@@ -116,41 +122,26 @@ Promoción aplicada el 13/09/2026:
 - frontend deployment `e1f9f77f-c8bd-4998-a064-aa3fe64123ab`: `SUCCESS`;
 - MySQL continuó `SUCCESS` y sin redeploy.
 
-Railway confirmó que ambos deployments provienen de:
+Railway confirmó en deployments y logs:
 
 ```text
-branch: main
-commit: cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044
-```
-
-### Health y revisión
-
-Logs del backend al arrancar:
-
-```text
-environment=staging
+branch=main
 revision=cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044
+environment=staging
 database=inventario_judicial_staging
-event=database_connected
+database_connected
 ```
 
-Railway healthcheck del backend:
+Healthcheck Railway:
 
 ```text
-GET /ready -> 200
-```
-
-con la misma revisión y `environment=staging` en el log estructurado.
-
-Frontend healthcheck Railway:
-
-```text
-GET / -> 200
+backend /health/ready -> 200
+frontend / -> 200
 ```
 
 ### Persistencia
 
-Después del redeploy siguen presentes:
+Después del redeploy siguieron presentes:
 
 - volumen backend `/data`;
 - `/data/uploads`;
@@ -162,56 +153,105 @@ No se detectó pérdida de volúmenes durante la promoción.
 
 ---
 
-## Desviación operativa registrada
+## Gate operativo final P8.7 — EJECUTADO ✅
 
-El runbook exige backup verificado antes de despliegue/migración.
+### 1. Preflight de despliegue
 
-En esta promoción P8.7:
+Ejecutado por Railway SSH sobre el servicio `backend`:
 
-- el deployment fue autorizado y aplicado antes de generar un nuevo backup pre-deploy;
-- la integración Railway disponible no permite ejecutar comandos arbitrarios dentro del contenedor en ejecución;
-- por lo tanto no se pudo ejecutar desde esta sesión `deploy:preflight`, `db:status`, `db:backup`, `db:backup:verify` ni `deploy:smoke`;
-- no hubo migraciones P8 nuevas aplicadas por esta promoción;
-- Railway sí validó startup, conexión a MySQL y healthcheck `/ready=200`.
+```text
+✓ Preflight de despliegue aprobado.
+Entorno: staging
+Revisión: cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044
+Base: inventario_judicial_staging
+trust proxy hops: 1
+```
 
-Esta desviación **no debe ocultarse**. El siguiente paso operativo antes de cerrar P8.7 y habilitar P9 es ejecutar manualmente el checklist de abajo mediante Railway CLI/SSH autenticado u otro mecanismo institucional aprobado.
+Resultado: **PASS**.
+
+### 2. Estado de migraciones
+
+`npm run db:status` confirmó como aplicadas:
+
+```text
+[x] 20260909_001_baseline_schema.js
+[x] 20260909_002_oficina_central.js
+[x] 20260910_003_operaciones_idempotentes.js
+[x] 20260910_004_auth_sessions.js
+[x] 20260911_005_admin_mfa.js
+```
+
+Resultado:
+
+```text
+✓ Base de datos al día.
+```
+
+No se ejecutó ninguna migración durante P8.7.
+
+### 3. Backup pre-piloto
+
+Creado después del deployment, antes de habilitar piloto:
+
+```text
+/data/backups/pre-pilot.sql
+```
+
+Evidencia:
+
+```text
+SHA-256: 604f27ccf2b954cd363e77276bf16911047c9515c1d73b77c458ab455beeb18d
+Bytes: 23746
+```
+
+`db:backup:verify` confirmó exactamente el mismo SHA-256 y tamaño.
+
+Resultado: **PASS**.
+
+Este backup es **pre-piloto**, no pre-deploy. La desviación de orden queda registrada. Al no existir migraciones P8 nuevas y estar el schema 001–005 al día, no existe una migración pendiente que deba revertirse por este cierre.
+
+La obligación de mantener copia fuera del host se activa antes de conservar información institucional que no pueda reconstruirse. El staging actual se mantiene como entorno de validación y no reemplaza una estrategia de backup institucional.
+
+### 4. Smoke externo
+
+Ejecutado desde fuera del contenedor contra el origen público de staging, esperando explícitamente:
+
+```text
+DEPLOY_ENV=staging
+DEPLOY_REVISION=cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044
+```
+
+Resultado:
+
+```text
+✓ /health/live confirma staging@cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044.
+✓ /health/ready confirma revisión esperada y acceso a MySQL.
+✓ Frontend accesible y con raíz de aplicación.
+✓ CORS/origin permite exactamente el frontend configurado con credenciales.
+✓ Smoke test post-deploy completado.
+```
+
+Resultado: **PASS**.
+
+El probe `/api/auth/me` sin sesión devolvió el 401 esperado y el contrato CORS con credenciales coincidió con el frontend de staging. Login, MFA, roles y aislamiento por oficina permanecen cubiertos por las suites de seguridad/integración/E2E del Quality Gate; P8 no introdujo cambios de contrato de autenticación después de esa validación.
 
 ---
 
-## Gate obligatorio antes de cerrar P8.7 / iniciar P9
+## Desviación operativa registrada
 
-Ejecutar sobre staging y conservar evidencia sin secretos:
+El runbook exige backup verificado antes de un deployment/migración que pueda requerir recuperación.
 
-```bash
-railway ssh --service backend -- npm run deploy:preflight
-railway ssh --service backend -- npm run db:status
-railway ssh --service backend -- npm run db:backup -- --output /data/backups/pre-pilot.sql
-railway ssh --service backend -- npm run db:backup:verify -- /data/backups/pre-pilot.sql
-```
+En la promoción P8.7:
 
-Después ejecutar desde contexto externo al backend:
+- el deployment fue autorizado y aplicado antes de generar un nuevo backup específico de esa promoción;
+- no hubo migraciones P8 nuevas;
+- el backend arrancó conectado a `inventario_judicial_staging` y `/health/ready` permaneció verde;
+- después se ejecutó `deploy:preflight` y se confirmó la revisión esperada;
+- `db:status` confirmó schema 001–005 completamente aplicado;
+- se creó y verificó `/data/backups/pre-pilot.sql` con SHA-256 estable;
+- el smoke externo quedó verde.
 
-```bash
-npm run deploy:smoke
-```
-
-con los origins de staging ya configurados.
-
-### Resultado exigido
-
-- preflight: verde;
-- `db:status`: sin migraciones pendientes;
-- backup creado;
-- SHA-256 verificado;
-- copia fuera del host cuando staging contenga información que deba conservarse;
-- `/health/live=200`;
-- `/health/ready=200`;
-- `environment=staging`;
-- `revision=cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044` o SHA posterior aprobado;
-- smoke externo verde;
-- login/MFA y permisos básicos verificados si el smoke no los cubre.
-
-Hasta entonces: **P8.7 activo / NO-GO para P9**.
+Conclusión: la desviación de orden queda documentada como lección operativa, pero no constituye un bloqueo técnico para el piloto. En próximos deploys se debe volver al orden del runbook: **preflight → backup verificado → migración/deploy cuando corresponda → smoke**.
 
 ---
 
@@ -246,7 +286,7 @@ GO solo si:
 GO solo si:
 
 - backup reciente verificado;
-- copia fuera del host cuando corresponda;
+- copia fuera del host antes de depender de datos institucionales irremplazables;
 - restore drill CI verde;
 - RPO objetivo: hasta 24 h;
 - RTO objetivo: hasta 4 h;
@@ -330,16 +370,24 @@ Estos valores son baseline ocioso, no capacidad máxima ni SLA.
 
 ---
 
-## Criterio de cierre pendiente P8.7
+## Criterio de cierre P8.7
 
-Para cerrar P8.7 faltan exclusivamente los checks operativos manuales del gate pre-piloto:
+Checks operativos pre-piloto:
 
-- `deploy:preflight`;
-- `db:status`;
-- backup `pre-pilot.sql` + SHA-256 verde;
-- smoke externo;
-- registro del resultado en este documento y `ROADMAP.md`;
-- Quality Gate del commit documental final;
-- PR, merge y Quality Gate post-merge.
+- `deploy:preflight` ✅;
+- `db:status` ✅;
+- backup `pre-pilot.sql` + SHA-256 verificado ✅;
+- smoke externo ✅;
+- revisión desplegada exacta ✅;
+- staging/MySQL/volúmenes saludables ✅;
+- criterios GO/SEV/observabilidad documentados ✅.
 
-Hasta completar eso, **P8.7 continúa activo y P9 permanece bloqueado**.
+Faltan únicamente los controles de integración documental de esta rama:
+
+1. actualizar `ROADMAP.md` y el índice documental;
+2. ejecutar Quality Gate completo sobre el HEAD final de P8.7;
+3. revisar diff y abrir/integrar PR;
+4. confirmar Quality Gate post-merge sobre el SHA final de `main`;
+5. releer `ROADMAP.md` antes de abrir P9.
+
+Hasta completar esos cinco pasos, **P8.7 no se considera formalmente cerrado y P9 no se considera iniciado**.
