@@ -546,3 +546,114 @@ Quality Gate #201 quedó verde completo con:
 - contratos estáticos + MySQL real agregados al Quality Gate ✅;
 - Quality Gate de implementación #201 verde completo ✅;
 - siguiente bloque: **P8.4 — Rendimiento frontend**.
+
+---
+
+## P8.4 — Rendimiento frontend ✅
+
+P8.4 mide y reduce el costo de carga inicial del frontend sin alterar autenticación, permisos, navegación, accesibilidad ni los contratos funcionales. La implementación quedó completamente verde en el **Quality Gate #206** sobre la rama `performance/p8-frontend` / PR #28.
+
+### Línea base antes de P8.4
+
+El artifact frontend del Gate post-merge #204 mostraba un build esencialmente monolítico:
+
+- JavaScript: **265,15 KB gzip**;
+- CSS: **16,41 KB gzip**;
+- total `dist`: **499,56 KB gzip**;
+- bundle JS principal: **265,15 KB gzip / 930,16 KB raw**;
+- todas las pantallas protegidas se importaban estáticamente desde `AppRouter.jsx`;
+- Dashboard importaba Recharts dentro de ese mismo grafo inicial.
+
+El problema no era superar el presupuesto global, sino obligar al navegador a descargar y parsear rutas que el usuario podía no visitar.
+
+### Code splitting por rutas
+
+Se aplicó separación por ruta con `React.lazy` + `Suspense`:
+
+- Login permanece eager para no agregar una espera artificial a la entrada pública;
+- las 15 pantallas protegidas pasan a chunks diferidos;
+- `PrivateRoute` permanece en el mismo lugar del árbol y sigue siendo la autoridad de navegación por sesión/rol;
+- el fallback reutiliza estilos existentes y expone `role="status"` + `aria-live="polite"`;
+- `test:p8-frontend-contracts` impide volver accidentalmente a imports estáticos de esas rutas.
+
+La biblioteca Recharts queda fuera de la carga inicial y aislada dentro del chunk de Dashboard.
+
+### Fuentes y assets estáticos
+
+El import genérico de Inter se reemplazó por `@fontsource/inter/latin-400.css`:
+
+- se mantiene el mismo peso tipográfico usado por la interfaz;
+- se eliminan subsets innecesarios de alfabetos que el sistema no utiliza;
+- el build conserva WOFF + WOFF2 por compatibilidad;
+- peso de fuentes medido: **52,98 KB gzip**.
+
+Los únicos assets públicos adicionales son dos SVG pequeños (~9,5 KB y ~5 KB raw); no existe evidencia para agregar pipelines de imagen, compresión adicional o lazy loading de imágenes.
+
+### Baseline frontend v2 — Quality Gate #206
+
+`scripts/performance-frontend.js` mantiene los presupuestos globales y agrega métricas de carga inicial extraídas del `index.html` generado (`script`, `modulepreload` y stylesheets), cantidad de chunks y peso de fuentes.
+
+| Métrica | Antes #204 | Después #206 | Resultado |
+| --- | ---: | ---: | --- |
+| JS inicial gzip | 265,15 KB | **129,79 KB** | ~51 % menor |
+| JS total gzip | 265,15 KB | **282,16 KB** | +~6,4 % por overhead de chunks |
+| CSS gzip | 16,41 KB | **19,49 KB** | dentro de presupuesto |
+| carga inicial JS + CSS | 281,56 KB | **139,57 KB** | ~50 % menor |
+| total `dist` gzip | 499,56 KB | **358,43 KB** | ~28 % menor |
+| total `dist` raw | 1251,60 KB | **1094,18 KB** | menor |
+| chunks JS | 1 | **18** | separación por rutas |
+| fuentes gzip | múltiples subsets | **52,98 KB** | Latin 400 únicamente |
+
+El aumento pequeño del JS total es una consecuencia esperada de separar módulos; se acepta porque reduce aproximadamente a la mitad la descarga JS de entrada y el peso total del build también disminuye de forma significativa.
+
+### Presupuestos protegidos
+
+El baseline v2 agrega límites accionables:
+
+- JS inicial gzip: objetivo **180 KB**, techo duro **300 KB**;
+- fuentes gzip: objetivo **60 KB**, techo duro **80 KB**;
+- continúan vigentes los límites globales de JS, CSS y total `dist`.
+
+El objetivo de fuentes se calibró después de medir el subset Latin real: WOFF + WOFF2 suman 52,98 KB. Se conserva margen estrecho para detectar la reintroducción de subsets no usados sin sacrificar compatibilidad por una cifra arbitraria.
+
+### Renders y trabajo del navegador
+
+La revisión de las pantallas críticas no encontró evidencia reproducible que justifique memoización adicional generalizada:
+
+- Dashboard ya utiliza `useMemo`/`useCallback` donde corresponde;
+- no se agregan `memo`, callbacks o caches por intuición;
+- la optimización estructural demostrada es evitar descargar pantallas no visitadas.
+
+El chunk de Dashboard queda en **104,42 KB gzip**, principalmente por Recharts. Como Recharts ya no forma parte del bundle inicial, no se difieren los gráficos dentro del propio Dashboard sin una medición de experiencia de usuario que demuestre beneficio; ese punto puede reevaluarse con carga/telemetría posterior.
+
+### Regresión y seguridad
+
+Quality Gate #206 quedó verde completo con:
+
+- auditoría de dependencias frontend/backend;
+- lint + build frontend;
+- baseline frontend v2 con `target=pass` y `hard=pass`;
+- sintaxis backend y `npm test`, incluido `test:p8-frontend-contracts`;
+- migraciones + integración MySQL real;
+- auth hardening y MFA;
+- P6 concurrencia/idempotencia;
+- health checks;
+- backup/restore;
+- baseline API P8.0;
+- profiler P8.1;
+- Chromium E2E crítico.
+
+### Criterios de salida P8.4
+
+- baseline inicial comparado antes/después ✅;
+- code splitting por rutas con Login eager ✅;
+- Recharts fuera de la carga inicial ✅;
+- fallback de lazy loading accesible ✅;
+- permisos/navegación preservados ✅;
+- subset de fuentes justificado y medido ✅;
+- assets estáticos revisados sin optimizaciones especulativas ✅;
+- métricas de JS inicial/fuentes agregadas al baseline ✅;
+- presupuestos objetivo/techo versionados ✅;
+- contratos P8.4 incluidos en `npm test` ✅;
+- Quality Gate de implementación #206 verde completo ✅;
+- siguiente bloque: **P8.5 — Pruebas de carga**.
