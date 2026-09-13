@@ -49,9 +49,6 @@ const obtenerDashboard = async (req, res) => {
     let insumosStockBajo = 0;
     let ultimosMovimientosActivos = [];
     let ultimosMovimientosStock = [];
-    let pedidosEnviados = 0;
-    let pedidosEnRevision = 0;
-    let pedidosEntregados = 0;
     let ultimosPedidos = [];
     let detalleInsumosStockBajo = [];
     let pedidosPorEstadoRaw = [];
@@ -66,106 +63,50 @@ const obtenerDashboard = async (req, res) => {
         insumosStockBajo,
         ultimosMovimientosActivos,
         ultimosMovimientosStock,
-        pedidosEnviados,
-        pedidosEnRevision,
-        pedidosEntregados,
         ultimosPedidos,
         detalleInsumosStockBajo,
         pedidosPorEstadoRaw,
         movimientosStockPorTipoRaw,
       ] = await Promise.all([
-        Activo.count({
-          where: whereActivos,
-        }),
-
-        Insumo.count({
-          where: { activo: true },
-        }),
-
-        Usuario.count({
-          where: { activo: true },
-        }),
-
-        Solicitud.count({
-          where: { estado: "PENDIENTE" },
-        }),
-
+        Activo.count({ where: whereActivos }),
+        Insumo.count({ where: { activo: true } }),
+        Usuario.count({ where: { activo: true } }),
+        Solicitud.count({ where: { estado: "PENDIENTE" } }),
         Insumo.count({
           where: {
             activo: true,
-            stock_actual: {
-              [Op.lte]: col("stock_minimo"),
-            },
+            stock_actual: { [Op.lte]: col("stock_minimo") },
           },
         }),
-
         Movimiento.findAll({
           limit: 5,
           order: [["id", "DESC"]],
           include: [
-            {
-              model: Activo,
-              attributes: ["id", "nombre", "codigo_interno"],
-            },
-            {
-              model: Usuario,
-              attributes: ["id", "nombre", "apellido"],
-            },
+            { model: Activo, attributes: ["id", "nombre", "codigo_interno"] },
+            { model: Usuario, attributes: ["id", "nombre", "apellido"] },
           ],
         }),
-
         MovimientoStock.findAll({
           limit: 5,
           order: [["id", "DESC"]],
           include: [
-            {
-              model: Insumo,
-              attributes: ["id", "nombre"],
-            },
-            {
-              model: Usuario,
-              attributes: ["id", "nombre", "apellido"],
-            },
-            {
-              model: Oficina,
-              attributes: ["id", "nombre"],
-            },
+            { model: Insumo, attributes: ["id", "nombre"] },
+            { model: Usuario, attributes: ["id", "nombre", "apellido"] },
+            { model: Oficina, attributes: ["id", "nombre"] },
           ],
         }),
-
-        PedidoInsumo.count({
-          where: { estado: "ENVIADO" },
-        }),
-
-        PedidoInsumo.count({
-          where: { estado: "EN_REVISION" },
-        }),
-
-        PedidoInsumo.count({
-          where: { estado: "ENTREGADO" },
-        }),
-
         PedidoInsumo.findAll({
           limit: 5,
           order: [["id", "DESC"]],
           include: [
-            {
-              model: Oficina,
-              attributes: ["id", "nombre"],
-            },
-            {
-              model: Usuario,
-              attributes: ["id", "nombre", "apellido"],
-            },
+            { model: Oficina, attributes: ["id", "nombre"] },
+            { model: Usuario, attributes: ["id", "nombre", "apellido"] },
           ],
         }),
-
         Insumo.findAll({
           where: {
             activo: true,
-            stock_actual: {
-              [Op.lte]: col("stock_minimo"),
-            },
+            stock_actual: { [Op.lte]: col("stock_minimo") },
           },
           order: [["stock_actual", "ASC"]],
           limit: 8,
@@ -177,7 +118,6 @@ const obtenerDashboard = async (req, res) => {
             "stock_minimo",
           ],
         }),
-
         PedidoInsumo.findAll({
           attributes: [
             "estado",
@@ -186,7 +126,6 @@ const obtenerDashboard = async (req, res) => {
           group: ["estado"],
           raw: true,
         }),
-
         MovimientoStock.findAll({
           attributes: [
             "tipo",
@@ -205,128 +144,60 @@ const obtenerDashboard = async (req, res) => {
         insumosStockBajo,
         ultimosMovimientosActivos,
         ultimosMovimientosStock,
-        pedidosEnviados,
-        pedidosEnRevision,
-        pedidosEntregados,
         ultimosPedidos,
         detalleInsumosStockBajo,
         pedidosPorEstadoRaw,
         movimientosStockPorTipoRaw,
       ] = await Promise.all([
-        Activo.count({
-          where: whereActivos,
-        }),
-
-        StockOficina.count({
-          where: {
-            oficina_id: oficinaId,
-          },
-        }),
-
+        Activo.count({ where: whereActivos }),
+        StockOficina.count({ where: { oficina_id: oficinaId } }),
         Usuario.count({
-          where: {
-            activo: true,
-            oficina_id: oficinaId,
-          },
+          where: { activo: true, oficina_id: oficinaId },
         }),
-
         Solicitud.count({
-          where: {
-            estado: "PENDIENTE",
-            oficina_id: oficinaId,
-          },
+          where: { estado: "PENDIENTE", oficina_id: oficinaId },
         }),
-
         StockOficina.count({
           where: {
             oficina_id: oficinaId,
-            cantidad: {
-              [Op.lte]: 0,
-            },
+            cantidad: { [Op.lte]: 0 },
           },
         }),
-
         Movimiento.findAll({
           limit: 5,
           order: [["id", "DESC"]],
           include: [
             {
               model: Activo,
-              where: {
-                oficina_id: oficinaId,
-              },
+              where: { oficina_id: oficinaId },
               attributes: ["id", "nombre", "codigo_interno"],
             },
-            {
-              model: Usuario,
-              attributes: ["id", "nombre", "apellido"],
-            },
+            { model: Usuario, attributes: ["id", "nombre", "apellido"] },
           ],
         }),
-
         MovimientoStock.findAll({
           where: whereMovimientoStock,
           limit: 5,
           order: [["id", "DESC"]],
           include: [
-            {
-              model: Insumo,
-              attributes: ["id", "nombre"],
-            },
-            {
-              model: Usuario,
-              attributes: ["id", "nombre", "apellido"],
-            },
-            {
-              model: Oficina,
-              attributes: ["id", "nombre"],
-            },
+            { model: Insumo, attributes: ["id", "nombre"] },
+            { model: Usuario, attributes: ["id", "nombre", "apellido"] },
+            { model: Oficina, attributes: ["id", "nombre"] },
           ],
         }),
-
-        PedidoInsumo.count({
-          where: {
-            ...wherePedidos,
-            estado: "ENVIADO",
-          },
-        }),
-
-        PedidoInsumo.count({
-          where: {
-            ...wherePedidos,
-            estado: "EN_REVISION",
-          },
-        }),
-
-        PedidoInsumo.count({
-          where: {
-            ...wherePedidos,
-            estado: "ENTREGADO",
-          },
-        }),
-
         PedidoInsumo.findAll({
           where: wherePedidos,
           limit: 5,
           order: [["id", "DESC"]],
           include: [
-            {
-              model: Oficina,
-              attributes: ["id", "nombre"],
-            },
-            {
-              model: Usuario,
-              attributes: ["id", "nombre", "apellido"],
-            },
+            { model: Oficina, attributes: ["id", "nombre"] },
+            { model: Usuario, attributes: ["id", "nombre", "apellido"] },
           ],
         }),
-
         StockOficina.findAll({
           where: {
             oficina_id: oficinaId,
-            cantidad: {
-              [Op.lte]: 0,
-            },
+            cantidad: { [Op.lte]: 0 },
           },
           include: [
             {
@@ -343,7 +214,6 @@ const obtenerDashboard = async (req, res) => {
           order: [["cantidad", "ASC"]],
           limit: 8,
         }),
-
         PedidoInsumo.findAll({
           attributes: [
             "estado",
@@ -353,7 +223,6 @@ const obtenerDashboard = async (req, res) => {
           group: ["estado"],
           raw: true,
         }),
-
         MovimientoStock.findAll({
           attributes: [
             "tipo",
@@ -368,20 +237,19 @@ const obtenerDashboard = async (req, res) => {
 
     const pedidos_por_estado = ESTADOS_PEDIDO.map((estado) => {
       const encontrado = pedidosPorEstadoRaw.find((p) => p.estado === estado);
-
-      return {
-        estado,
-        total: Number(encontrado?.total || 0),
-      };
+      return { estado, total: Number(encontrado?.total || 0) };
     });
+
+    const pedidosPorEstadoMap = new Map(
+      pedidos_por_estado.map((item) => [item.estado, item.total]),
+    );
+    const pedidosEnviados = pedidosPorEstadoMap.get("ENVIADO") || 0;
+    const pedidosEnRevision = pedidosPorEstadoMap.get("EN_REVISION") || 0;
+    const pedidosEntregados = pedidosPorEstadoMap.get("ENTREGADO") || 0;
 
     const movimientos_stock_por_tipo = TIPOS_MOVIMIENTO_STOCK.map((tipo) => {
       const encontrado = movimientosStockPorTipoRaw.find((m) => m.tipo === tipo);
-
-      return {
-        tipo,
-        total: Number(encontrado?.total || 0),
-      };
+      return { tipo, total: Number(encontrado?.total || 0) };
     });
 
     const detalle_insumos_stock_bajo = esDireccion
@@ -431,6 +299,4 @@ const obtenerDashboard = async (req, res) => {
   }
 };
 
-module.exports = {
-  obtenerDashboard,
-};
+module.exports = { obtenerDashboard };

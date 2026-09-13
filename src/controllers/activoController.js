@@ -1,4 +1,4 @@
-const { Op } = require("sequelize");
+const { Op, QueryTypes } = require("sequelize");
 const sequelize = require("../config/database");
 const { Activo, Categoria, Oficina, Movimiento } = require("../models");
 const { registrarBitacora } = require("../utils/bitacora");
@@ -11,6 +11,32 @@ const {
   completarIdempotencia,
   responderReplay,
 } = require("../utils/idempotencia");
+
+const DEFAULT_PAGE_SIZE = 25;
+const MAX_PAGE_SIZE = 100;
+const MAX_SEARCH_LENGTH = 100;
+const ESTADOS_ACTIVO = new Set([
+  "Excelente estado",
+  "Buen estado",
+  "Regular estado",
+  "Mal estado",
+  "Sin funcionar",
+  "Dado de baja",
+]);
+
+const LIST_ATTRIBUTES = [
+  "id",
+  "codigo_interno",
+  "nombre",
+  "marca",
+  "modelo",
+  "numero_serie",
+  "cantidad",
+  "estado",
+  "activo",
+  "categoria_id",
+  "oficina_id",
+];
 
 const registrarBitacoraSegura = async (datos) => {
   try {
@@ -25,10 +51,181 @@ const rollbackYResponder = async (transaction, res, status, body) => {
   res.status(status).json(body);
 };
 
+const parsePositiveInteger = (value, fallback, max = Number.MAX_SAFE_INTEGER) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (!/^\d+$/.test(String(value))) return null;
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > max) return null;
+  return parsed;
+};
+
+const escapeLike = (value) => String(value).replace(/[\\%_]/g, "\\$&");
+
+const buildScopeWhere = (req, direccion) => {
+  if (direccion) return {};
+  if (!req.usuario?.oficina_id) return null;
+  return {
+    oficina_id: req.usuario.oficina_id,
+    activo: true,
+  };
+};
+
+const obtenerResumenActivos = async ({ direccion, oficinaId }) => {
+  const columnaDiversidad = direccion ? "oficina_id" : "categoria_id";
+  const whereSql = direccion ? "" : "WHERE oficina_id = :oficinaId AND activo = 1";
+  const rows = await sequelize.query(
+    `SELECT
+       COUNT(*) AS total,
+       SUM(CASE WHEN activo = 1 AND estado <> 'Dado de baja' THEN 1 ELSE 0 END) AS vigentes,
+       SUM(CASE WHEN activo = 1 AND estado IN ('Mal estado', 'Sin funcionar') THEN 1 ELSE 0 END) AS atencion,
+       COUNT(DISTINCT CASE
+         WHEN activo = 1 AND estado <> 'Dado de baja' THEN ${columnaDiversidad}
+         ELSE NULL
+       END) AS diversidad
+     FROM activos
+     ${whereSql}`,
+    {
+      replacements: direccion ? {} : { oficinaId },
+      type: QueryTypes.SELECT,
+      logging: false,
+    },
+  );
+  const row = rows[0] || {};
+  return {
+    total: Number(row.total || 0),
+    vigentes: Number(row.vigentes || 0),
+    atencion: Number(row.atencion || 0),
+    diversidad: Number(row.diversidad || 0),
+  };
+};
+
 const listarActivos = async (req, res) => {
   try {
     const direccion = esAdminGeneral(req.usuario);
-    const where = {};
+    const scopeWhere = buildScopeWhere(req, direccion);
+
+    if (!scopeWhere) {
+      return res.status(403).json({
+        mensaje: "El usuario no tiene oficina asignada",
+      });
+    }
+
+    const usaContratoPaginado = [
+      "page",
+      "page_size",
+      "q",
+      "estado",
+      "oficina_id",
+    ].some((key) => Object.prototype.hasOwnProperty.call(req.query, key));
+
+    if (!usaContratoPaginado) {
+      const activos = await Activo.findAll({
+        where: scopeWhere,
+        include: [
+          { model: Categoria, attributes: ["id", "nombre"] },
+          { model: Oficina, attributes: ["id", "nombre"] },
+        ],
+        order: [["id", "DESC"]],
+      });
+      return res.status(200).json(activos);
+    }
+
+    const pageRequested = parsePositiveInteger(req.query.page, 1);
+    const pageSize = parsePositiveInteger(
+      req.query.page_size,
+      DEFAULT_PAGE_SIZE,
+      MAX_PAGE_SIZE,
+    );
+    if (!pageRequested || !pageSize) {
+      return res.status(400).json({
+        mensaje: `page debe ser >= 1 y page_size debe estar entre 1 y ${MAX_PAGE_SIZE}`,
+      });
+    }
+
+    const search = String(req.query.q || "").trim();
+    if (search.length > MAX_SEARCH_LENGTH) {
+      return res.status(400).json({
+        mensaje: `La búsqueda no puede superar ${MAX_SEARCH_LENGTH} caracteres`,
+      });
+    }
+
+    const estado = String(req.query.estado || "").trim();
+    if (estado && !ESTADOS_ACTIVO.has(estado)) {
+      return res.status(400).json({ mensaje: "Estado de activo inválido" });
+    }
+
+    let oficinaFiltro = null;
+    if (direccion && req.query.oficina_id !== undefined && req.query.oficina_id !== "") {
+      oficinaFiltro = parsePositiveInteger(req.query.oficina_id, null);
+      if (!oficinaFiltro) {
+        return res.status(400).json({ mensaje: "oficina_id inválido" });
+      }
+    }
+
+    const where = { ...scopeWhere };
+    if (estado) where.estado = estado;
+    if (direccion && oficinaFiltro) where.oficina_id = oficinaFiltro;
+
+    if (search) {
+      const like = `%${escapeLike(search)}%`;
+      where[Op.or] = [
+        { nombre: { [Op.like]: like } },
+        { codigo_interno: { [Op.like]: like } },
+        { marca: { [Op.like]: like } },
+        { modelo: { [Op.like]: like } },
+        { numero_serie: { [Op.like]: like } },
+      ];
+    }
+
+    const [total, resumen] = await Promise.all([
+      Activo.count({ where }),
+      obtenerResumenActivos({
+        direccion,
+        oficinaId: req.usuario?.oficina_id || null,
+      }),
+    ]);
+
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const page = Math.min(pageRequested, totalPages);
+    const offset = (page - 1) * pageSize;
+
+    const activos = await Activo.findAll({
+      where,
+      attributes: LIST_ATTRIBUTES,
+      include: [
+        { model: Categoria, attributes: ["id", "nombre"] },
+        { model: Oficina, attributes: ["id", "nombre"] },
+      ],
+      order: [["id", "DESC"]],
+      limit: pageSize,
+      offset,
+    });
+
+    return res.status(200).json({
+      items: activos,
+      pagination: {
+        page,
+        page_size: pageSize,
+        total,
+        total_pages: total === 0 ? 0 : totalPages,
+      },
+      summary: resumen,
+      filters: {
+        q: search,
+        estado: estado || null,
+        oficina_id: direccion ? oficinaFiltro : req.usuario.oficina_id,
+      },
+    });
+  } catch (error) {
+    console.error("Error al listar activos:", error);
+    return res.status(500).json({ mensaje: "Error al listar activos" });
+  }
+};
+
+const obtenerActivo = async (req, res) => {
+  try {
+    const direccion = esAdminGeneral(req.usuario);
+    const where = { id: req.params.id };
 
     if (!direccion) {
       if (!req.usuario?.oficina_id) {
@@ -36,24 +233,26 @@ const listarActivos = async (req, res) => {
           mensaje: "El usuario no tiene oficina asignada",
         });
       }
-
       where.oficina_id = req.usuario.oficina_id;
       where.activo = true;
     }
 
-    const activos = await Activo.findAll({
+    const activo = await Activo.findOne({
       where,
       include: [
         { model: Categoria, attributes: ["id", "nombre"] },
         { model: Oficina, attributes: ["id", "nombre"] },
       ],
-      order: [["id", "DESC"]],
     });
 
-    return res.status(200).json(activos);
+    if (!activo) {
+      return res.status(404).json({ mensaje: "Activo no encontrado" });
+    }
+
+    return res.status(200).json(activo);
   } catch (error) {
-    console.error("Error al listar activos:", error);
-    return res.status(500).json({ mensaje: "Error al listar activos" });
+    console.error("Error al obtener activo:", error);
+    return res.status(500).json({ mensaje: "Error al obtener activo" });
   }
 };
 
@@ -143,7 +342,7 @@ const crearActivo = async (req, res) => {
 
     if (!categoria) {
       await rollbackYResponder(transaction, res, 404, {
-        mensaje: "Categoría no encontrada",
+        mensaje: "Categoréa no encontrada",
       });
       transaction = null;
       return;
@@ -220,7 +419,7 @@ const crearActivo = async (req, res) => {
       error.original?.code === "ER_DUP_ENTRY"
     ) {
       return res.status(409).json({
-        mensaje: "Ya existe un activo con ese código interno",
+        mensaje: "Ya existe un activo con ese sódigo interno",
       });
     }
 
@@ -247,6 +446,7 @@ const actualizarActivo = async (req, res) => {
 
     const direccion = esAdminGeneral(req.usuario);
     const { id } = req.params;
+
     const {
       nombre,
       descripcion,
@@ -312,7 +512,7 @@ const actualizarActivo = async (req, res) => {
     if (
       !direccion &&
       String(activoDb.oficina_id) !== String(req.usuario.oficina_id)
-    ) {
+   ) {
       await rollbackYResponder(transaction, res, 403, {
         mensaje: "No tenés permisos para modificar activos de otra oficina",
       });
@@ -590,6 +790,7 @@ const darDeBajaActivo = async (req, res) => {
 
 module.exports = {
   listarActivos,
+  obtenerActivo,
   crearActivo,
   actualizarActivo,
   darDeBajaActivo,

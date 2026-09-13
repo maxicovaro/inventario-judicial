@@ -1,0 +1,11 @@
+import { useState } from "react";
+import { Badge, Button, EmptyState, TableFrame } from "../ui";
+import AdjuntosPanel from "../AdjuntosPanel";
+const tone=e=>e==="Excelente estado"?"success":e==="Buen estado"?"info":e==="Regular estado"?"warning":e==="Dado de baja"?"neutral":"danger";
+export default function ActivosTable({activos,loading,usuario,direccion,gestiona,detailId,onEdit,onBaja}){
+ const [adjunto,setAdjunto]=useState(null);
+ if(loading) return <p aria-live="polite">Cargando activos...</p>;
+ if(!activos.length) return <EmptyState title="No hay activos para mostrar" description="Probá cambiar los filtros o la búsqueda."/>;
+ return <TableFrame label="Listado de activos"><table className="ui-table assets-table"><caption className="sr-only">Listado de activos</caption><thead><tr><th>Código</th><th>Activo</th><th>Estado</th><th>Oficina</th><th>Categoría</th><th>Acciones</th></tr></thead><tbody>{activos.map(a=>{const own=String(a.oficina_id)===String(usuario.oficina_id),canSee=direccion||own,canEdit=gestiona&&canSee&&a.activo!==false&&a.estado!=="Dado de baja";return <FragmentRow key={a.id} a={a} canSee={canSee} canEdit={canEdit} direccion={direccion} detailId={detailId} adjunto={adjunto} setAdjunto={setAdjunto} onEdit={onEdit} onBaja={onBaja}/>;})}</tbody></table></TableFrame>;
+}
+function FragmentRow({a,canSee,canEdit,direccion,detailId,adjunto,setAdjunto,onEdit,onBaja}){return <><tr><td>{a.codigo_interno||"—"}</td><td><strong>{a.nombre}</strong><div className="ops-muted">{[a.marca,a.modelo].filter(Boolean).join(" · ")||"Sin marca/modelo"}</div></td><td><Badge tone={tone(a.estado)}>{a.estado}</Badge></td><td>{a.Oficina?.nombre||"—"}</td><td>{a.Categorium?.nombre||a.Categoria?.nombre||"—"}</td><td><div className="assets-row-actions">{canEdit&&<Button size="sm" variant="secondary" disabled={detailId===a.id} busy={detailId===a.id} onClick={()=>onEdit(a)}>Editar</Button>}{canSee&&<Button size="sm" variant="ghost" onClick={()=>setAdjunto(adjunto===a.id?null:a.id)}>Adjuntos</Button>}{direccion&&a.activo!==false&&a.estado!=="Dado de baja"&&<Button size="sm" variant="danger" onClick={()=>onBaja(a)}>Dar de baja</Button>}</div></td></tr>{adjunto===a.id&&<tr><td colSpan="6"><AdjuntosPanel activoId={a.id}/></td></tr>}</>}
