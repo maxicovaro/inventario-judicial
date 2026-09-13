@@ -9,7 +9,10 @@ const controller = fs.readFileSync("src/controllers/activoController.js", "utf8"
 const dashboard = fs.readFileSync("src/controllers/dashboardController.js", "utf8");
 
 assert.match(packageJson.scripts["test:p8-query-pagination"], /test-p8-query-pagination/);
-assert.match(packageJson.scripts.test, /test:p8-query-pagination/);
+assert.match(packageJson.scripts["test:p8-query-contracts"], /test-p8-query-contracts/);
+assert.match(packageJson.scripts.test, /test:p8-query-contracts/);
+assert.doesNotMatch(packageJson.scripts.test, /test:p8-query-pagination/);
+assert.match(packageJson.scripts["test:integration"], /test:p8-query-pagination/);
 assert.match(baseline, /\/api\/activos\?page=1&page_size=25/);
 assert.match(profile, /\/api\/activos\?page=1&page_size=25/);
 assert.match(controller, /DEFAULT_PAGE_SIZE = 25/);
