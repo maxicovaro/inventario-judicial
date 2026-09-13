@@ -10,6 +10,8 @@
     "auth_me_admin": { "target_p95_ms": 200, "hard_p95_ms": 1500, "target_payload_kb": 20, "hard_payload_kb": 200 },
     "activos_admin": { "target_p95_ms": 150, "hard_p95_ms": 1000, "target_payload_kb": 100, "hard_payload_kb": 500 },
     "activos_responsable": { "target_p95_ms": 150, "hard_p95_ms": 1000, "target_payload_kb": 100, "hard_payload_kb": 500 },
+    "activos_catalogo_admin": { "target_p95_ms": 150, "hard_p95_ms": 1000, "target_payload_kb": 25, "hard_payload_kb": 100 },
+    "activos_catalogo_responsable": { "target_p95_ms": 150, "hard_p95_ms": 1000, "target_payload_kb": 25, "hard_payload_kb": 100 },
     "dashboard_admin": { "target_p95_ms": 300, "hard_p95_ms": 2500, "target_payload_kb": 100, "hard_payload_kb": 3000 },
     "insumos_admin": { "target_p95_ms": 300, "hard_p95_ms": 2500, "target_payload_kb": 500, "hard_payload_kb": 5000 }
   },
