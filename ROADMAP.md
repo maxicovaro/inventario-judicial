@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 13/09/2026 después del cierre técnico de **P8.5 — Pruebas de carga**. El bloque activo pasa a ser **P8.6 — Optimización + regresión**.
+> Actualizada al 13/09/2026 después del cierre técnico de **P8.6 — Optimización + regresión**. El bloque activo pasa a ser **P8.7 — Cierre documental y criterios de piloto**.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -27,8 +27,8 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | P8.3 Payloads, uploads y reportes | ✅ Completo | PR #27; Gate de implementación #201 |
 | P8.4 Rendimiento frontend | ✅ Completo | PR #28; Gate de implementación #206 |
 | P8.5 Pruebas de carga | ✅ Completo | PR #29; Gate de implementación #211 |
-| **P8.6 Optimización + regresión** | 🟡 **Activo** | Siguiente bloque autorizado |
-| P8.7 Cierre documental y criterios de piloto | ⏳ Pendiente | Después de P8.6 |
+| P8.6 Optimización + regresión | ✅ Completo | PR #30; Gate #218; `docs/P8_6_CLOSURE.md` |
+| **P8.7 Cierre documental y criterios de piloto** | 🟡 **Activo** | Siguiente bloque autorizado |
 | P9 Piloto | ⏳ Pendiente | Después de P8 completo |
 
 ---
@@ -429,18 +429,49 @@ Interpretación:
 
 Los presupuestos de carga quedaron calibrados y versionados; cualquier error HTTP, invariante falsa o techo duro bloquea CI. Detalle completo en `docs/PERFORMANCE.md`.
 
-### BLOQUE ACTIVO — P8.6 Optimización + regresión 🟡
+### P8.6 — Optimización + regresión ✅
+
+Implementado en `performance/p8-optimization-regression` / PR #30.
+
+Resultado:
+- se agregó perfil reproducible de contención de Stock c1/c20;
+- se capturan tiempos SQL, queries `FOR UPDATE`, p95 HTTP e invariantes P6;
+- la clasificación se separó de la medición y usa participación SQL + multiplicadores de espera;
+- el artifact `performance-stock-contention` queda publicado en Quality Gate;
+- `test:p8-regression-contracts` protege los locks e idempotencia críticos;
+- **no se modificó lógica productiva** por falta de una alternativa segura/material demostrada.
+
+Evidencia — Gate #218:
+- c1: 26,03 ms p95, 0 errores, invariantes `true`;
+- c20: **270,17 ms p95**, 0 errores, invariantes `true`;
+- `Insumo ... FOR UPDATE`: **805 ms / 1179 ms SQL**, equivalente a **68,28 %**;
+- espera promedio del lock central: **40,25 ms** a c20;
+- `StockOficina ... FOR UPDATE`: 10 ms totales, 0,5 ms promedio;
+- multiplicador p95 HTTP c20/c1: **10,38×**;
+- `central_stock_lock_is_dominant_candidate=true`;
+- `production_change_required=false`.
+
+Decisión:
+- la presión proviene de la serialización deliberada del stock central al competir por el mismo insumo;
+- ese lock protege contra doble gasto y es coherente con provisión/asignación;
+- el lock de oficina protege coordinación con consumo y no es el cuello principal;
+- reordenar/eliminar locks trasladaría la cola o aumentaría riesgo de carrera/deadlock;
+- no se agregan índices, cachés ni complejidad transaccional sin evidencia de mejora real del piloto;
+- decisión versionada: `preserve_consistency_locks_and_regression_guards`.
+
+Detalle completo: `docs/P8_6_CLOSURE.md`.
+
+### BLOQUE ACTIVO — P8.7 Cierre documental y criterios de piloto 🟡
 
 Objetivos autorizados:
-1. partir exclusivamente de los hallazgos P8.0–P8.5; no abrir optimizaciones generales sin evidencia;
-2. analizar la contención de escrituras de Stock observada a concurrencia alta y localizar su costo real (transacción, locks, idempotencia, round-trips o instrumentación) antes de modificar código;
-3. conservar como invariantes obligatorias stock no negativo, una escritura por operación lógica, historial exacto y replay correcto;
-4. evaluar cambios solo si una comparación antes/después demuestra mejora repetible sin degradar seguridad ni consistencia;
-5. no reducir bcrypt, MFA, rate limiting, autorización, locking o idempotencia para mejorar benchmarks;
-6. no agregar índices/caches si `EXPLAIN`, perfil y carga no muestran una mejora concreta;
-7. endurecer contratos y presupuestos de regresión para los escenarios que ya demostraron estabilidad;
-8. si no existe una optimización segura y material, documentar la decisión y cerrar P8.6 con las regresiones actuales en lugar de introducir complejidad innecesaria;
-9. mantener `npm test`, integración MySQL, auth/MFA, P6, backup/restore, P8.0/P8.1/P8.5 y Chromium E2E completamente verdes.
+1. revisar P8.0–P8.6 como un único frente y confirmar que código, CI, artifacts y documentación estén alineados;
+2. definir criterios técnicos explícitos de entrada al piloto para rendimiento, seguridad, consistencia, recuperación y observabilidad;
+3. consolidar qué métricas deben vigilarse durante el piloto y qué umbrales obligan a detener/escalar;
+4. registrar límites conocidos y decisiones deliberadas, incluida la serialización de Stock central;
+5. verificar que staging siga siendo el entorno de validación previa y que P9 no requiera cambios de arquitectura pendientes;
+6. ejecutar el Quality Gate final de P8 sin excepciones, incluyendo P8.0, P8.1, P8.5, P8.6 y Chromium;
+7. producir el cierre documental de P8 y actualizar `ROADMAP.md` antes de habilitar P9;
+8. no abrir P9 mientras P8.7 permanezca activo.
 
 ### Continuidad P8
 
@@ -450,8 +481,8 @@ Objetivos autorizados:
 - **P8.3 Payloads, uploads y reportes ✅**
 - **P8.4 Rendimiento frontend ✅**
 - **P8.5 Pruebas de carga ✅**
-- **P8.6 Optimización + regresión 🟡 ACTIVO**
-- **P8.7 Cierre documental y criterios de piloto ⏳**
+- **P8.6 Optimización + regresión ✅**
+- **P8.7 Cierre documental y criterios de piloto 🟡 ACTIVO**
 
 No iniciar P9 hasta completar P8 y su Quality Gate final.
 
@@ -486,6 +517,7 @@ No abrir como frentes paralelos salvo que bloqueen P8/P9:
 - Railway staging: `docs/RAILWAY_STAGING.md`;
 - cierre P7: `docs/P7_CLOSURE.md`;
 - rendimiento/escalabilidad: `docs/PERFORMANCE.md`;
+- cierre P8.6: `docs/P8_6_CLOSURE.md`;
 - evidencia ejecutable: commits, PRs, Quality Gates y artifacts.
 
 ## Reglas de trabajo
