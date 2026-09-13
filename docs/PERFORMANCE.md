@@ -657,3 +657,104 @@ Quality Gate #206 quedó verde completo con:
 - contratos P8.4 incluidos en `npm test` ✅;
 - Quality Gate de implementación #206 verde completo ✅;
 - siguiente bloque: **P8.5 — Pruebas de carga**.
+
+---
+
+## P8.5 — Pruebas de carga ✅
+
+P8.5 incorpora una prueba de carga reproducible sobre la misma base MySQL descartable usada por CI. No se ejecuta contra staging ni producción y no utiliza datos judiciales reales. La implementación y la calibración final quedaron completamente verdes en el **Quality Gate #211** sobre `performance/p8-load-tests` / PR #29.
+
+### Metodología y seguridad
+
+`scripts/performance-load.js` usa `fetch` nativo de Node y levanta la aplicación sobre un puerto efímero. Antes de generar carga:
+
+- exige `NODE_ENV=test`;
+- exige que `DB_NAME` identifique una base `test`, `ci` o `e2e`;
+- reconstruye el dataset sintético de **6000 activos + 300 insumos**;
+- reutiliza los usuarios de integración, sin secretos ni datos reales;
+- conserva P6 como invariante: una prueba de rendimiento nunca puede aceptar duplicación, stock negativo ni replay incorrecto.
+
+Las lecturas se miden a concurrencia **1, 5, 10 y 20**, con varias iteraciones por worker. Login se mide a 1/3/5 para no convertir un control de seguridad costoso por diseño en una tormenta artificial. Las escrituras de Stock cubren:
+
+1. operaciones concurrentes con `Idempotency-Key` diferentes;
+2. pares concurrentes con la **misma** `Idempotency-Key`, donde una petición debe ser replay y la escritura física debe ocurrir una sola vez.
+
+Por escenario se registran p50, p95, p99, máximo, throughput, tasa de error, códigos HTTP, payload máximo y relación p95 respecto de concurrencia 1. El artifact es `performance-load-profile` / `performance-results/load-profile.json`.
+
+### Curva final — Quality Gate #211
+
+Todos los escenarios terminaron con **0 errores HTTP** y sin superar ningún techo duro.
+
+| Escenario | Concurrencia máxima | p95 | Throughput | Resultado |
+| --- | ---: | ---: | ---: | --- |
+| sesión `/auth/me` | 20 | **68,90 ms** | 486,73 req/s | pass |
+| Dashboard | 20 | **92,56 ms** | 233,09 req/s | pass |
+| Activos paginados | 20 | **80,91 ms** | 287,80 req/s | pass |
+| Pedidos RESPONSABLE | 20 | **59,82 ms** | 387,18 req/s | pass |
+| Stock RESPONSABLE | 20 | **49,24 ms** | 481,80 req/s | pass |
+| mix operativo | 20 | **76,65 ms** | 326,36 req/s | pass |
+| login exitoso | 5 | **34,31 ms** | 143,20 req/s | pass |
+| Stock, claves únicas | 20 | **275,71 ms** | 70,67 req/s | target=warn / hard=pass |
+| Stock, replay idempotente | 20 HTTP / 10 operaciones lógicas | **170,82 ms** | 116,29 req/s | pass |
+
+En `stock_write_unique`, las 20 operaciones dejaron exactamente 20 movimientos, descontaron 20 unidades del stock central y sumaron 20 unidades en la oficina. En el escenario idempotente, 10 operaciones lógicas enviadas por duplicado produjeron exactamente 10 escrituras y **10 replays**. Todas las invariantes quedaron `true`.
+
+### Variación entre runners y hallazgo estable
+
+La ejecución inicial #210 y la calibrada #211 muestran variación propia del runner compartido:
+
+- en #210, Stock con claves únicas quedó cerca de 147 ms p95 a c20 y el replay idempotente alrededor de 299 ms;
+- en #211, claves únicas quedó en 275,71 ms y replay idempotente en 170,82 ms.
+
+Por eso P8.5 **no concluye que un endpoint específico esté defectuoso** a partir de un único número. El hallazgo estable es más acotado: las lecturas permanecen holgadas hasta c20, mientras la primera zona sensible es la **serialización de escrituras de Stock** bajo concurrencia alta. La integridad no se degrada.
+
+Esto tampoco justifica por sí solo un índice, caché o relajación de locks/idempotencia. Cualquier optimización P8.6 debe demostrar que reduce contención sin permitir doble gasto, doble movimiento ni replay incorrecto.
+
+### Login y seguridad
+
+El login incorpora bcrypt, sesión y bitácora de manera deliberada. En las dos ejecuciones medidas, incluso bajo varios logins exitosos simultáneos el p95 se mantuvo bajo; no existe evidencia para reducir costo criptográfico, eliminar bitácora o relajar rate limiting. **La seguridad no se negocia para mejorar un benchmark.**
+
+### Presupuestos de regresión
+
+Después de la primera curva #210 se endurecieron los límites `performance/budgets.json`; #211 los validó:
+
+- sesión/pedidos/stock lectura: objetivos entre 150 ms y techo 500 ms;
+- Dashboard y mix: objetivo 200 ms, techo 750 ms;
+- Activos: objetivo 180 ms, techo 600 ms;
+- login: objetivo 150 ms, techo 600 ms;
+- Stock escritura única: objetivo 250 ms, techo 800 ms;
+- Stock idempotente: objetivo 250 ms, techo 1000 ms;
+- **tasa de error permitida: 0 %** en objetivo y techo para todos los escenarios.
+
+Un `target=warn` deja visible una zona de presión sin bloquear por ruido del runner; un `hard=fail`, un error HTTP o una invariante transaccional falsa bloquea CI.
+
+### Quality Gate y aislamiento
+
+P8.5 se ejecuta después de P8.0/P8.1 y antes de E2E. Al terminar, CI recrea los fixtures E2E normales, de modo que las escrituras de carga no contaminan Chromium.
+
+Quality Gate #211 quedó verde completo con:
+
+- auditoría y lint/build frontend;
+- sintaxis backend + `npm test`, incluido `test:p8-load-contracts`;
+- migraciones e integración MySQL;
+- auth hardening, concurrencia de login y MFA;
+- P6 concurrencia/idempotencia;
+- health + backup/restore;
+- baseline P8.0 y profiler P8.1;
+- perfil P8.5 + artifact;
+- Chromium E2E crítico.
+
+### Criterios de salida P8.5
+
+- metodología reproducible y test-only ✅;
+- dataset sintético representativo ✅;
+- carga escalonada de lecturas ✅;
+- login medido sin debilitar controles ✅;
+- escrituras de Stock con claves únicas e idempotentes ✅;
+- p50/p95/p99, throughput y errores registrados ✅;
+- invariantes P6 verificadas bajo carga ✅;
+- variabilidad de runner documentada y separada de SLA ✅;
+- presupuestos calibrados y versionados ✅;
+- artifact en Quality Gate ✅;
+- Quality Gate de implementación #211 verde completo ✅;
+- siguiente bloque: **P8.6 — Optimización + regresión**.

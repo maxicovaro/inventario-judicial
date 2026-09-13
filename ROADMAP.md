@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 13/09/2026 después del cierre técnico de **P8.4 — Rendimiento frontend**. El bloque activo pasa a ser **P8.5 — Pruebas de carga**.
+> Actualizada al 13/09/2026 después del cierre técnico de **P8.5 — Pruebas de carga**. El bloque activo pasa a ser **P8.6 — Optimización + regresión**.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -26,8 +26,9 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | P8.2 Índices, queries y paginación | ✅ Completo | PR #26; Gate de implementación #184 |
 | P8.3 Payloads, uploads y reportes | ✅ Completo | PR #27; Gate de implementación #201 |
 | P8.4 Rendimiento frontend | ✅ Completo | PR #28; Gate de implementación #206 |
-| **P8.5 Pruebas de carga** | 🟡 **Activo** | Siguiente bloque autorizado |
-| P8.6–P8.7 | ⏳ Pendiente | Después de P8.5 |
+| P8.5 Pruebas de carga | ✅ Completo | PR #29; Gate de implementación #211 |
+| **P8.6 Optimización + regresión** | 🟡 **Activo** | Siguiente bloque autorizado |
+| P8.7 Cierre documental y criterios de piloto | ⏳ Pendiente | Después de P8.6 |
 | P9 Piloto | ⏳ Pendiente | Después de P8 completo |
 
 ---
@@ -391,17 +392,55 @@ Evidencia — Gate #206:
 
 Detalle completo: `docs/PERFORMANCE.md`.
 
-### BLOQUE ACTIVO — P8.5 Pruebas de carga 🟡
+### P8.5 — Pruebas de carga ✅
+
+Implementado en `performance/p8-load-tests` / PR #29.
+
+Metodología:
+- ejecutor propio con `fetch` nativo, sin dependencia de benchmarking adicional;
+- ejecución exclusivamente con `NODE_ENV=test` sobre DB `test/ci/e2e`;
+- dataset sintético de 6000 activos + 300 insumos;
+- niveles de lectura 1/5/10/20 concurrentes;
+- login 1/3/5;
+- sesión, Dashboard, Activos paginados, Pedidos, Stock y mix operativo;
+- escrituras de Stock con claves idempotentes únicas y replay concurrente con la misma clave;
+- métricas p50/p95/p99, throughput, errores y primera degradación;
+- verificación de stock/movimientos/replays como invariantes P6;
+- artifact `performance-load-profile` en Quality Gate.
+
+Evidencia — Gate #211:
+- **0 errores HTTP** en todos los escenarios;
+- `auth_me_admin` c20: **68,90 ms p95**, 486,73 req/s;
+- Dashboard c20: **92,56 ms p95**, 233,09 req/s;
+- Activos c20: **80,91 ms p95**, 287,80 req/s;
+- Pedidos c20: **59,82 ms p95**, 387,18 req/s;
+- Stock lectura c20: **49,24 ms p95**, 481,80 req/s;
+- mix operativo c20: **76,65 ms p95**, 326,36 req/s;
+- login c5: **34,31 ms p95**, sin evidencia para debilitar bcrypt/rate limiting;
+- Stock con claves únicas c20: **275,71 ms p95**, `target=warn`, `hard=pass`, invariantes correctas;
+- Stock idempotente: 20 HTTP / 10 operaciones lógicas, **170,82 ms p95**, 10 replays y exactamente 10 escrituras.
+
+Interpretación:
+- no existe evidencia de saturación crítica en lecturas a concurrencia 20;
+- la primera zona sensible es la serialización de escrituras de Stock bajo concurrencia alta;
+- #210/#211 muestran variación del runner sobre qué escenario de escritura carga más, por lo que no se debe atribuir un problema estructural a una única cifra;
+- P6 se preserva completamente: ninguna mejora futura puede relajar locks, idempotencia ni consistencia;
+- no hay evidencia para agregar índices, caches o cambiar contratos generales en P8.5.
+
+Los presupuestos de carga quedaron calibrados y versionados; cualquier error HTTP, invariante falsa o techo duro bloquea CI. Detalle completo en `docs/PERFORMANCE.md`.
+
+### BLOQUE ACTIVO — P8.6 Optimización + regresión 🟡
 
 Objetivos autorizados:
-1. definir una metodología reproducible de carga sobre entorno descartable/controlado, nunca sobre producción ni datos judiciales reales;
-2. modelar concurrencia representativa del piloto para lectura y escritura, incluyendo login/sesión, Dashboard, Activos paginados, catálogos, pedidos y stock;
-3. medir throughput, latencia p50/p95/p99, tasa de error y saturación bajo niveles crecientes de concurrencia;
-4. identificar el primer punto de degradación real antes de proponer nuevos índices, caches, paginaciones o cambios de contrato;
-5. incluir escenarios de operaciones transaccionales sensibles sin duplicar escrituras ni debilitar P6/idempotencia;
-6. separar límites del runner/infraestructura de los límites de aplicación y documentar esa distinción;
-7. dejar artifacts y presupuestos de regresión cuando una métrica resulte estable y accionable;
-8. mantener `npm test`, integración MySQL, auth/MFA, P6, backup/restore, baseline/profile y Chromium E2E completamente verdes.
+1. partir exclusivamente de los hallazgos P8.0–P8.5; no abrir optimizaciones generales sin evidencia;
+2. analizar la contención de escrituras de Stock observada a concurrencia alta y localizar su costo real (transacción, locks, idempotencia, round-trips o instrumentación) antes de modificar código;
+3. conservar como invariantes obligatorias stock no negativo, una escritura por operación lógica, historial exacto y replay correcto;
+4. evaluar cambios solo si una comparación antes/después demuestra mejora repetible sin degradar seguridad ni consistencia;
+5. no reducir bcrypt, MFA, rate limiting, autorización, locking o idempotencia para mejorar benchmarks;
+6. no agregar índices/caches si `EXPLAIN`, perfil y carga no muestran una mejora concreta;
+7. endurecer contratos y presupuestos de regresión para los escenarios que ya demostraron estabilidad;
+8. si no existe una optimización segura y material, documentar la decisión y cerrar P8.6 con las regresiones actuales en lugar de introducir complejidad innecesaria;
+9. mantener `npm test`, integración MySQL, auth/MFA, P6, backup/restore, P8.0/P8.1/P8.5 y Chromium E2E completamente verdes.
 
 ### Continuidad P8
 
@@ -410,8 +449,8 @@ Objetivos autorizados:
 - **P8.2 Índices, queries y paginación ✅**
 - **P8.3 Payloads, uploads y reportes ✅**
 - **P8.4 Rendimiento frontend ✅**
-- **P8.5 Pruebas de carga 🟡 ACTIVO**
-- **P8.6 Optimización + regresión ⏳**
+- **P8.5 Pruebas de carga ✅**
+- **P8.6 Optimización + regresión 🟡 ACTIVO**
 - **P8.7 Cierre documental y criterios de piloto ⏳**
 
 No iniciar P9 hasta completar P8 y su Quality Gate final.
