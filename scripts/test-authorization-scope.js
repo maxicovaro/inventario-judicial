@@ -52,7 +52,7 @@ const layout = fs.readFileSync(
   "utf8",
 );
 const activosFrontend = fs.readFileSync(
-  "inventario-frontend/src/pages/Activos.jsx",
+  "inventario-frontend/src/pages/ActivosPaginados.jsx",
   "utf8",
 );
 const solicitudesFrontend = fs.readFileSync(

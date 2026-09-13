@@ -33,16 +33,12 @@ const crearVerificadorSesion = ({ exigirMfa }) => async (req, res, next) => {
       token.includes(" ") ||
       token.length > MAX_BEARER_TOKEN_LENGTH
     ) {
-      return res.status(401).json({
-        mensaje: "Token no válido",
-      });
+      return res.status(401).json({ mensaje: "Token no válido" });
     }
 
     if (!process.env.JWT_SECRET) {
       console.error("JWT_SECRET no está configurado");
-      return res.status(500).json({
-        mensaje: "Error interno de autenticación",
-      });
+      return res.status(500).json({ mensaje: "Error interno de autenticación" });
     }
 
     const decoded = jwt.verify(
@@ -52,9 +48,7 @@ const crearVerificadorSesion = ({ exigirMfa }) => async (req, res, next) => {
     );
 
     if (!decoded?.id || !decoded?.jti || String(decoded.sub) !== String(decoded.id)) {
-      return res.status(401).json({
-        mensaje: "Sesión inválida o expirada",
-      });
+      return res.status(401).json({ mensaje: "Sesión inválida o expirada" });
     }
 
     const sesion = await AuthSession.findOne({
@@ -68,12 +62,20 @@ const crearVerificadorSesion = ({ exigirMfa }) => async (req, res, next) => {
     });
 
     if (!sesion) {
-      return res.status(401).json({
-        mensaje: "Sesión inválida o expirada",
-      });
+      return res.status(401).json({ mensaje: "Sesión inválida o expirada" });
     }
 
     const usuario = await Usuario.findByPk(decoded.id, {
+      attributes: [
+        "id",
+        "nombre",
+        "apellido",
+        "email",
+        "role_id",
+        "oficina_id",
+        "activo",
+        "mfa_enabled",
+      ],
       include: [
         { model: Role, attributes: ["id", "nombre"] },
         { model: Oficina, attributes: ["id", "nombre", "es_central"] },
@@ -87,9 +89,7 @@ const crearVerificadorSesion = ({ exigirMfa }) => async (req, res, next) => {
     }
 
     if (!usuario.activo) {
-      return res.status(403).json({
-        mensaje: "El usuario está inactivo",
-      });
+      return res.status(403).json({ mensaje: "El usuario está inactivo" });
     }
 
     req.auth = {
@@ -134,9 +134,7 @@ const crearVerificadorSesion = ({ exigirMfa }) => async (req, res, next) => {
     next();
   } catch (error) {
     console.warn("Token rechazado:", error.name);
-    return res.status(401).json({
-      mensaje: "Token inválido o expirado",
-    });
+    return res.status(401).json({ mensaje: "Token inválido o expirado" });
   }
 };
 
@@ -185,7 +183,6 @@ const verificarAdminGeneral = (req, res, next) => {
       mensaje: "Acceso denegado. Se requiere permiso de Administrador General",
     });
   }
-
   next();
 };
 
@@ -195,7 +192,6 @@ const verificarGestionOficina = (req, res, next) => {
       mensaje: "Acceso denegado. Se requiere ser Administrador General o RESPONSABLE de una oficina",
     });
   }
-
   next();
 };
 

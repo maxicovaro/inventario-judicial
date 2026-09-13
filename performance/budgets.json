@@ -8,8 +8,8 @@
     "health_ready": { "target_p95_ms": 150, "hard_p95_ms": 1000, "target_payload_kb": 20, "hard_payload_kb": 200 },
     "login_admin": { "target_p95_ms": 600, "hard_p95_ms": 3000, "target_payload_kb": 20, "hard_payload_kb": 200 },
     "auth_me_admin": { "target_p95_ms": 200, "hard_p95_ms": 1500, "target_payload_kb": 20, "hard_payload_kb": 200 },
-    "activos_admin": { "target_p95_ms": 500, "hard_p95_ms": 5000, "target_payload_kb": 1000, "hard_payload_kb": 15000 },
-    "activos_responsable": { "target_p95_ms": 500, "hard_p95_ms": 4000, "target_payload_kb": 500, "hard_payload_kb": 6000 },
+    "activos_admin": { "target_p95_ms": 150, "hard_p95_ms": 1000, "target_payload_kb": 100, "hard_payload_kb": 500 },
+    "activos_responsable": { "target_p95_ms": 150, "hard_p95_ms": 1000, "target_payload_kb": 100, "hard_payload_kb": 500 },
     "dashboard_admin": { "target_p95_ms": 300, "hard_p95_ms": 2500, "target_payload_kb": 100, "hard_payload_kb": 3000 },
     "insumos_admin": { "target_p95_ms": 300, "hard_p95_ms": 2500, "target_payload_kb": 500, "hard_payload_kb": 5000 }
   },

@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 13/09/2026 después del cierre técnico de **P8.1 — Perfilado backend/MySQL**. El bloque activo pasa a ser **P8.2 — Índices, queries y paginación**.
+> Actualizada al 13/09/2026 después del cierre técnico de **P8.2 — Índices, queries y paginación**. El bloque activo pasa a ser **P8.3 — Payloads, uploads y reportes**.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -23,8 +23,9 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | P7.2 Staging real | ✅ Completo | PR #22; merge `6872095e...`; Gate #168 |
 | P8.0 Baseline y metodología | ✅ Completo | PR #24; Gate #172/#174 |
 | P8.1 Perfilado backend/MySQL | ✅ Completo | PR #25; perfil inicial Gate #175 |
-| **P8.2 Índices, queries y paginación** | 🟡 **Activo** | Siguiente bloque autorizado |
-| P8.3–P8.7 | ⏳ Pendiente | Después de P8.2 |
+| P8.2 Índices, queries y paginación | ✅ Completo | PR #26; Gate de implementación #184 |
+| **P8.3 Payloads, uploads y reportes** | 🟡 **Activo** | Siguiente bloque autorizado |
+| P8.4–P8.7 | ⏳ Pendiente | Después de P8.3 |
 | P9 Piloto | ⏳ Pendiente | Después de P8 completo |
 
 ---
@@ -289,24 +290,66 @@ Decisiones para P8.2:
 
 Detalle completo: `docs/PERFORMANCE.md`.
 
-### BLOQUE ACTIVO — P8.2 Índices, queries y paginación 🟡
+### P8.2 — Índices, queries y paginación ✅
+
+Implementado en `performance/p8-query-pagination` / PR #26.
+
+Cambios principales:
+- listado de Activos con paginación server-side (25 por defecto, máximo 100);
+- búsqueda y filtros server-side por texto, estado y oficina;
+- proyección de columnas del listado + detalle protegido por ID para edición;
+- resumen KPI mediante agregación SQL independiente de la página;
+- UI React con debounce, selector 25/50/100 y paginación accesible;
+- permisos y alcance por oficina preservados;
+- atributos de usuario minimizados en auth middleware sin alterar MFA/sesión;
+- Dashboard reutiliza agregación por estado y elimina tres counts redundantes;
+- baseline/profile P8 apuntan al contrato paginado explícito;
+- prueba dinámica de paginación y aislamiento ejecutada sobre MySQL real.
+
+Evidencia Gate #184:
+- `activos_admin`: p95 224,09 → **11,35 ms**; payload 3331,35 → **9,16 KB**;
+- `activos_responsable`: p95 13,11 → **7,81 ms**; payload 123,34 → **9,09 KB**;
+- `dashboard_admin`: 16 → **13 queries/request**;
+- 0 errores en baseline;
+- frontend sin crecimiento: 264,85 KB JS gzip y 499,26 KB gzip total;
+- Quality Gate completo verde, incluido Chromium E2E.
+
+Decisión de índices:
+- no se agregan índices nuevos porque `oficina_id` ya sirve el alcance de oficina;
+- auth usa índices/PK;
+- `activo=true` tiene baja selectividad;
+- scans restantes ocurren sobre tablas pequeñas/no representativas;
+- no existe mejora demostrada que compense costo de escritura/mantenimiento de un índice nuevo.
+
+Presupuestos protegidos después de la mejora:
+- Activos p95 objetivo 150 ms / techo duro 1000 ms;
+- payload objetivo 100 KB / techo duro 500 KB.
+
+Compatibilidad transitoria:
+- `/api/activos` sin query params conserva temporalmente la respuesta legacy para Solicitudes y Adjuntos;
+- nuevas pantallas y mediciones no deben usar ese modo;
+- **P8.3 debe migrar esos consumidores a un catálogo ligero/búsqueda específica y retirar o acotar la carga completa**.
+
+Detalle completo: `docs/PERFORMANCE.md`.
+
+### BLOQUE ACTIVO — P8.3 Payloads, uploads y reportes 🟡
 
 Objetivos autorizados:
-1. implementar paginación server-side del listado global de activos preservando alcance por rol/oficina;
-2. definir contrato de búsqueda/filtros compatible con paginación y actualizar frontend/E2E donde corresponda;
-3. proyectar únicamente columnas necesarias en listados y autorización;
-4. consolidar agregaciones redundantes del dashboard sin alterar su respuesta pública;
-5. evaluar índices existentes/nuevos con `EXPLAIN` antes/después y selectividad real cuando sea necesario;
-6. no agregar índices de baja utilidad ni basados en tablas sin volumen representativo;
-7. comparar P8.0/P8.1 antes y después;
-8. mantener seguridad, MFA, permisos, P6, E2E y consistencia completamente verdes.
+1. eliminar la dependencia de Solicitudes/Adjuntos del listado legacy completo de `/api/activos` mediante catálogo ligero o búsqueda server-side;
+2. revisar payloads de reportes, pedidos, solicitudes, adjuntos e insumos con tamaños representativos;
+3. evitar transferir columnas o relaciones que la pantalla/reporte no utiliza;
+4. revisar estrategia de uploads, límites, compresión, lectura/descarga y persistencia sin debilitar controles de tipo/tamaño/autorización;
+5. revisar generación/exportación de PDF/Excel para evitar materialización innecesaria o respuestas excesivas;
+6. mantener contratos API compatibles o versionar claramente cualquier transición necesaria;
+7. ampliar baseline/perfilado cuando un flujo P8.3 requiera medición propia;
+8. mantener seguridad, MFA, permisos, P6, backup/restore y E2E completamente verdes.
 
 ### Continuidad P8
 
 - **P8.0 Baseline y metodología ✅**
 - **P8.1 Perfilado backend/MySQL ✅**
-- **P8.2 Índices, queries y paginación 🟡 ACTIVO**
-- **P8.3 Payloads, uploads y reportes ⏳**
+- **P8.2 Índices, queries y paginación ✅**
+- **P8.3 Payloads, uploads y reportes 🟡 ACTIVO**
 - **P8.4 Rendimiento frontend ⏳**
 - **P8.5 Pruebas de carga ⏳**
 - **P8.6 Optimización + regresión ⏳**
