@@ -91,12 +91,26 @@ Contiene:
 - persistencia de adjuntos;
 - rollback y evidencia de cierre de P7.2.
 
+### 7. Rendimiento y escalabilidad
+
+`PERFORMANCE.md`
+
+Contiene:
+- metodología reproducible de P8;
+- dataset sintético de 6000 activos + 300 insumos;
+- baseline API p50/p95/p99 y payloads;
+- baseline de bundle frontend;
+- presupuestos objetivo y techos duros;
+- artifacts de Quality Gate;
+- hallazgos priorizados y continuidad hacia P8.1/P8.2.
+
 ## Evidencia técnica
 
 La documentación anterior define el estado consolidado. La evidencia detallada de que un cambio fue implementado/validado vive en:
 - commits;
 - Pull Requests;
 - GitHub Actions / Quality Gate;
+- artifacts de rendimiento;
 - pruebas E2E e integración del repositorio.
 
 Los PRs no sustituyen la hoja de ruta: una vez cerrado un bloque, `ROADMAP.md` debe reflejarlo.
@@ -111,7 +125,8 @@ Para retomar el proyecto después de una pausa:
 4. Consultar `OPERATIONS.md` si hay base de datos, despliegue o incidente involucrado.
 5. Para P7/staging, consultar `STAGING.md`.
 6. Si el proveedor activo es Railway, leer también `RAILWAY_STAGING.md`.
-7. Verificar último Quality Gate antes de modificar/integrar.
+7. Para P8, leer `PERFORMANCE.md` y revisar el último artifact de baseline.
+8. Verificar último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
 
@@ -122,6 +137,7 @@ Actualizar documentación cuando ocurra cualquiera de estos eventos:
 - cambia la arquitectura UI global;
 - se agrega una migración relevante;
 - cambia staging/producción/infraestructura;
+- cambia un presupuesto o metodología de rendimiento;
 - un incidente genera una acción preventiva;
 - se toma una decisión técnica que afectará futuros módulos.
 

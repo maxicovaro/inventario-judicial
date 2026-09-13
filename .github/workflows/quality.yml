@@ -120,6 +120,44 @@ jobs:
           RESTORE_DB_PASSWORD: root_ci_password
         run: npm run test:backup-restore
 
+      - name: Run P8.0 API baseline
+        run: |
+          npm run perf:fixtures
+
+          cleanup_perf() {
+            if [ -f /tmp/inventario-perf-backend.pid ]; then kill "$(cat /tmp/inventario-perf-backend.pid)" 2>/dev/null || true; fi
+          }
+          trap cleanup_perf EXIT
+
+          node server.js > /tmp/inventario-perf-backend.log 2>&1 &
+          echo $! > /tmp/inventario-perf-backend.pid
+
+          for attempt in {1..45}; do
+            if curl --fail --silent http://localhost:3000/health/ready >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl --fail --silent http://localhost:3000/health/ready >/dev/null
+          if ! npm run perf:baseline; then
+            echo "--- Backend performance log ---"
+            tail -200 /tmp/inventario-perf-backend.log || true
+            exit 1
+          fi
+
+          cleanup_perf
+          trap - EXIT
+
+      - name: Upload P8.0 API baseline artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-backend-baseline
+          path: performance-results/api-baseline.json
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Prepare isolated E2E fixtures
         run: npm run test:integration:fixtures
 
@@ -233,3 +271,16 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+      - name: Measure P8.0 frontend baseline
+        working-directory: .
+        run: npm run perf:frontend
+
+      - name: Upload P8.0 frontend baseline artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-frontend-baseline
+          path: performance-results/frontend-baseline.json
+          if-no-files-found: warn
+          retention-days: 30
