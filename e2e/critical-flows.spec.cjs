@@ -295,7 +295,9 @@ test("pedido mensual se aprueba, provisiona y llega al reporte", async ({ page }
     page.getByRole("heading", { name: "Historial de pedidos de insumos" }),
   ).toBeVisible();
 
-  await expect(page.getByText("MENSUAL", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /Pedido #\d+ · \d+\/\d+ · Mensual/ }),
+  ).toBeVisible();
   await expect(page.getByText("ENVIADO", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Aprobar" }).click();
   await expect(page.getByText("APROBADO", { exact: true })).toBeVisible();
