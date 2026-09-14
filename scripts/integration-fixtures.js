@@ -10,6 +10,8 @@ const TEST_USERS = Object.freeze({
   responsable1: "responsable.uj1@inventario.test",
   responsable2: "responsable.uj2@inventario.test",
   usuario1: "usuario.uj1@inventario.test",
+  responsableContable: "responsable.contable@inventario.test",
+  responsableInformatica: "responsable.informatica@inventario.test",
 });
 
 const assertSafeIntegrationDatabase = () => {
@@ -73,18 +75,30 @@ const resetIntegrationData = async () => {
     Role.findOne({ where: { nombre: "USUARIO" } }),
   ]);
 
-  const [central, uj1, uj2, categoria] = await Promise.all([
-    Oficina.findOne({ where: { es_central: true } }),
-    Oficina.findOne({ where: { nombre: "Unidad Judicial N° 1" } }),
-    Oficina.findOne({ where: { nombre: "Unidad Judicial N° 2" } }),
-    Categoria.findOne({ where: { nombre: "Equipos informáticos y de comunicación" } }),
-  ]);
+  const [central, uj1, uj2, contable, informatica, deposito, categoria] =
+    await Promise.all([
+      Oficina.findOne({ where: { es_central: true } }),
+      Oficina.findOne({ where: { nombre: "Unidad Judicial N° 1" } }),
+      Oficina.findOne({ where: { nombre: "Unidad Judicial N° 2" } }),
+      Oficina.findOne({ where: { nombre: "Área Contable" } }),
+      Oficina.findOne({ where: { nombre: "Área Informática" } }),
+      Oficina.findOne({ where: { es_deposito_central: true } }),
+      Categoria.findOne({
+        where: { nombre: "Equipos informáticos y de comunicación" },
+      }),
+    ]);
 
   if (!adminRole || !responsableRole || !usuarioRole) {
     throw new Error("No se encontraron los roles base para integración");
   }
-  if (!central || !uj1 || !uj2 || !categoria) {
+  if (!central || !uj1 || !uj2 || !contable || !informatica || !deposito || !categoria) {
     throw new Error("No se encontraron oficinas/categoría base para integración");
+  }
+  if (!contable.gestiona_deposito) {
+    throw new Error("Área Contable no quedó configurada para gestionar depósito");
+  }
+  if (!deposito.es_deposito_central) {
+    throw new Error("No quedó configurado el Depósito Central");
   }
 
   const password = await bcrypt.hash(TEST_PASSWORD, 4);
@@ -102,11 +116,40 @@ const resetIntegrationData = async () => {
       bloqueado_hasta: null,
     });
 
-  const [admin, responsable1, responsable2, usuario1] = await Promise.all([
+  const [
+    admin,
+    responsable1,
+    responsable2,
+    usuario1,
+    responsableContable,
+    responsableInformatica,
+  ] = await Promise.all([
     createUser(TEST_USERS.admin, adminRole.id, central.id, "Admin"),
-    createUser(TEST_USERS.responsable1, responsableRole.id, uj1.id, "Responsable Uno"),
-    createUser(TEST_USERS.responsable2, responsableRole.id, uj2.id, "Responsable Dos"),
+    createUser(
+      TEST_USERS.responsable1,
+      responsableRole.id,
+      uj1.id,
+      "Responsable Uno",
+    ),
+    createUser(
+      TEST_USERS.responsable2,
+      responsableRole.id,
+      uj2.id,
+      "Responsable Dos",
+    ),
     createUser(TEST_USERS.usuario1, usuarioRole.id, uj1.id, "Usuario Uno"),
+    createUser(
+      TEST_USERS.responsableContable,
+      responsableRole.id,
+      contable.id,
+      "Responsable Contable",
+    ),
+    createUser(
+      TEST_USERS.responsableInformatica,
+      responsableRole.id,
+      informatica.id,
+      "Responsable Informática",
+    ),
   ]);
 
   const activoBase = await Activo.create({
@@ -136,13 +179,22 @@ const resetIntegrationData = async () => {
       responsable1,
       responsable2,
       usuario1,
+      responsableContable,
+      responsableInformatica,
     },
     roles: {
       admin: adminRole,
       responsable: responsableRole,
       usuario: usuarioRole,
     },
-    offices: { central, uj1, uj2 },
+    offices: {
+      central,
+      uj1,
+      uj2,
+      contable,
+      informatica,
+      deposito,
+    },
     categoria,
     activoBase,
     insumoBase,
@@ -156,6 +208,10 @@ const main = async () => {
     console.log(`✓ Admin: ${fixtures.users.admin.email}`);
     console.log(`✓ Responsable UJ1: ${fixtures.users.responsable1.email}`);
     console.log(`✓ Usuario UJ1: ${fixtures.users.usuario1.email}`);
+    console.log(`✓ Responsable Contable: ${fixtures.users.responsableContable.email}`);
+    console.log(
+      `✓ Responsable Informática: ${fixtures.users.responsableInformatica.email}`,
+    );
   } finally {
     await sequelize.close();
   }
