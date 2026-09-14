@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/axios";
-import { esAdminGeneral } from "../utils/permisos";
+import { esAdminGeneral, puedeGestionarDeposito } from "../utils/permisos";
 import "../styles/app-shell.css";
 
 const MOBILE_QUERY = "(max-width: 980px)";
@@ -176,6 +176,10 @@ const routeMeta = {
   "/reportes-pedidos": ["Reportes de pedidos", "Consulta y análisis"],
   "/consumo-oficina": ["Consumo por oficina", "Evolución de insumos"],
   "/reporte-consumo-oficina": ["Reporte mensual", "Resumen de consumo"],
+  "/deposito-central/activos": ["Bienes en depósito", "Depósito Central"],
+  "/deposito-central/insumos": ["Insumos y distribución", "Depósito Central"],
+  "/deposito-central/solicitudes": ["Solicitudes recibidas", "Depósito Central"],
+  "/deposito-central/pedidos": ["Pedidos de insumos", "Depósito Central"],
   "/usuarios": ["Usuarios", "Administración de accesos"],
   "/bitacora": ["Bitácora", "Trazabilidad de acciones"],
   "/notificaciones": ["Notificaciones", "Novedades del sistema"],
@@ -188,6 +192,7 @@ export default function Layout({ children }) {
   const sidebarNavRef = useRef(null);
   const usuario = useMemo(() => obtenerUsuarioLocal(), []);
   const esDireccion = esAdminGeneral(usuario);
+  const gestionaDeposito = puedeGestionarDeposito(usuario);
 
   const [noLeidas, setNoLeidas] = useState(0);
   const [colapsado, setColapsado] = useState(
@@ -358,7 +363,7 @@ export default function Layout({ children }) {
       ];
     }
 
-    return [
+    const seccionesOficina = [
       {
         titulo: "General",
         items: [{ to: "/dashboard", label: "Inicio", icon: "dashboard" }],
@@ -389,7 +394,21 @@ export default function Layout({ children }) {
         items: [{ to: "/notificaciones", label: "Notificaciones", icon: "bell" }],
       },
     ];
-  }, [esDireccion]);
+
+    if (gestionaDeposito) {
+      seccionesOficina.splice(2, 0, {
+        titulo: "Depósito Central",
+        items: [
+          { to: "/deposito-central/activos", label: "Bienes en depósito", icon: "asset" },
+          { to: "/deposito-central/insumos", label: "Insumos y distribución", icon: "warehouse" },
+          { to: "/deposito-central/solicitudes", label: "Solicitudes recibidas", icon: "clipboard" },
+          { to: "/deposito-central/pedidos", label: "Pedidos recibidos", icon: "history" },
+        ],
+      });
+    }
+
+    return seccionesOficina;
+  }, [esDireccion, gestionaDeposito]);
 
   const [tituloActual, contextoActual] =
     routeMeta[location.pathname] || ["Inventario Judicial", "Gestión institucional"];
@@ -399,7 +418,9 @@ export default function Layout({ children }) {
   const inicial = nombreUsuario.charAt(0).toUpperCase();
   const contextoUsuario = esDireccion
     ? "Dirección / Depósito"
-    : usuario.oficina_nombre || usuario.role || "Mi oficina";
+    : gestionaDeposito
+      ? `${usuario.oficina_nombre || "Área Contable"} · Depósito Central`
+      : usuario.oficina_nombre || usuario.role || "Mi oficina";
 
   const shellClasses = [
     "app-shell",
