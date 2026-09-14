@@ -15,6 +15,9 @@ const {
   verificarToken,
   verificarAdminGeneral,
 } = require("../middlewares/authMiddleware");
+const {
+  validarEntregaConProvision,
+} = require("../middlewares/pedidoProvisionGuard");
 
 router.post("/", verificarToken, crearPedido);
 router.get("/", verificarToken, listarPedidos);
@@ -23,6 +26,7 @@ router.put(
   "/:id/proveer",
   verificarToken,
   verificarAdminGeneral,
+  validarEntregaConProvision,
   actualizarProvision,
 );
 router.put(
