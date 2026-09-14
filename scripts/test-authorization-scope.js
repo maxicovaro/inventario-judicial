@@ -5,6 +5,7 @@ const {
   esAdminGeneral,
   esResponsable,
   puedeGestionarOficina,
+  puedeGestionarDeposito,
 } = require("../src/utils/permisos");
 
 const adminCentral = {
@@ -24,6 +25,24 @@ const responsable = {
   oficina_id: 2,
   oficina_es_central: false,
 };
+const responsableDeposito = {
+  role: "RESPONSABLE",
+  oficina_id: 3,
+  oficina_es_central: false,
+  oficina_gestiona_deposito: true,
+};
+const responsableSinDeposito = {
+  role: "RESPONSABLE",
+  oficina_id: 4,
+  oficina_es_central: false,
+  oficina_gestiona_deposito: false,
+};
+const usuarioDeposito = {
+  role: "USUARIO",
+  oficina_id: 3,
+  oficina_es_central: false,
+  oficina_gestiona_deposito: true,
+};
 const usuario = {
   role: "USUARIO",
   oficina_id: 2,
@@ -36,6 +55,10 @@ assert.strictEqual(esResponsable(responsable), true);
 assert.strictEqual(puedeGestionarOficina(adminCentral), true);
 assert.strictEqual(puedeGestionarOficina(responsable), true);
 assert.strictEqual(puedeGestionarOficina(usuario), false);
+assert.strictEqual(puedeGestionarDeposito(adminCentral), true);
+assert.strictEqual(puedeGestionarDeposito(responsableDeposito), true);
+assert.strictEqual(puedeGestionarDeposito(responsableSinDeposito), false);
+assert.strictEqual(puedeGestionarDeposito(usuarioDeposito), false);
 
 const oficinaModel = fs.readFileSync("src/models/Oficina.js", "utf8");
 const permisos = fs.readFileSync("src/utils/permisos.js", "utf8");
@@ -67,16 +90,28 @@ const migration = fs.readFileSync(
   "src/db/migrations/20260909_002_oficina_central.js",
   "utf8",
 );
+const depositoMigration = fs.readFileSync(
+  "src/db/migrations/20260913_006_deposito_central_capabilities.js",
+  "utf8",
+);
 
 assert.match(oficinaModel, /es_central/);
+assert.match(oficinaModel, /gestiona_deposito/);
+assert.match(oficinaModel, /es_deposito_central/);
 assert.match(migration, /describeTable\("oficinas"\)/);
 assert.match(migration, /addColumn\("oficinas", "es_central"/);
+assert.match(depositoMigration, /gestiona_deposito/);
+assert.match(depositoMigration, /es_deposito_central/);
 assert.match(permisos, /oficina_es_central/);
+assert.match(permisos, /oficina_gestiona_deposito/);
 assert.doesNotMatch(permisos, /includes\("DIRECCION"\)/);
 assert.doesNotMatch(permisos, /includes\("POLICIA JUDICIAL"\)/);
+assert.doesNotMatch(permisos, /Área Contable|Area Contable/i);
 assert.match(authMiddleware, /verificarAdminGeneral/);
 assert.match(authMiddleware, /verificarGestionOficina/);
+assert.match(authMiddleware, /verificarGestionDeposito/);
 assert.match(authMiddleware, /oficina_es_central/);
+assert.match(authMiddleware, /oficina_gestiona_deposito/);
 assert.match(authController, /oficina_es_central/);
 
 assert.match(bootstrapAdmin, /where:\s*\{ es_central: true \}/);
@@ -92,7 +127,9 @@ assert.match(
 );
 
 assert.match(privateRoute, /esAdminGeneral/);
+assert.match(privateRoute, /puedeGestionarDeposito/);
 assert.match(layout, /esAdminGeneral/);
+assert.match(layout, /puedeGestionarDeposito/);
 assert.match(activosFrontend, /puedeGestionarOficina/);
 assert.match(activosFrontend, /const puedeGestionar = puedeGestionarOficina\(usuario\)/);
 assert.match(solicitudesFrontend, /esAdminGeneral/);
