@@ -1,6 +1,5 @@
 const sequelize = require("../config/database");
-const { PedidoInsumo, Oficina } = require("../models");
-const { esAdminGeneral } = require("../utils/permisos");
+const { PedidoInsumo } = require("../models");
 const { crearNotificacion } = require("../utils/notificaciones");
 const { registrarBitacora } = require("../utils/bitacora");
 const {
@@ -15,42 +14,28 @@ const {
   responderReplay,
 } = require("../utils/idempotencia");
 
-const actualizarEstadoPedidoSeguro = async (req, res) => {
+const actualizarEstadoPedidoDeposito = async (req, res) => {
   let transaction;
   let operacionIdempotente;
 
   try {
     const { estado } = req.body;
-
-    if (!esAdminGeneral(req.usuario)) {
-      return res.status(403).json({
-        mensaje: "Solo Dirección puede cambiar el estado de pedidos",
-      });
-    }
-
     if (!estado || !ESTADOS_VALIDOS.includes(estado)) {
-      return res.status(400).json({
-        mensaje: "Estado inválido",
-      });
+      return res.status(400).json({ mensaje: "Estado inválido" });
     }
 
     if (estado === "ENTREGADO") {
       return res.status(400).json({
-        mensaje:
-          "El estado ENTREGADO debe registrarse mediante la provisión del pedido",
+        mensaje: "ENTREGADO debe registrarse mediante la provisión del pedido",
       });
     }
 
     const inicio = await iniciarTransaccionIdempotente({
       sequelize,
       req,
-      scope: "pedido:estado",
+      scope: "deposito:pedido:estado",
     });
-
-    if (inicio.replay) {
-      responderReplay(res, inicio.replay);
-      return;
-    }
+    if (inicio.replay) return responderReplay(res, inicio.replay);
 
     transaction = inicio.transaction;
     operacionIdempotente = inicio.operacion;
@@ -63,46 +48,33 @@ const actualizarEstadoPedidoSeguro = async (req, res) => {
     if (!pedido) {
       await transaction.rollback();
       transaction = null;
-      return res.status(404).json({
-        mensaje: "Pedido no encontrado",
-      });
+      return res.status(404).json({ mensaje: "Pedido no encontrado" });
     }
 
-    const estadoAnterior = pedido.estado;
-    const cambioEstado = estadoAnterior !== estado;
-
-    if (!validarTransicionEstado(estadoAnterior, estado)) {
+    const anterior = pedido.estado;
+    if (!validarTransicionEstado(anterior, estado)) {
       await transaction.rollback();
       transaction = null;
       return res.status(409).json({
-        mensaje:
-          `Transición de estado no permitida: ${estadoAnterior} -> ${estado}`,
+        mensaje: `Transición de estado no permitida: ${anterior} -> ${estado}`,
       });
     }
 
-    if (cambioEstado) {
+    if (anterior !== estado) {
       await pedido.update({ estado }, { transaction });
     }
 
-    const respuesta = {
-      mensaje: "Estado actualizado correctamente",
-      pedido,
-    };
-
+    const respuesta = { mensaje: "Estado actualizado correctamente", pedido };
     await completarIdempotencia({
       operacion: operacionIdempotente,
       transaction,
       status: 200,
       body: respuesta,
     });
-
     await transaction.commit();
     transaction = null;
 
-    if (cambioEstado) {
-      const oficina = pedido.oficina_id
-        ? await Oficina.findByPk(pedido.oficina_id, { attributes: ["nombre"] })
-        : null;
+    if (anterior !== estado) {
       const etiqueta = etiquetaPedido(pedido.tipo);
       const titulo = tituloPedido(pedido.tipo);
 
@@ -113,7 +85,7 @@ const actualizarEstadoPedidoSeguro = async (req, res) => {
           mensaje: `Tu ${etiqueta} N° ${pedido.id} ahora se encuentra en estado: ${estado}.`,
         });
       } catch (errorNotificacion) {
-        console.error("Error al crear notificación:", errorNotificacion);
+        console.error("Error al notificar estado de pedido:", errorNotificacion);
       }
 
       try {
@@ -121,30 +93,22 @@ const actualizarEstadoPedidoSeguro = async (req, res) => {
           usuario_id: req.usuario.id,
           accion: "CAMBIAR_ESTADO",
           modulo: "PEDIDOS",
-          descripcion: `Cambió el estado del ${etiqueta} N° ${pedido.id} de ${estadoAnterior} a ${estado} (${oficina?.nombre || "-"})`,
+          descripcion: `Cambió el estado del ${etiqueta} N° ${pedido.id} de ${anterior} a ${estado} desde Depósito Central`,
         });
       } catch (errorBitacora) {
-        console.error("Error al registrar bitácora:", errorBitacora);
+        console.error("Error al registrar bitácora de estado de pedido:", errorBitacora);
       }
     }
 
     return res.status(200).json(respuesta);
   } catch (error) {
-    if (transaction) {
-      await transaction.rollback();
-    }
-
-    if (error.status) {
-      return res.status(error.status).json({ mensaje: error.message });
-    }
-
-    console.error("ERROR actualizarEstadoPedidoSeguro:", error);
-    return res.status(500).json({
-      mensaje: "Error al actualizar estado",
+    if (transaction) await transaction.rollback();
+    return res.status(error.status || 500).json({
+      mensaje: error.status ? error.message : "Error al actualizar estado del pedido",
     });
   }
 };
 
 module.exports = {
-  actualizarEstadoPedidoSeguro,
+  actualizarEstadoPedidoDeposito,
 };
