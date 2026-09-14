@@ -4,13 +4,14 @@ const {
   Categoria,
 } = require("../models");
 
-const seedInitialData = async () => {
+const seedInitialData = async ({ transaction } = {}) => {
   try {
     const roles = ["ADMIN", "RESPONSABLE", "USUARIO"];
 
     for (const nombre of roles) {
       await Role.findOrCreate({
         where: { nombre },
+        transaction,
       });
     }
 
@@ -49,6 +50,7 @@ const seedInitialData = async () => {
       await Categoria.findOrCreate({
         where: { nombre: categoria.nombre },
         defaults: categoria,
+        transaction,
       });
     }
 
@@ -98,6 +100,7 @@ const seedInitialData = async () => {
       const [registro] = await Oficina.findOrCreate({
         where: { nombre: oficina.nombre },
         defaults: oficina,
+        transaction,
       });
 
       const cambios = {};
@@ -110,7 +113,7 @@ const seedInitialData = async () => {
       }
 
       if (Object.keys(cambios).length > 0) {
-        await registro.update(cambios);
+        await registro.update(cambios, { transaction });
       }
     }
 
