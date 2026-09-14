@@ -6,6 +6,7 @@ const { opcionesVerificacionJwt } = require("../config/jwt");
 const {
   esAdminGeneral,
   puedeGestionarOficina,
+  puedeGestionarDeposito,
 } = require("../utils/permisos");
 
 const MAX_BEARER_TOKEN_LENGTH = 4096;
@@ -78,7 +79,16 @@ const crearVerificadorSesion = ({ exigirMfa }) => async (req, res, next) => {
       ],
       include: [
         { model: Role, attributes: ["id", "nombre"] },
-        { model: Oficina, attributes: ["id", "nombre", "es_central"] },
+        {
+          model: Oficina,
+          attributes: [
+            "id",
+            "nombre",
+            "es_central",
+            "gestiona_deposito",
+            "es_deposito_central",
+          ],
+        },
       ],
     });
 
@@ -110,6 +120,8 @@ const crearVerificadorSesion = ({ exigirMfa }) => async (req, res, next) => {
       oficina_id: usuario.oficina_id,
       oficina_nombre: usuario.Oficina?.nombre || "",
       oficina_es_central: Boolean(usuario.Oficina?.es_central),
+      oficina_gestiona_deposito: Boolean(usuario.Oficina?.gestiona_deposito),
+      oficina_es_deposito_central: Boolean(usuario.Oficina?.es_deposito_central),
       mfa_enabled: Boolean(usuario.mfa_enabled),
     };
 
@@ -195,6 +207,15 @@ const verificarGestionOficina = (req, res, next) => {
   next();
 };
 
+const verificarGestionDeposito = (req, res, next) => {
+  if (!puedeGestionarDeposito(req.usuario)) {
+    return res.status(403).json({
+      mensaje: "Acceso denegado. Se requiere autorización para gestionar el Depósito Central",
+    });
+  }
+  next();
+};
+
 module.exports = {
   verificarToken,
   verificarSesionMfa,
@@ -202,4 +223,5 @@ module.exports = {
   permitirRoles,
   verificarAdminGeneral,
   verificarGestionOficina,
+  verificarGestionDeposito,
 };
