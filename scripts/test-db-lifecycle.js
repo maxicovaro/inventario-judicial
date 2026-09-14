@@ -8,6 +8,10 @@ const baseline = fs.readFileSync(
   "src/db/migrations/20260909_001_baseline_schema.js",
   "utf8",
 );
+const pedidosComplementariosMigration = fs.readFileSync(
+  "src/db/migrations/20260914_007_pedidos_complementarios.js",
+  "utf8",
+);
 const stockModel = fs.readFileSync("src/models/StockOficina.js", "utf8");
 const pedidoModel = fs.readFileSync("src/models/PedidoInsumo.js", "utf8");
 
@@ -20,7 +24,16 @@ assert.match(baseline, /sequelize\.sync/);
 assert.match(baseline, /force:\s*false/);
 assert.match(baseline, /alter:\s*false/);
 assert.match(stockModel, /uq_stock_oficina_insumo_oficina/);
-assert.match(pedidoModel, /uq_pedido_oficina_mes_anio/);
+assert.match(pedidoModel, /uq_pedido_mensual_oficina_mes_anio/);
+assert.match(pedidoModel, /clave_mensual_unica/);
+assert.match(
+  pedidosComplementariosMigration,
+  /removeIndexIfExists[\s\S]*uq_pedido_oficina_mes_anio/,
+);
+assert.match(
+  pedidosComplementariosMigration,
+  /addIndexIfMissing[\s\S]*uq_pedido_mensual_oficina_mes_anio/,
+);
 
 for (const script of ["db:migrate", "db:status", "db:seed", "db:setup"]) {
   assert.ok(packageJson.scripts[script], `Falta script ${script}`);

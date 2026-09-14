@@ -74,6 +74,7 @@ export default function HistorialPedidos() {
         pedido.Oficina?.nombre?.toLowerCase().includes(texto) ||
         pedido.Usuario?.nombre?.toLowerCase().includes(texto) ||
         pedido.Usuario?.apellido?.toLowerCase().includes(texto) ||
+        pedido.tipo?.toLowerCase().includes(texto) ||
         String(pedido.mes).includes(texto) ||
         String(pedido.anio).includes(texto);
       const coincideEstado = !filtroEstado || pedido.estado === filtroEstado;
@@ -158,11 +159,11 @@ export default function HistorialPedidos() {
       <div className="ui-page admin-page">
         <PageHeader
           eyebrow="Abastecimiento"
-          title="Historial de pedidos mensuales"
+          title="Historial de pedidos de insumos"
           description={
             esDireccion
-              ? "Revisá pedidos, tomá decisiones, registrá la provisión y conservá trazabilidad de cada entrega."
-              : "Consultá el estado, detalle y documentación de los pedidos enviados por tu dependencia."
+              ? "Revisá pedidos mensuales y complementarios, tomá decisiones, registrá la provisión y conservá trazabilidad de cada entrega."
+              : "Consultá el estado, tipo, detalle y documentación de los pedidos enviados por tu dependencia."
           }
         />
 
@@ -182,7 +183,7 @@ export default function HistorialPedidos() {
                 id="buscar-historial-pedidos"
                 type="search"
                 className="ui-control"
-                placeholder="Buscar por ID, oficina, usuario o período..."
+                placeholder="Buscar por ID, tipo, oficina, usuario o período..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
               />
@@ -216,12 +217,13 @@ export default function HistorialPedidos() {
               const abierto = pedidoAbierto === pedido.id;
               const totalSolicitado = detalles.reduce((acc, item) => acc + (Number(item.cantidad_solicitada) || 0), 0);
               const totalProvisto = detalles.reduce((acc, item) => acc + (Number(item.cantidad_provista) || 0), 0);
+              const tipoPedido = pedido.tipo === "COMPLEMENTARIO" ? "Complementario" : "Mensual";
 
               return (
                 <Card key={pedido.id} className="order-history-card">
                   <div className="order-history-header">
                     <div>
-                      <h2 className="order-history-title">Pedido #{pedido.id} · {pedido.mes}/{pedido.anio}</h2>
+                      <h2 className="order-history-title">Pedido #{pedido.id} · {pedido.mes}/{pedido.anio} · {tipoPedido}</h2>
                       <p className="order-history-meta">
                         {pedido.Oficina?.nombre || "Oficina sin identificar"} · {pedido.Usuario ? `${pedido.Usuario.nombre} ${pedido.Usuario.apellido}` : "Usuario sin identificar"}
                       </p>

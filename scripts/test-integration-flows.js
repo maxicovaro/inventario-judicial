@@ -419,7 +419,7 @@ const main = async () => {
       "RESPONSABLE no asigna stock central",
     );
 
-    // --- Pedido mensual y provisión real de stock ---
+    // --- Pedido mensual, complementario y provisión real de stock ---
     const pedidoBody = expectStatus(
       await request(base, "/api/pedidos", {
         method: "POST",
@@ -443,8 +443,10 @@ const main = async () => {
       "RESPONSABLE crea pedido mensual",
     );
     const pedidoId = pedidoBody.pedido.id;
+    assert.strictEqual(pedidoBody.pedido.tipo, "MENSUAL");
+    assert.strictEqual(Number(pedidoBody.pedido.clave_mensual_unica), 1);
 
-    expectStatus(
+    const pedidoComplementarioBody = expectStatus(
       await request(base, "/api/pedidos", {
         method: "POST",
         token: responsable1Login.token,
@@ -454,9 +456,12 @@ const main = async () => {
           detalles: [{ insumo_id: insumoId, cantidad_solicitada: 1 }],
         },
       }),
-      400,
-      "pedido mensual duplicado se rechaza",
+      201,
+      "pedido adicional del mismo período se registra como complementario",
     );
+    const pedidoComplementarioId = pedidoComplementarioBody.pedido.id;
+    assert.strictEqual(pedidoComplementarioBody.pedido.tipo, "COMPLEMENTARIO");
+    assert.strictEqual(pedidoComplementarioBody.pedido.clave_mensual_unica, null);
 
     expectStatus(
       await request(base, "/api/pedidos", {
@@ -484,6 +489,11 @@ const main = async () => {
       "RESPONSABLE UJ2 lista pedidos propios",
     );
     assert.ok(!pedidosResp2.some((pedido) => Number(pedido.id) === Number(pedidoId)));
+    assert.ok(
+      !pedidosResp2.some(
+        (pedido) => Number(pedido.id) === Number(pedidoComplementarioId),
+      ),
+    );
 
     const pedidosAdmin = expectStatus(
       await request(base, "/api/pedidos", { token: adminLogin.token }),
@@ -491,6 +501,14 @@ const main = async () => {
       "Admin General lista pedidos globales",
     );
     assert.ok(pedidosAdmin.some((pedido) => Number(pedido.id) === Number(pedidoId)));
+    assert.ok(
+      pedidosAdmin.some(
+        (pedido) =>
+          Number(pedido.id) === Number(pedidoComplementarioId) &&
+          pedido.tipo === "COMPLEMENTARIO",
+      ),
+    );
+    console.log("OK - alcance y tipo del pedido complementario persisten en MySQL");
 
     expectStatus(
       await request(base, `/api/pedidos/${pedidoId}/estado`, {
