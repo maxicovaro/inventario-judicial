@@ -14,6 +14,12 @@ const normalizarUsuario = (raw = {}) => ({
   oficina_es_central: Boolean(
     raw.oficina_es_central ?? raw.Oficina?.es_central ?? false,
   ),
+  oficina_gestiona_deposito: Boolean(
+    raw.oficina_gestiona_deposito ?? raw.Oficina?.gestiona_deposito ?? false,
+  ),
+  oficina_es_deposito_central: Boolean(
+    raw.oficina_es_deposito_central ?? raw.Oficina?.es_deposito_central ?? false,
+  ),
   mfa_enabled: Boolean(raw.mfa_enabled),
 });
 
@@ -89,9 +95,13 @@ export function AuthProvider({ children }) {
   const iniciarSesion = useCallback(
     async (credenciales) => {
       const response = await api.post("/auth/login", credenciales);
-      return aplicarRespuestaAuth(response.data);
+      const resultado = aplicarRespuestaAuth(response.data);
+      if (resultado === "authenticated") {
+        return refrescarSesion({ mostrarCarga: false });
+      }
+      return resultado;
     },
-    [aplicarRespuestaAuth],
+    [aplicarRespuestaAuth, refrescarSesion],
   );
 
   const prepararMfa = useCallback(async () => {
