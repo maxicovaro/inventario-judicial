@@ -40,7 +40,7 @@
     "test:runtime-health": "node scripts/test-runtime-health.js",
     "test:recovery-runbook": "node scripts/test-recovery-runbook.js",
     "test:integration:fixtures": "node scripts/integration-fixtures.js",
-    "test:integration": "node scripts/test-integration-flows.js && node scripts/test-integration-attachments-requests.js && node scripts/test-p9-deposito-integration.js && npm run test:p8-query-pagination && npm run test:p8-payload-catalog && npm run test:p8-report-contracts",
+    "test:integration": "node scripts/test-integration-flows.js && node scripts/test-integration-attachments-requests.js && npm run test:p8-query-pagination && npm run test:p8-payload-catalog && npm run test:p8-report-contracts && node scripts/test-p9-deposito-integration.js",
     "test:integration:attachments": "node scripts/test-integration-attachments-requests.js",
     "test:p9-deposito-integration": "node scripts/test-p9-deposito-integration.js",
     "test:integration-e2e-contracts": "node scripts/test-integration-e2e-contracts.js",
