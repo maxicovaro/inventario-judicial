@@ -4,6 +4,8 @@ const sequelize = require("../src/config/database");
 const {
   Activo,
   Movimiento,
+  MovimientoStock,
+  Bitacora,
   Insumo,
   StockOficina,
   Solicitud,
@@ -88,12 +90,24 @@ const main = async () => {
     };
 
     const contableToken = await login(TEST_USERS.responsableContable);
+    const contable2Token = await login(TEST_USERS.responsableContable2);
+    const usuarioContableToken = await login(TEST_USERS.usuarioContable);
     const informaticaToken = await login(TEST_USERS.responsableInformatica);
 
     const contableMe = expectStatus(
       await request(base, "/api/auth/me", { token: contableToken }),
       200,
-      "RESPONSABLE de Contable obtiene sesión",
+      "primer RESPONSABLE de Contable obtiene sesión",
+    );
+    const contable2Me = expectStatus(
+      await request(base, "/api/auth/me", { token: contable2Token }),
+      200,
+      "segundo RESPONSABLE de Contable obtiene sesión",
+    );
+    const usuarioContableMe = expectStatus(
+      await request(base, "/api/auth/me", { token: usuarioContableToken }),
+      200,
+      "USUARIO de Contable obtiene sesión",
     );
     const informaticaMe = expectStatus(
       await request(base, "/api/auth/me", { token: informaticaToken }),
@@ -102,17 +116,35 @@ const main = async () => {
     );
 
     assert.strictEqual(contableMe.usuario.role, "RESPONSABLE");
+    assert.strictEqual(contable2Me.usuario.role, "RESPONSABLE");
     assert.strictEqual(contableMe.usuario.oficina_gestiona_deposito, true);
+    assert.strictEqual(contable2Me.usuario.oficina_gestiona_deposito, true);
+    assert.strictEqual(usuarioContableMe.usuario.role, "USUARIO");
+    assert.strictEqual(usuarioContableMe.usuario.oficina_gestiona_deposito, true);
     assert.strictEqual(informaticaMe.usuario.oficina_gestiona_deposito, false);
-    console.log("OK - capacidad de depósito proviene de la oficina y no del rol global");
+    console.log(
+      "OK - la oficina puede tener múltiples RESPONSABLE de depósito sin habilitar a usuarios comunes",
+    );
 
     const contexto = expectStatus(
       await request(base, "/api/deposito/contexto", { token: contableToken }),
       200,
-      "Contable accede al contexto de Depósito Central",
+      "primer responsable de Contable accede al Depósito Central",
     );
     assert.strictEqual(contexto.deposito.id, fixture.offices.deposito.id);
     assert.strictEqual(contexto.oficina_gestora.id, fixture.offices.contable.id);
+
+    expectStatus(
+      await request(base, "/api/deposito/contexto", { token: contable2Token }),
+      200,
+      "segundo responsable de Contable también accede al Depósito Central",
+    );
+
+    expectStatus(
+      await request(base, "/api/deposito/contexto", { token: usuarioContableToken }),
+      403,
+      "usuario común de Contable no administra Depósito Central",
+    );
 
     expectStatus(
       await request(base, "/api/deposito/contexto", { token: informaticaToken }),
@@ -161,11 +193,22 @@ const main = async () => {
         idempotencyKey: "p9-deposito-asset-create-001",
       }),
       201,
-      "Contable ingresa activo al Depósito Central",
+      "primer responsable ingresa activo al Depósito Central",
     );
 
     let activoDeposito = await Activo.findByPk(activoDepositoBody.activo.id);
     assert.strictEqual(activoDeposito.oficina_id, fixture.offices.deposito.id);
+
+    const altaDeposito = await Movimiento.findOne({
+      where: { activo_id: activoDeposito.id, tipo: "ALTA" },
+    });
+    assert.ok(altaDeposito, "El ingreso del activo debe generar movimiento ALTA");
+    assert.strictEqual(
+      altaDeposito.usuario_id,
+      fixture.users.responsableContable.id,
+      "El ALTA debe identificar al empleado que recibió/cargó el bien",
+    );
+    console.log("OK - recepción de activo queda atribuida al responsable concreto");
 
     expectStatus(
       await request(base, "/api/deposito/activos", {
@@ -183,12 +226,12 @@ const main = async () => {
     expectStatus(
       await request(base, `/api/deposito/activos/${activoDeposito.id}/transferir`, {
         method: "POST",
-        token: contableToken,
+        token: contable2Token,
         body: { oficina_destino_id: fixture.offices.informatica.id },
         idempotencyKey: "p9-deposito-transfer-asset-001",
       }),
       200,
-      "Contable entrega activo de depósito a Informática",
+      "segundo responsable entrega activo de depósito a Informática",
     );
 
     activoDeposito = await Activo.findByPk(activoDeposito.id);
@@ -197,12 +240,55 @@ const main = async () => {
       where: { activo_id: activoDeposito.id, tipo: "TRASLADO" },
     });
     assert.ok(traslado, "La entrega debe generar movimiento TRASLADO");
+    assert.strictEqual(
+      traslado.usuario_id,
+      fixture.users.responsableContable2.id,
+      "El TRASLADO debe identificar al empleado que realizó la entrega",
+    );
     assert.match(traslado.descripcion, /Depósito/i);
     assert.match(traslado.descripcion, /Informática/i);
-    console.log("OK - entrega patrimonial conserva trazabilidad de origen y destino");
+    console.log(
+      "OK - recepción y entrega patrimonial pueden ser realizadas por empleados distintos y quedan individualizadas",
+    );
 
-    const insumoAntes = await Insumo.findByPk(fixture.insumoBase.id);
-    const stockCentralAntes = Number(insumoAntes.stock_actual);
+    const insumoAntesIngreso = await Insumo.findByPk(fixture.insumoBase.id);
+    const stockAntesIngreso = Number(insumoAntesIngreso.stock_actual);
+
+    expectStatus(
+      await request(base, "/api/deposito/movimientos", {
+        method: "POST",
+        token: contable2Token,
+        body: {
+          insumo_id: fixture.insumoBase.id,
+          tipo: "INGRESO",
+          cantidad: 7,
+          motivo: "Recepción de resmas para prueba multiusuario",
+        },
+        idempotencyKey: "p9-deposito-ingreso-stock-001",
+      }),
+      201,
+      "segundo responsable registra recepción de insumos",
+    );
+
+    const ingresoStock = await MovimientoStock.findOne({
+      where: {
+        insumo_id: fixture.insumoBase.id,
+        tipo: "INGRESO",
+        motivo: "Recepción de resmas para prueba multiusuario",
+      },
+      order: [["id", "DESC"]],
+    });
+    assert.ok(ingresoStock, "La recepción de insumos debe generar MovimientoStock");
+    assert.strictEqual(
+      ingresoStock.usuario_id,
+      fixture.users.responsableContable2.id,
+      "El ingreso de stock debe identificar al empleado receptor",
+    );
+    const insumoTrasIngreso = await Insumo.findByPk(fixture.insumoBase.id);
+    assert.strictEqual(Number(insumoTrasIngreso.stock_actual), stockAntesIngreso + 7);
+    console.log("OK - recepción de insumos queda atribuida al responsable concreto");
+
+    const stockCentralAntes = Number(insumoTrasIngreso.stock_actual);
 
     expectStatus(
       await request(base, "/api/deposito/stock/asignar", {
@@ -217,7 +303,7 @@ const main = async () => {
         idempotencyKey: "p9-deposito-stock-informatica-001",
       }),
       200,
-      "Contable distribuye insumos a Informática",
+      "primer responsable distribuye insumos a Informática",
     );
 
     const insumoDespues = await Insumo.findByPk(fixture.insumoBase.id);
@@ -227,9 +313,40 @@ const main = async () => {
         oficina_id: fixture.offices.informatica.id,
       },
     });
+    const egresoStock = await MovimientoStock.findOne({
+      where: {
+        insumo_id: fixture.insumoBase.id,
+        tipo: "EGRESO",
+        oficina_id: fixture.offices.informatica.id,
+        motivo: "Entrega piloto a Informática",
+      },
+      order: [["id", "DESC"]],
+    });
     assert.strictEqual(Number(insumoDespues.stock_actual), stockCentralAntes - 10);
     assert.strictEqual(Number(stockInformatica.cantidad), 10);
-    console.log("OK - distribución descuenta central y acredita oficina en forma consistente");
+    assert.ok(egresoStock, "La entrega debe generar MovimientoStock EGRESO");
+    assert.strictEqual(
+      egresoStock.usuario_id,
+      fixture.users.responsableContable.id,
+      "La entrega de stock debe identificar al empleado que la realizó",
+    );
+    console.log(
+      "OK - recepción y entrega de stock por responsables diferentes conservan autor individual",
+    );
+
+    expectStatus(
+      await request(base, "/api/deposito/stock/asignar", {
+        method: "POST",
+        token: usuarioContableToken,
+        body: {
+          insumo_id: fixture.insumoBase.id,
+          oficina_id: fixture.offices.informatica.id,
+          cantidad: 1,
+        },
+      }),
+      403,
+      "usuario común de Contable no puede distribuir stock central",
+    );
 
     expectStatus(
       await request(base, "/api/deposito/stock/asignar", {
@@ -275,7 +392,7 @@ const main = async () => {
         `/api/deposito/solicitudes/${solicitudBody.solicitud.id}/responder`,
         {
           method: "PUT",
-          token: contableToken,
+          token: contable2Token,
           body: {
             estado: "APROBADA",
             respuesta_admin: "Aprobada para gestión del Depósito Central",
@@ -283,10 +400,23 @@ const main = async () => {
         },
       ),
       200,
-      "Contable responde solicitud institucional",
+      "segundo responsable responde solicitud institucional",
     );
     const solicitudDb = await Solicitud.findByPk(solicitudBody.solicitud.id);
     assert.strictEqual(solicitudDb.estado, "APROBADA");
+    const bitacoraSolicitud = await Bitacora.findOne({
+      where: {
+        accion: "RESPONDER_SOLICITUD",
+        modulo: "SOLICITUDES",
+        usuario_id: fixture.users.responsableContable2.id,
+      },
+      order: [["id", "DESC"]],
+    });
+    assert.ok(
+      bitacoraSolicitud,
+      "La respuesta de solicitud debe identificar en bitácora al empleado responsable",
+    );
+    console.log("OK - gestión de solicitudes queda individualizada por empleado");
 
     const pedidoBody = expectStatus(
       await request(base, "/api/pedidos-insumos", {
@@ -319,19 +449,34 @@ const main = async () => {
         idempotencyKey: "p9-deposito-pedido-aprobar-001",
       }),
       200,
-      "Contable aprueba pedido mensual",
+      "primer responsable aprueba pedido mensual",
+    );
+
+    const bitacoraAprobacion = await Bitacora.findOne({
+      where: {
+        accion: "CAMBIAR_ESTADO",
+        modulo: "PEDIDOS",
+        usuario_id: fixture.users.responsableContable.id,
+      },
+      order: [["id", "DESC"]],
+    });
+    assert.ok(
+      bitacoraAprobacion,
+      "El cambio de estado del pedido debe identificar al responsable que lo aprobó",
     );
 
     const pedidosDeposito = expectStatus(
-      await request(base, "/api/deposito/pedidos", { token: contableToken }),
+      await request(base, "/api/deposito/pedidos", { token: contable2Token }),
       200,
-      "Contable visualiza pedidos institucionales",
+      "segundo responsable visualiza pedidos institucionales",
     );
     const pedidoVisible = pedidosDeposito.find((item) => item.id === pedidoId);
     assert.ok(pedidoVisible, "El pedido aprobado debe estar visible en depósito");
     const detalle = pedidoVisible.PedidoInsumoDetalles[0];
 
-    const stockAntesProvision = Number((await Insumo.findByPk(fixture.insumoBase.id)).stock_actual);
+    const stockAntesProvision = Number(
+      (await Insumo.findByPk(fixture.insumoBase.id)).stock_actual,
+    );
     const stockOficinaAntesProvision = Number(
       (
         await StockOficina.findOne({
@@ -346,14 +491,14 @@ const main = async () => {
     expectStatus(
       await request(base, `/api/deposito/pedidos/${pedidoId}/proveer`, {
         method: "PUT",
-        token: contableToken,
+        token: contable2Token,
         body: {
           estado: "ENTREGADO",
           detalles: [{ id: detalle.id, cantidad_provista: 5 }],
         },
       }),
       200,
-      "Contable provisiona y entrega pedido mensual",
+      "segundo responsable provisiona y entrega pedido mensual",
     );
 
     const pedidoDb = await PedidoInsumo.findByPk(pedidoId);
@@ -370,12 +515,31 @@ const main = async () => {
         })
       ).cantidad,
     );
+    const egresoPedido = await MovimientoStock.findOne({
+      where: {
+        insumo_id: fixture.insumoBase.id,
+        tipo: "EGRESO",
+        oficina_id: fixture.offices.informatica.id,
+      },
+      order: [["id", "DESC"]],
+    });
+
     assert.strictEqual(pedidoDb.estado, "ENTREGADO");
     assert.strictEqual(stockTrasProvision, stockAntesProvision - 5);
     assert.strictEqual(stockOficinaTrasProvision, stockOficinaAntesProvision + 5);
-    console.log("OK - pedido mensual completa entrega con stock real consistente");
+    assert.ok(egresoPedido, "La provisión debe generar movimiento de stock");
+    assert.strictEqual(
+      egresoPedido.usuario_id,
+      fixture.users.responsableContable2.id,
+      "La provisión debe identificar al empleado que materializó la entrega",
+    );
+    console.log(
+      "OK - aprobación y entrega del mismo pedido pueden recaer en responsables distintos con auditoría individual",
+    );
 
-    console.log("P9.2A - integración Depósito Central/Contable validada correctamente.");
+    console.log(
+      "P9.2A - integración multiusuario Depósito Central/Contable validada correctamente.",
+    );
   } finally {
     if (server) await close(server);
     await sequelize.close();
