@@ -9,6 +9,8 @@ const migration = read(
 );
 const permisos = read("src/utils/permisos.js");
 const authMiddleware = read("src/middlewares/authMiddleware.js");
+const oficinaRoutes = read("src/routes/oficinaRoutes.js");
+const oficinaController = read("src/controllers/oficinaController.js");
 const depositoRoutes = read("src/routes/depositoRoutes.js");
 const depositoController = read("src/controllers/depositoController.js");
 const depositoAuditoriaController = read(
@@ -21,6 +23,8 @@ const frontendPermisos = read("inventario-frontend/src/utils/permisos.js");
 const privateRoute = read("inventario-frontend/src/components/PrivateRoute.jsx");
 const router = read("inventario-frontend/src/router/AppRouter.jsx");
 const layout = read("inventario-frontend/src/components/Layout.jsx");
+const depositoActivos = read("inventario-frontend/src/pages/DepositoActivos.jsx");
+const depositoInsumos = read("inventario-frontend/src/pages/DepositoInsumos.jsx");
 
 assert.match(oficinaModel, /gestiona_deposito/);
 assert.match(oficinaModel, /es_deposito_central/);
@@ -54,6 +58,29 @@ assert.match(depositoRoutes, /router\.get\("\/auditoria", listarAuditoriaDeposit
 assert.match(depositoRoutes, /exigirStockInicialCero/);
 assert.match(depositoRoutes, /Los insumos nuevos se crean con stock 0/);
 assert.match(app, /app\.use\("\/api\/deposito", depositoRoutes\)/);
+
+assert.match(
+  oficinaRoutes,
+  /"\/destinos-deposito"[\s\S]*verificarToken[\s\S]*verificarGestionDeposito[\s\S]*listarOficinasDestinoDeposito/,
+  "El catálogo de destinos debe estar protegido por la capacidad de gestión de depósito",
+);
+assert.match(
+  oficinaController,
+  /where:\s*\{ es_deposito_central: false \}/,
+  "El catálogo de destinos no debe incluir el Depósito Central",
+);
+assert.match(depositoActivos, /api\.get\("\/oficinas\/destinos-deposito"\)/);
+assert.match(depositoInsumos, /api\.get\("\/oficinas\/destinos-deposito"\)/);
+assert.doesNotMatch(
+  depositoActivos,
+  /api\.get\("\/oficinas"\)/,
+  "Depósito Activos no debe reutilizar el listado de oficinas limitado a la oficina propia",
+);
+assert.doesNotMatch(
+  depositoInsumos,
+  /api\.get\("\/oficinas"\)/,
+  "Depósito Insumos no debe reutilizar el listado de oficinas limitado a la oficina propia",
+);
 
 assert.match(depositoController, /where:\s*\{ es_deposito_central: true \}/);
 assert.match(depositoController, /deposito:activo:create/);
