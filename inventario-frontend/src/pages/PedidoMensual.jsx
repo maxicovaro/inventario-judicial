@@ -141,8 +141,8 @@ export default function PedidoMensual() {
         detalles: [...detallesValidos, ...extrasValidos],
       };
 
-      await api.post("/pedidos-insumos", payload);
-      setMensaje("Pedido enviado correctamente");
+      const response = await api.post("/pedidos-insumos", payload);
+      setMensaje(response.data?.mensaje || "Pedido enviado correctamente");
       reset({
         mes: new Date().getMonth() + 1,
         anio: new Date().getFullYear(),
@@ -168,8 +168,8 @@ export default function PedidoMensual() {
       <div className="ui-page admin-page order-page">
         <PageHeader
           eyebrow="Abastecimiento"
-          title="Pedido mensual de insumos"
-          description="Completá una única planilla mensual con cantidades, incidencias y artículos extraordinarios antes de enviarla a Dirección."
+          title="Pedido de insumos"
+          description="Enviá el pedido mensual de la dependencia. Si el período ya tiene un pedido base, el nuevo envío se registrará automáticamente como pedido complementario."
         />
 
         <div className="admin-stack" aria-live="polite">
@@ -181,7 +181,7 @@ export default function PedidoMensual() {
           <Card className="order-period-card">
             <SectionHeader
               title="Datos del período"
-              description="Estos datos contextualizan el consumo y la necesidad mensual de la dependencia."
+              description="Estos datos contextualizan el consumo y la necesidad de la dependencia para el período seleccionado."
             />
             <div className="order-period-grid">
               <Field label="Mes" htmlFor="pedido-mes" error={errors.mes} errorId="pedido-mes-error">
