@@ -11,6 +11,8 @@ const TEST_USERS = Object.freeze({
   responsable2: "responsable.uj2@inventario.test",
   usuario1: "usuario.uj1@inventario.test",
   responsableContable: "responsable.contable@inventario.test",
+  responsableContable2: "responsable.contable2@inventario.test",
+  usuarioContable: "usuario.contable@inventario.test",
   responsableInformatica: "responsable.informatica@inventario.test",
 });
 
@@ -122,6 +124,8 @@ const resetIntegrationData = async () => {
     responsable2,
     usuario1,
     responsableContable,
+    responsableContable2,
+    usuarioContable,
     responsableInformatica,
   ] = await Promise.all([
     createUser(TEST_USERS.admin, adminRole.id, central.id, "Admin"),
@@ -142,7 +146,19 @@ const resetIntegrationData = async () => {
       TEST_USERS.responsableContable,
       responsableRole.id,
       contable.id,
-      "Responsable Contable",
+      "Responsable Contable Uno",
+    ),
+    createUser(
+      TEST_USERS.responsableContable2,
+      responsableRole.id,
+      contable.id,
+      "Responsable Contable Dos",
+    ),
+    createUser(
+      TEST_USERS.usuarioContable,
+      usuarioRole.id,
+      contable.id,
+      "Usuario Contable",
     ),
     createUser(
       TEST_USERS.responsableInformatica,
@@ -180,6 +196,8 @@ const resetIntegrationData = async () => {
       responsable2,
       usuario1,
       responsableContable,
+      responsableContable2,
+      usuarioContable,
       responsableInformatica,
     },
     roles: {
@@ -208,7 +226,9 @@ const main = async () => {
     console.log(`✓ Admin: ${fixtures.users.admin.email}`);
     console.log(`✓ Responsable UJ1: ${fixtures.users.responsable1.email}`);
     console.log(`✓ Usuario UJ1: ${fixtures.users.usuario1.email}`);
-    console.log(`✓ Responsable Contable: ${fixtures.users.responsableContable.email}`);
+    console.log(`✓ Responsable Contable 1: ${fixtures.users.responsableContable.email}`);
+    console.log(`✓ Responsable Contable 2: ${fixtures.users.responsableContable2.email}`);
+    console.log(`✓ Usuario Contable: ${fixtures.users.usuarioContable.email}`);
     console.log(
       `✓ Responsable Informática: ${fixtures.users.responsableInformatica.email}`,
     );
