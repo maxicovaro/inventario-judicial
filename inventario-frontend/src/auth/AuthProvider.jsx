@@ -44,7 +44,7 @@ export function AuthProvider({ children }) {
     setEstado("anonymous");
   }, []);
 
-  const aplicarRespuestaAuth = useCallback((data = {}) => {
+  const aplicarRespuestaAuth = useCallback((data = {}, { autenticar = true } = {}) => {
     const usuarioNormalizado = data.usuario?.id
       ? normalizarUsuario(data.usuario)
       : null;
@@ -66,7 +66,7 @@ export function AuthProvider({ children }) {
       return "mfa_verify";
     }
 
-    setEstado("authenticated");
+    if (autenticar) setEstado("authenticated");
     return "authenticated";
   }, []);
 
@@ -95,8 +95,11 @@ export function AuthProvider({ children }) {
   const iniciarSesion = useCallback(
     async (credenciales) => {
       const response = await api.post("/auth/login", credenciales);
-      const resultado = aplicarRespuestaAuth(response.data);
+      const resultado = aplicarRespuestaAuth(response.data, { autenticar: false });
       if (resultado === "authenticated") {
+        // /auth/login puede devolver un perfil parcial. No habilitamos la navegación
+        // hasta que /auth/me entregue el usuario canónico con capacidades de oficina.
+        setEstado("loading");
         return refrescarSesion({ mostrarCarga: false });
       }
       return resultado;
