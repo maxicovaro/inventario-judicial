@@ -31,6 +31,24 @@ const listarOficinas = async (req, res) => {
   }
 };
 
+const listarOficinasDestinoDeposito = async (_req, res) => {
+  try {
+    const oficinas = await Oficina.findAll({
+      where: { es_deposito_central: false },
+      attributes: ["id", "nombre", "descripcion"],
+      order: [["nombre", "ASC"]],
+    });
+
+    return res.status(200).json(oficinas);
+  } catch (error) {
+    return res.status(500).json({
+      mensaje: "Error al listar oficinas destino del Depósito Central",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   listarOficinas,
+  listarOficinasDestinoDeposito,
 };
