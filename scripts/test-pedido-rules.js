@@ -222,8 +222,13 @@ probar("texto inválido", () => {
 });
 
 // --------------------------------------------------
-// COMPROBACIONES DEL CONTROLADOR
+// COMPROBACIONES DE CONTROLADORES
 // --------------------------------------------------
+
+const createController = fs.readFileSync(
+  "src/controllers/pedidoCreateController.js",
+  "utf8"
+);
 
 const controller = fs.readFileSync(
   "src/controllers/pedidoInsumoController.js",
@@ -232,14 +237,14 @@ const controller = fs.readFileSync(
 
 probar("pedido nuevo fuerza cantidad_provista = 0", () => {
   assert.match(
-    controller,
+    createController,
     /cantidad_provista:\s*0/
   );
 });
 
 probar("pedido nuevo registra fecha_envio", () => {
   assert.match(
-    controller,
+    createController,
     /fecha_envio:\s*new Date\(\)/
   );
 });
@@ -265,11 +270,65 @@ probar("ENTREGADO exige provisión", () => {
   );
 });
 
-probar("duplicado concurrente devuelve conflicto", () => {
+probar("concurrencia del mensual devuelve conflicto reintentable", () => {
   assert.match(
-    controller,
+    createController,
     /status\(409\)/
   );
+  assert.match(
+    createController,
+    /Volvé a enviar para registrarlo como complementario/
+  );
+});
+
+// --------------------------------------------------
+// PEDIDOS COMPLEMENTARIOS P9.2B
+// --------------------------------------------------
+
+const pedidoModel = fs.readFileSync(
+  "src/models/PedidoInsumo.js",
+  "utf8"
+);
+const migration = fs.readFileSync(
+  "src/db/migrations/20260914_007_pedidos_complementarios.js",
+  "utf8"
+);
+const pedidoFrontend = fs.readFileSync(
+  "inventario-frontend/src/pages/PedidoMensual.jsx",
+  "utf8"
+);
+const pedidoRoutes = fs.readFileSync(
+  "src/routes/pedidoInsumoRoutes.js",
+  "utf8"
+);
+
+probar("primer pedido del periodo se conserva como MENSUAL", () => {
+  assert.match(createController, /tipoPedido === "MENSUAL" \? 1 : null/);
+});
+
+probar("pedido posterior del periodo se clasifica COMPLEMENTARIO", () => {
+  assert.match(createController, /\? "COMPLEMENTARIO"\s*:\s*"MENSUAL"/);
+});
+
+probar("complementarios usan clave mensual NULL", () => {
+  assert.match(pedidoModel, /clave_mensual_unica/);
+  assert.match(migration, /tipo = 'COMPLEMENTARIO'/);
+  assert.match(migration, /clave_mensual_unica = NULL/);
+});
+
+probar("se reemplaza la unicidad antigua por la unicidad del pedido base", () => {
+  assert.match(migration, /uq_pedido_oficina_mes_anio/);
+  assert.match(migration, /uq_pedido_mensual_oficina_mes_anio/);
+  assert.match(pedidoModel, /"oficina_id", "mes", "anio", "clave_mensual_unica"/);
+});
+
+probar("ruta POST usa el creador compatible con complementarios", () => {
+  assert.match(pedidoRoutes, /pedidoCreateController/);
+});
+
+probar("frontend explica y muestra resultado de pedido complementario", () => {
+  assert.match(pedidoFrontend, /pedido complementario/);
+  assert.match(pedidoFrontend, /response\.data\?\.mensaje/);
 });
 
 console.log(
