@@ -275,7 +275,7 @@ test("pedido mensual se aprueba, provisiona y llega al reporte", async ({ page }
   await login(page, USERS.responsable);
   await page.goto("/pedido-mensual");
   await expect(
-    page.getByRole("heading", { name: "Pedido mensual de insumos" }),
+    page.getByRole("heading", { name: "Pedido de insumos" }),
   ).toBeVisible();
 
   const filaInsumo = page
@@ -287,14 +287,15 @@ test("pedido mensual se aprueba, provisiona y llega al reporte", async ({ page }
     .getByPlaceholder("Observaciones generales")
     .fill("Pedido E2E completo");
   await page.getByRole("button", { name: "Enviar pedido" }).click();
-  await expect(page.getByText("Pedido enviado correctamente")).toBeVisible();
+  await expect(page.getByText("Pedido mensual enviado correctamente")).toBeVisible();
 
   await cambiarUsuario(page, USERS.admin);
   await page.goto("/historial-pedidos");
   await expect(
-    page.getByRole("heading", { name: "Historial de pedidos mensuales" }),
+    page.getByRole("heading", { name: "Historial de pedidos de insumos" }),
   ).toBeVisible();
 
+  await expect(page.getByText("MENSUAL", { exact: true })).toBeVisible();
   await expect(page.getByText("ENVIADO", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Aprobar" }).click();
   await expect(page.getByText("APROBADO", { exact: true })).toBeVisible();
