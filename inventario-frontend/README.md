@@ -14,3 +14,7 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Staging deployment note
+
+The Railway staging frontend watches changes under `inventario-frontend/**`. This note records the P9.2B source refresh required after the complementary-orders merge (`a4206580374361c4fc9551dd76564aafddb05857`) so staging is rebuilt from the current `main` source instead of reusing an older deployment snapshot.
