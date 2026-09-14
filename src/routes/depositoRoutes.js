@@ -22,6 +22,25 @@ const {
   actualizarEstadoPedidoDeposito,
 } = require("../controllers/depositoController");
 
+const exigirStockInicialCero = (req, res, next) => {
+  const valor = req.body?.stock_actual;
+  if (valor === undefined || valor === null || valor === "") {
+    req.body.stock_actual = 0;
+    return next();
+  }
+
+  const stock = Number(valor);
+  if (!Number.isFinite(stock) || stock !== 0) {
+    return res.status(400).json({
+      mensaje:
+        "Los insumos nuevos se crean con stock 0. Registrá luego un INGRESO para que la entrada física quede trazada.",
+    });
+  }
+
+  req.body.stock_actual = 0;
+  return next();
+};
+
 router.use(verificarToken, verificarGestionDeposito);
 
 router.get("/contexto", obtenerContexto);
@@ -32,7 +51,7 @@ router.put("/activos/:id", actualizarActivoDeposito);
 router.post("/activos/:id/transferir", transferirActivoDeposito);
 
 router.get("/insumos", listarInsumosDeposito);
-router.post("/insumos", crearInsumoDeposito);
+router.post("/insumos", exigirStockInicialCero, crearInsumoDeposito);
 router.get("/movimientos", listarMovimientosDeposito);
 router.post("/movimientos", registrarMovimientoDeposito);
 router.post("/stock/asignar", asignarStockDeposito);
