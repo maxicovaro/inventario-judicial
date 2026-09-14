@@ -180,6 +180,7 @@ const routeMeta = {
   "/deposito-central/insumos": ["Insumos y distribución", "Depósito Central"],
   "/deposito-central/solicitudes": ["Solicitudes recibidas", "Depósito Central"],
   "/deposito-central/pedidos": ["Pedidos de insumos", "Depósito Central"],
+  "/deposito-central/auditoria": ["Auditoría operativa", "Depósito Central"],
   "/usuarios": ["Usuarios", "Administración de accesos"],
   "/bitacora": ["Bitácora", "Trazabilidad de acciones"],
   "/notificaciones": ["Notificaciones", "Novedades del sistema"],
@@ -403,6 +404,7 @@ export default function Layout({ children }) {
           { to: "/deposito-central/insumos", label: "Insumos y distribución", icon: "warehouse" },
           { to: "/deposito-central/solicitudes", label: "Solicitudes recibidas", icon: "clipboard" },
           { to: "/deposito-central/pedidos", label: "Pedidos recibidos", icon: "history" },
+          { to: "/deposito-central/auditoria", label: "Auditoría operativa", icon: "activity" },
         ],
       });
     }
