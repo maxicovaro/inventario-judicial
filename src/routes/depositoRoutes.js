@@ -21,6 +21,9 @@ const {
   proveerPedidoDeposito,
   actualizarEstadoPedidoDeposito,
 } = require("../controllers/depositoController");
+const {
+  listarAuditoriaDeposito,
+} = require("../controllers/depositoAuditoriaController");
 
 const exigirStockInicialCero = (req, res, next) => {
   const valor = req.body?.stock_actual;
@@ -44,6 +47,7 @@ const exigirStockInicialCero = (req, res, next) => {
 router.use(verificarToken, verificarGestionDeposito);
 
 router.get("/contexto", obtenerContexto);
+router.get("/auditoria", listarAuditoriaDeposito);
 
 router.get("/activos", listarActivosDeposito);
 router.post("/activos", crearActivoDeposito);
