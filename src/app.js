@@ -30,6 +30,7 @@ const pedidoInsumoRoutes = require("./routes/pedidoInsumoRoutes");
 const reportePedidoRoutes = require("./routes/reportePedidoRoutes");
 const roleRoutes = require("./routes/roleRoutes");
 const bitacoraRoutes = require("./routes/bitacoraRoutes");
+const depositoRoutes = require("./routes/depositoRoutes");
 
 const app = express();
 
@@ -64,6 +65,7 @@ app.use("/api/oficinas", oficinaRoutes);
 app.use("/api/categorias", categoriaRoutes);
 app.use("/api/bitacora", bitacoraRoutes);
 app.use("/api/notificaciones", notificacionRoutes);
+app.use("/api/deposito", depositoRoutes);
 app.use("/api/activos", activoRoutes);
 app.use("/api/movimientos", movimientoRoutes);
 app.use("/api/solicitudes", solicitudRoutes);

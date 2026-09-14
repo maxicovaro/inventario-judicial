@@ -7,3 +7,5 @@ src/uploads/
 storage/uploads/
 backups/
 performance-results/
+pilot/*.private.json
+pilot/*.local.json

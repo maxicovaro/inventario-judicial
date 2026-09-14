@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 13/09/2026. **P8 — Rendimiento y escalabilidad quedó formalmente cerrado** con PR #31, merge `5defc4472105f0da777d5053183f4c352ddfc8d4` y Quality Gate post-merge #225 verde. **P9.1 — Soporte e incident response del piloto** completó su implementación y está en integración final mediante PR #32. Quality Gate #226 quedó verde sobre el HEAD previo a esta sincronización documental; el HEAD final debe revalidarse antes del merge. P9.2 permanece bloqueado hasta merge, Gate post-merge verde y relectura de este archivo desde `main`.
+> Actualizada al 13/09/2026. **P9.1 — Soporte e incident response quedó formalmente cerrado** con PR #32, Quality Gate final #228, merge `67dd2526a796cba03b7edfcfd1c047d4ca5045ab`, Quality Gate post-merge #229 verde y relectura de este archivo desde `main`. **P9.2 — Alta controlada de oficinas y usuarios** es el bloque activo. Dentro de P9.2, **P9.2A — Modelo Depósito Central + Área Contable** está en integración final mediante PR #33; P9.2B — primera ola real Contable + Informática no se abre hasta merge, Gate post-merge verde y relectura de este archivo desde `main`. P9.3 permanece bloqueado hasta el cierre formal de P9.2 completo.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -30,9 +30,11 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | P8.6 Optimización + regresión | ✅ Completo | PR #30; Gate #218; `docs/P8_6_CLOSURE.md` |
 | P8.7 Cierre documental y criterios de piloto | ✅ Completo | PR #31; merge `5defc447...`; Gate post-merge #225 |
 | **P8 Rendimiento y escalabilidad** | ✅ **Completo** | `docs/P8_CLOSURE.md`; staging y Gate final verdes |
-| **P9.1 Soporte e incident response** | 🟢 **Integración final** | PR #32; Gate #226 verde sobre HEAD previo; revalidar HEAD final |
-| P9.2 Alta controlada de oficinas/usuarios | ⏳ Bloqueado | Habilitar solo después del cierre formal post-merge de P9.1 |
-| P9.3 Procedimiento operativo de administración | ⏳ Pendiente | Después de P9.2 |
+| **P9.1 Soporte e incident response** | ✅ **Completo** | PR #32; Gate #228; merge `67dd2526...`; Gate post-merge #229 |
+| **P9.2 Alta controlada de oficinas/usuarios** | 🟡 **Activo** | P9.2A en integración final; P9.2B pendiente |
+| **P9.2A Depósito Central + Área Contable** | 🟢 **Integración final** | PR #33; contratos + integración MySQL multiusuario; revalidar HEAD final |
+| P9.2B Primera ola Contable + Informática | ⏳ Bloqueado | Después del cierre formal post-merge de P9.2A |
+| P9.3 Procedimiento operativo de administración | ⏳ Bloqueado | Después del cierre formal de P9.2 |
 | P9.4 Indicadores reales del piloto | ⏳ Pendiente | Después de P9.3 |
 | P9.5 Backup/restore periódico del piloto | ⏳ Pendiente | Después de P9.4 |
 | P9.6 Criterios de salida a producción institucional | ⏳ Pendiente | Después de P9.5 |
@@ -355,11 +357,9 @@ Detalle: `docs/P8_CLOSURE.md`.
 
 ## P9 — Operación de piloto
 
-### P9.1 — Soporte e incident response 🟢 INTEGRACIÓN FINAL
+### P9.1 — Soporte e incident response ✅ CERRADO
 
-Rama: `ops/p9-pilot-incident-response`.
-
-Implementación completada:
+Implementación:
 - Incident Commander y responsabilidades operativas;
 - severidad SEV-1/SEV-2/SEV-3;
 - objetivos de reconocimiento y actualización;
@@ -371,35 +371,104 @@ Implementación completada:
 - tabletop exercise;
 - contrato `test:p9-incident-response-contracts` incluido en `npm test`.
 
-Documentación alineada:
-- `docs/P9_1_INCIDENT_RESPONSE.md`;
-- `docs/OPERATIONS.md`;
-- `docs/README.md`;
-- este `ROADMAP.md`.
+Evidencia definitiva:
+- PR #32 ✅;
+- Quality Gate final #228 sobre `d8277fa6a644fb9d7aff14e2ade7bd0175eead3e` ✅;
+- merge `67dd2526a796cba03b7edfcfd1c047d4ca5045ab` ✅;
+- Quality Gate post-merge #229 sobre ese SHA ✅;
+- `ROADMAP.md` releído desde `main` antes de abrir P9.2 ✅.
 
-Evidencia de integración:
-- PR #32 abierto ✅;
-- Quality Gate #226 verde completo sobre `b832b0756fad0f6efdb3a2ec218c5f319e2825f3` ✅;
-- esa ejecución incluyó contrato P9.1, MySQL integration, auth hardening, MFA, P6, backup/restore, P8.0/P8.1/P8.5/P8.6 y Chromium E2E ✅;
-- esta sincronización documental modifica el HEAD, por lo que el **HEAD final debe pasar nuevamente el Quality Gate antes del merge**.
+Detalle: `docs/P9_1_INCIDENT_RESPONSE.md`.
 
-Cierre formal restante:
-1. Quality Gate completo verde sobre el HEAD final de PR #32;
-2. revisión final de diff;
-3. merge de PR #32 a `main`;
-4. Quality Gate post-merge verde sobre el SHA resultante;
-5. releer `ROADMAP.md` desde `main`.
+### P9.2 — Alta controlada de oficinas y usuarios 🟡 ACTIVO
 
-No iniciar P9.2 antes de esos pasos.
+Objetivo: incorporar una primera ola pequeña, explícitamente aprobada y reversible sin bypass de las protecciones del módulo de usuarios.
 
-### P9.2 — Alta controlada de oficinas y usuarios ⏳
+Base de onboarding implementada:
+- manifiesto sintético `pilot/wave.example.json`;
+- manifiestos reales/privados excluidos de Git;
+- `pilot:onboarding:check` en modos `plan` y `verify`, read-only;
+- validación de oficinas y roles;
+- bloqueo de `ADMIN` en manifiestos de ola;
+- chequeo de `ADMIN` activo en oficina central;
+- MFA obligatorio de administradores en staging;
+- detección de usuarios existentes con emails enmascarados;
+- alta real únicamente desde Gestión de Usuarios;
+- rollback mediante desactivación y revocación de sesiones;
+- contrato `test:p9-onboarding-contracts` en `npm test`.
 
-Previsto:
-- selección explícita de primera ola de oficinas;
-- alta de responsables/usuarios mínimos;
-- validación de roles, oficina y MFA de administradores;
-- onboarding controlado y reversibilidad;
-- evitar incorporación masiva antes de validar la primera ola.
+Documento técnico: `docs/P9_2_CONTROLLED_ONBOARDING.md`.
+
+#### P9.2A — Modelo Depósito Central + Área Contable 🟢 INTEGRACIÓN FINAL
+
+Rama/PR: `ops/p9-controlled-onboarding` / PR #33.
+
+Regla institucional consolidada:
+- `Área Contable` es una oficina ordinaria con activos e insumos propios;
+- `Depósito` es una ubicación institucional separada;
+- Contable administra el depósito sin absorber sus existencias como propias;
+- una entrega a Contable se registra como `Depósito -> Área Contable` igual que para cualquier otra dependencia.
+
+Modelo de permisos:
+- `oficinas.gestiona_deposito` identifica a la oficina gestora;
+- `oficinas.es_deposito_central` identifica la ubicación depósito;
+- el permiso efectivo exige `RESPONSABLE` de oficina gestora o Administrador General;
+- no depende del nombre visible de la oficina;
+- un `USUARIO` común de Contable no administra depósito;
+- Contable no recibe administración global ni rol `ADMIN`.
+
+Operación multiusuario:
+- puede haber varios `RESPONSABLE` en Área Contable;
+- cada responsable usa su propia cuenta;
+- recepción, carga, ajuste, entrega, traslado, respuesta y provisión conservan el `usuario_id` del empleado interviniente;
+- distintos responsables pueden ejecutar etapas distintas del mismo circuito;
+- existe Auditoría operativa del Depósito Central visible para responsables autorizados sin exponer la Bitácora global de Dirección.
+
+Superficies separadas:
+- `Mi oficina`: activos/stock/solicitudes/consumos propios de Contable;
+- `Depósito Central`: activos, insumos, solicitudes, pedidos y auditoría bajo `/api/deposito/*` y rutas frontend dedicadas.
+
+Integridad:
+- insumos nuevos nacen con stock 0;
+- la entrada física exige movimiento trazable;
+- distribución reutiliza locks, transacciones e idempotencia P6;
+- activos de depósito se entregan mediante `TRASLADO` con origen/destino;
+- pedidos solo mueven stock desde estados permitidos.
+
+Pruebas incorporadas:
+- `test:p9-deposito-contracts`;
+- `test:p9-deposito-integration` sobre MySQL real descartable;
+- dos responsables distintos de Contable;
+- usuario común de Contable bloqueado;
+- responsable de Informática bloqueado;
+- Contable sin acceso a administración de usuarios;
+- autor individual verificado en movimientos de activos, stock, solicitudes y pedidos.
+
+Cierre formal restante de P9.2A:
+1. Quality Gate completo verde sobre el HEAD final del PR #33;
+2. revisar diff final;
+3. marcar PR #33 Ready for review;
+4. merge a `main`;
+5. Quality Gate post-merge verde sobre el SHA resultante;
+6. releer `ROADMAP.md` desde `main`.
+
+No abrir P9.2B antes de esos pasos.
+
+#### P9.2B — Primera ola Contable + Informática ⏳ BLOQUEADO
+
+Después del cierre formal de P9.2A:
+1. seleccionar personas reales de Área Contable y Área Informática;
+2. permitir más de un `RESPONSABLE` de Contable cuando corresponda;
+3. definir roles mínimos en manifiesto privado;
+4. registrar aprobación institucional;
+5. ejecutar `plan` sobre staging;
+6. realizar altas reales únicamente desde Gestión de Usuarios;
+7. ejecutar `verify`;
+8. validar login, rol, scope, gestión de depósito y auditoría;
+9. probar rollback controlado por desactivación;
+10. cerrar P9.2 con documentación, PR, merge y Gate post-merge.
+
+P9.3 no se inicia hasta completar P9.2B y cerrar P9.2.
 
 ### P9.3 — Procedimiento operativo de administración ⏳
 
@@ -469,6 +538,7 @@ No abrir como frentes paralelos salvo que bloqueen P9:
 - cierre P8.6: `docs/P8_6_CLOSURE.md`;
 - cierre P8 y gate piloto: `docs/P8_CLOSURE.md`;
 - P9.1 incident response: `docs/P9_1_INCIDENT_RESPONSE.md`;
+- P9.2 onboarding y Depósito Central: `docs/P9_2_CONTROLLED_ONBOARDING.md`;
 - evidencia ejecutable: commits, PRs, Quality Gates y artifacts.
 
 ## Reglas de trabajo

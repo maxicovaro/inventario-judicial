@@ -71,7 +71,7 @@ const asignarStockAOficina = async (req, res) => {
     if (!puedeGestionarDeposito(req.usuario)) {
       return res.status(403).json({
         mensaje:
-          "Acceso denegado. Solo Dirección de Policía Judicial puede asignar stock a las oficinas.",
+          "Acceso denegado. Se requiere autorización para gestionar y distribuir stock del Depósito Central.",
       });
     }
 

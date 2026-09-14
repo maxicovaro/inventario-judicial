@@ -23,6 +23,16 @@ const Oficina = sequelize.define(
       allowNull: false,
       defaultValue: false,
     },
+    gestiona_deposito: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    es_deposito_central: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
   },
   {
     tableName: "oficinas",

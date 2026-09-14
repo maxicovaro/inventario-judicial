@@ -1,0 +1,27 @@
+{
+  "wave_id": "wave-1",
+  "environment": "staging",
+  "approved": false,
+  "approved_by": null,
+  "approved_at": null,
+  "selection_reason": "Ejemplo sintético. Reemplazar en un archivo privado no versionado luego de aprobar las oficinas piloto.",
+  "offices": [
+    "Unidad Judicial N° 1"
+  ],
+  "users": [
+    {
+      "nombre": "Responsable",
+      "apellido": "Piloto",
+      "email": "responsable.uj1@example.invalid",
+      "role": "RESPONSABLE",
+      "office": "Unidad Judicial N° 1"
+    },
+    {
+      "nombre": "Usuario",
+      "apellido": "Piloto",
+      "email": "usuario.uj1@example.invalid",
+      "role": "USUARIO",
+      "office": "Unidad Judicial N° 1"
+    }
+  ]
+}

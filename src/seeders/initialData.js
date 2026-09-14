@@ -58,9 +58,17 @@ const seedInitialData = async () => {
         descripcion: "Oficina central",
         es_central: true,
       },
-      { nombre: "Depósito", descripcion: "Depósito central de bienes e insumos" },
+      {
+        nombre: "Depósito",
+        descripcion: "Depósito central de bienes e insumos",
+        es_deposito_central: true,
+      },
       { nombre: "Área de Personal", descripcion: "Gestión de personal" },
-      { nombre: "Área Contable", descripcion: "Administración contable" },
+      {
+        nombre: "Área Contable",
+        descripcion: "Administración contable",
+        gestiona_deposito: true,
+      },
       { nombre: "Área Informática", descripcion: "Soporte y sistemas" },
       { nombre: "Mesa de Entradas", descripcion: "Recepción de documentación" },
       { nombre: "Secretaría General", descripcion: "Secretaría General de la Dirección" },
@@ -92,8 +100,17 @@ const seedInitialData = async () => {
         defaults: oficina,
       });
 
-      if (oficina.es_central && !registro.es_central) {
-        await registro.update({ es_central: true });
+      const cambios = {};
+      if (oficina.es_central && !registro.es_central) cambios.es_central = true;
+      if (oficina.gestiona_deposito && !registro.gestiona_deposito) {
+        cambios.gestiona_deposito = true;
+      }
+      if (oficina.es_deposito_central && !registro.es_deposito_central) {
+        cambios.es_deposito_central = true;
+      }
+
+      if (Object.keys(cambios).length > 0) {
+        await registro.update(cambios);
       }
     }
 

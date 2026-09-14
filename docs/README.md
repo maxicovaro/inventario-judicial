@@ -135,9 +135,34 @@ Contiene:
 - evidencia mínima y plantilla de incidente;
 - MTTA/MTTR, RPO/RTO y métricas de soporte;
 - tabletop exercise previo a ampliar el piloto;
-- criterios de cierre de P9.1 y bloqueo de P9.2 hasta completar Gate/merge/post-merge.
+- criterios de cierre de P9.1.
 
 Plantilla operativa: `../.github/ISSUE_TEMPLATE/incident.md`.
+
+### 10. P9.2 — Alta controlada + Depósito Central
+
+`P9_2_CONTROLLED_ONBOARDING.md`
+
+Contiene:
+- selección y aprobación explícita de la primera ola;
+- manifiesto privado excluido de Git;
+- preflight y verificación read-only;
+- prohibición de crear `ADMIN` desde el manifiesto;
+- control de MFA de administradores en staging;
+- alta real únicamente desde Gestión de Usuarios;
+- rollback mediante desactivación y conservación de bitácora;
+- **P9.2A: separación entre Área Contable y Depósito Central**;
+- `Área Contable` como oficina normal con sus propios activos/insumos;
+- `Depósito` como ubicación institucional independiente;
+- capacidad explícita `gestiona_deposito` sin elevar al responsable a `ADMIN`;
+- superficie `/api/deposito/*` y pantallas `/deposito-central/*`;
+- ingreso, custodia y traslado de activos;
+- stock central con entradas trazables y distribución transaccional;
+- gestión de solicitudes y pedidos institucionales;
+- primera ola funcional prevista `Área Contable + Área Informática`;
+- tests negativos para impedir gestión de depósito desde una oficina común.
+
+Ejemplo sintético de onboarding: `../pilot/wave.example.json`.
 
 ## Evidencia técnica
 
@@ -162,7 +187,8 @@ Para retomar el proyecto después de una pausa:
 6. Si el proveedor activo es Railway, leer también `RAILWAY_STAGING.md`.
 7. Para P8, leer `PERFORMANCE.md`, `P8_6_CLOSURE.md` y `P8_CLOSURE.md`.
 8. Para P9.1/incidentes, leer `P9_1_INCIDENT_RESPONSE.md` y la plantilla versionada.
-9. Verificar el último Quality Gate antes de modificar/integrar.
+9. Para P9.2/onboarding y Depósito Central, leer `P9_2_CONTROLLED_ONBOARDING.md` y usar un manifiesto privado derivado del ejemplo.
+10. Verificar el último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
 
