@@ -21,9 +21,13 @@ const {
   listarSolicitudesDeposito,
   responderSolicitudDeposito,
   listarPedidosDeposito,
-  proveerPedidoDeposito,
-  actualizarEstadoPedidoDeposito,
 } = require("../controllers/depositoController");
+const {
+  actualizarProvision,
+} = require("../controllers/pedidoProvisionController");
+const {
+  actualizarEstadoPedidoDeposito,
+} = require("../controllers/pedidoDepositoEstadoController");
 const {
   listarAuditoriaDeposito,
 } = require("../controllers/depositoAuditoriaController");
@@ -70,7 +74,7 @@ router.get("/pedidos", listarPedidosDeposito);
 router.put(
   "/pedidos/:id/proveer",
   validarEntregaConProvision,
-  proveerPedidoDeposito,
+  actualizarProvision,
 );
 router.put("/pedidos/:id/estado", actualizarEstadoPedidoDeposito);
 
