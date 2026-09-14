@@ -41,7 +41,13 @@ module.exports = {
     );
 
     await sequelize.query(
-      "UPDATE pedidos_insumos SET tipo = 'MENSUAL', clave_mensual_unica = 1 WHERE tipo IS NULL OR clave_mensual_unica IS NULL",
+      "UPDATE pedidos_insumos SET tipo = 'MENSUAL' WHERE tipo IS NULL",
+    );
+    await sequelize.query(
+      "UPDATE pedidos_insumos SET clave_mensual_unica = 1 WHERE tipo = 'MENSUAL' AND clave_mensual_unica IS NULL",
+    );
+    await sequelize.query(
+      "UPDATE pedidos_insumos SET clave_mensual_unica = NULL WHERE tipo = 'COMPLEMENTARIO'",
     );
 
     await removeIndexIfExists(
