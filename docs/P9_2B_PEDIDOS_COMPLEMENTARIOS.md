@@ -50,6 +50,36 @@ La pantalla de pedido informa que, cuando ya existe el pedido base del período,
 
 El historial muestra explícitamente `Mensual` o `Complementario` para evitar que dos pedidos del mismo período parezcan duplicados accidentales.
 
+## Evidencia técnica pre-merge
+
+Implementación validada en PR #38 (`fix/p9-2b-pedidos-complementarios`).
+
+HEAD validado:
+
+```text
+6d3651e2ad06020edf55f918cfc7d90559d14b67
+```
+
+Quality Gate #287: **verde**.
+
+La corrida completa validó:
+
+- lint y build frontend;
+- tests backend;
+- migraciones desde base limpia;
+- re-ejecución idempotente de migraciones;
+- `db:status`;
+- integración MySQL real;
+- creación del primer pedido como `MENSUAL` y del siguiente como `COMPLEMENTARIO`;
+- aislamiento de pedidos entre oficinas;
+- autenticación y MFA;
+- concurrencia e idempotencia;
+- health y backup/restore;
+- baselines y perfiles de rendimiento P8;
+- Playwright E2E crítico, incluido el ciclo `MENSUAL -> APROBADO -> ENTREGADO -> reporte` con el tipo mensual visible en el historial.
+
+Durante la adecuación de los contratos se detectaron y corrigieron expectativas antiguas que todavía suponían un único pedido por período o textos previos al rediseño. No se relajaron invariantes de base ni controles de autorización.
+
 ## Evidencia requerida en staging
 
 Antes de dar por resuelto este hallazgo dentro de P9.2B debe verificarse:
