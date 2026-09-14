@@ -72,6 +72,16 @@ for (const forbidden of [
   assert(!checker.includes(forbidden), `El plan P9.2B dejó de ser read-only: ${forbidden}`);
 }
 
+const authProvider = read("inventario-frontend/src/auth/AuthProvider.jsx");
+assert(
+  authProvider.includes('aplicarRespuestaAuth(response.data, { autenticar: false })'),
+  "El login P9.2B debe evitar marcar authenticated antes de refrescar el perfil canónico",
+);
+assert(
+  authProvider.includes('setEstado("loading");\n        return refrescarSesion({ mostrarCarga: false });'),
+  "El login P9.2B debe esperar /auth/me antes de habilitar navegación con capacidades de oficina",
+);
+
 const docs = read("docs/P9_2B_FIRST_WAVE.md");
 for (const required of [
   "Área Contable",
