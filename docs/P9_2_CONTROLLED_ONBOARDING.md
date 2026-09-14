@@ -4,60 +4,68 @@
 
 P9.2 prepara la incorporación de la primera ola del piloto sin altas masivas, sin credenciales versionadas y sin crear caminos alternativos que eviten la autorización normal del sistema.
 
-La regla central de onboarding se mantiene: **el preflight es read-only y el alta real de usuarios se realiza únicamente desde el módulo administrativo** por un Administrador General autenticado. Así se conservan autorización, política de contraseñas, bitácora, revocación de sesiones y validaciones de rol/oficina ya implementadas.
+La regla central de onboarding se mantiene: **el preflight es read-only y el alta real se realiza únicamente desde el módulo administrativo** por un Administrador General autenticado. Así se conservan autorización, política de contraseñas, bitácora, revocación de sesiones y validaciones de rol/oficina ya implementadas.
 
-Antes de seleccionar personas reales se abrió **P9.2A — Modelo operativo Depósito Central + Área Contable**, porque la operatoria institucional requiere distinguir con precisión la oficina Contable de los bienes e insumos que custodia para toda Policía Judicial.
+Antes de seleccionar personas reales se abrió **P9.2A — Modelo operativo Depósito Central + Área Contable**. Este subbloque define cómo conviven el inventario propio de Contable y la custodia institucional del Depósito Central, incluyendo operación multiusuario y trazabilidad individual.
 
 ---
 
-## 1. P9.2A — Regla institucional aprobada
+## 1. Regla institucional aprobada
 
-### Área Contable como oficina
+### Área Contable sigue siendo una oficina común
 
-`Área Contable` es una oficina ordinaria a efectos de inventario. Tiene y consume sus propios recursos:
+`Área Contable` tiene sus propios recursos y consumos, igual que cualquier otra dependencia:
 - PC, monitores, impresoras y otros activos;
 - escritorios, sillas y mobiliario;
-- papel, tóner y otros insumos asignados a la oficina;
+- papel, tóner y demás insumos asignados a su oficina;
 - solicitudes, pedidos y consumos propios.
 
-Esos elementos **no forman parte del Depósito Central** por el solo hecho de que Contable sea quien lo administra.
+Estos elementos **no forman parte del Depósito Central** por el solo hecho de que Contable sea quien lo administra.
 
-Cuando Contable recibe papel u otro insumo para su propio consumo, debe existir una distribución real:
+Cuando Contable necesita insumos del depósito, debe existir una distribución real:
 
 ```text
 Depósito Central -> Área Contable
 ```
 
-Del mismo modo, un bien pasa a formar parte del inventario propio de Contable únicamente cuando sale formalmente del depósito y se registra su traslado.
+Cuando recibe un bien patrimonial, debe existir un traslado formal desde Depósito Central a Área Contable.
 
-### Depósito Central como ubicación separada
+### Depósito Central es una ubicación separada
 
 `Depósito` representa la custodia institucional previa a la distribución:
-- bienes nuevos todavía no asignados a una dependencia;
+- bienes nuevos todavía no asignados;
 - stock central de insumos;
 - ingresos y devoluciones;
 - entregas a oficinas y unidades judiciales;
 - respuesta operativa a solicitudes;
 - provisión de pedidos mensuales.
 
-La separación evita que mercadería institucional pendiente de distribución aparezca como patrimonio o consumo propio de Contable.
-
-### Responsable de Contable
-
-El `RESPONSABLE` de `Área Contable` mantiene sus permisos normales sobre su oficina y recibe además una **capacidad explícita de gestión de depósito**.
-
-No se lo convierte en `ADMIN` y, por lo tanto, no obtiene:
-- administración global de usuarios;
-- configuración de seguridad;
-- funciones de MFA administrativo;
-- acceso general a bitácora como administrador;
-- autoridad global sobre cualquier dato por el solo hecho de gestionar depósito.
-
-La autorización se basa en atributos persistidos de oficina, no en comparar textos como `nombre === "Área Contable"`.
+Esto evita que bienes o insumos institucionales pendientes de distribución aparezcan como patrimonio o consumo propio de Contable.
 
 ---
 
-## 2. Modelo técnico de capacidades
+## 2. Múltiples responsables de Contable
+
+Área Contable puede tener **más de un usuario con rol `RESPONSABLE`**.
+
+Cada `RESPONSABLE` de una oficina con `gestiona_deposito=true` puede operar el Depósito Central. La capacidad no pertenece a una sola persona: pertenece a la función institucional de la oficina y se combina con el rol del usuario.
+
+Un `USUARIO` común de Contable no obtiene permisos de depósito aunque pertenezca a la misma oficina.
+
+Esto permite que varios empleados compartan las tareas de:
+- recibir/cargar activos;
+- registrar ingresos o devoluciones de insumos;
+- controlar existencias;
+- entregar activos;
+- distribuir insumos;
+- responder solicitudes;
+- gestionar y provisionar pedidos.
+
+Cada acción se ejecuta con la identidad autenticada del empleado que la realiza. No se comparte una cuenta genérica de depósito.
+
+---
+
+## 3. Modelo técnico de capacidades
 
 La tabla `oficinas` incorpora dos atributos independientes:
 
@@ -69,43 +77,48 @@ es_deposito_central
 Configuración inicial:
 - `Área Contable`: `gestiona_deposito = true`;
 - `Depósito`: `es_deposito_central = true`;
-- demás oficinas: ambas capacidades en `false`, salvo modificación institucional futura mediante migración/proceso controlado.
+- demás oficinas: ambas capacidades en `false` salvo decisión institucional futura y cambio controlado.
 
-La capacidad efectiva requiere simultáneamente:
-1. rol `RESPONSABLE` con oficina asignada y `oficina_gestiona_deposito=true`; o
+La capacidad efectiva de depósito exige:
+1. ser `RESPONSABLE` con oficina asignada y `oficina_gestiona_deposito=true`; o
 2. ser Administrador General.
 
-Un `USUARIO` de Contable no recibe automáticamente gestión del depósito.
+No se decide autorización por textos como `nombre === "Área Contable"`.
 
-La sesión recupera estas capacidades desde base de datos en cada verificación autenticada. Cambiar el nombre visible de una oficina no cambia permisos.
+La sesión recupera las capacidades desde base de datos. Cambiar el nombre visible de una oficina no concede ni quita permisos.
+
+El responsable de Contable **no se convierte en `ADMIN`** y no obtiene por esta función:
+- administración global de usuarios;
+- configuración de seguridad;
+- funciones de MFA administrativo;
+- Bitácora global de Dirección;
+- permisos globales sobre cualquier oficina fuera de los flujos específicos de depósito.
 
 ---
 
-## 3. Separación de superficies de trabajo
-
-El responsable de Contable trabaja con dos contextos explícitos.
+## 4. Dos contextos de trabajo para Contable
 
 ### Mi oficina
 
-Usa las pantallas normales del sistema:
-- Mis activos;
-- Mis insumos;
-- Solicitudes propias;
-- Pedido mensual;
-- Consumo mensual;
-- reportes de su oficina.
+El responsable usa las pantallas normales para:
+- activos propios de Contable;
+- stock propio de Contable;
+- solicitudes propias;
+- pedido mensual;
+- consumo y reportes de su oficina.
 
-El alcance continúa limitado a `Área Contable` como cualquier otro `RESPONSABLE`.
+Estas pantallas continúan limitadas a `Área Contable` como cualquier otro `RESPONSABLE`.
 
 ### Depósito Central
 
-Usa rutas dedicadas protegidas por capacidad:
+El responsable autorizado dispone de un bloque separado:
 
 ```text
 /deposito-central/activos
 /deposito-central/insumos
 /deposito-central/solicitudes
 /deposito-central/pedidos
+/deposito-central/auditoria
 ```
 
 API dedicada:
@@ -114,299 +127,314 @@ API dedicada:
 /api/deposito/*
 ```
 
-El guard de estas rutas exige autenticación y `verificarGestionDeposito`.
+Todas estas rutas exigen autenticación y `verificarGestionDeposito`.
 
-Este diseño evita ampliar las pantallas normales de Contable para que vean arbitrariamente datos de otras oficinas.
+Este diseño evita ampliar las pantallas ordinarias de Contable para consultar o editar arbitrariamente información de otras oficinas.
 
 ---
 
-## 4. Operatoria de activos del Depósito Central
+## 5. Activos del Depósito Central
 
-Un activo nuevo pendiente de asignación se registra con ubicación `Depósito Central` determinada por el backend.
-
-El usuario no puede elegir otra oficina durante el alta de depósito ni convertir esa acción en una baja.
+Un activo nuevo pendiente de asignación se registra directamente en la ubicación `Depósito Central` determinada por backend.
 
 Ciclo esperado:
 
 ```text
 Ingreso físico
-    -> alta en Depósito Central
-    -> custodia
-    -> selección de oficina destino
-    -> entrega/traslado
-    -> activo asignado a la oficina destino
+  -> alta en Depósito Central
+  -> custodia
+  -> selección de oficina destino
+  -> entrega/traslado
+  -> inventario de la oficina receptora
 ```
 
-La entrega:
-- bloquea el registro durante la operación;
-- utiliza idempotencia donde corresponde;
-- cambia la oficina del activo;
-- registra un movimiento `TRASLADO` con origen y destino;
-- registra bitácora.
+La operación conserva:
+- bloqueo transaccional donde corresponde;
+- idempotencia;
+- origen y destino;
+- movimiento `ALTA` o `TRASLADO`;
+- `usuario_id` del empleado que recibió, actualizó o entregó;
+- bitácora operativa.
 
-Después de la entrega, el bien deja de aparecer como existencia del depósito y pasa al inventario de la oficina receptora.
+Dos responsables distintos pueden intervenir en etapas diferentes. Por ejemplo, un empleado puede cargar la recepción y otro realizar posteriormente la entrega; ambos quedan individualizados.
 
-El responsable de Contable no obtiene por esto permiso de baja formal global. La baja continúa bajo el procedimiento administrativo existente.
+El responsable de depósito no obtiene por esto permiso general de baja patrimonial.
 
 ---
 
-## 5. Operatoria de insumos y stock central
+## 6. Insumos y stock central
 
-`Insumo.stock_actual` continúa representando la existencia central disponible para distribución.
+`Insumo.stock_actual` representa la existencia central disponible para distribución.
 
-Un insumo nuevo se crea con **stock inicial 0**. Toda entrada física posterior debe registrarse como:
+Un insumo nuevo se crea con **stock inicial 0**. La entrada física posterior debe registrarse mediante:
 - `INGRESO`;
 - `DEVOLUCION`; o
-- `AJUSTE` cuando exista una regularización explícita.
+- `AJUSTE` cuando exista regularización explícita.
 
-No se admite crear una referencia con stock inicial positivo, porque eso produciría existencia sin movimiento trazable.
+No se permite crear una referencia con stock inicial positivo porque produciría existencia sin movimiento trazable.
 
-Las entregas a oficinas no usan un `EGRESO` manual. Se realizan mediante la operación de distribución existente, que dentro de una transacción:
-1. bloquea el stock central;
+Las entregas a oficinas se realizan mediante la operación de distribución, que dentro de una transacción:
+1. bloquea stock central;
 2. valida disponibilidad;
-3. descuenta la cantidad central;
-4. crea o bloquea `StockOficina` del destino;
-5. acredita la cantidad en la oficina;
+3. descuenta existencia central;
+4. crea o bloquea `StockOficina`;
+5. acredita la oficina receptora;
 6. registra `MovimientoStock`;
-7. preserva idempotencia y reglas P6.
+7. conserva `usuario_id` del empleado que realizó la entrega;
+8. mantiene las garantías de concurrencia e idempotencia de P6.
 
-Esto aplica también cuando la oficina destino es la propia `Área Contable`.
+Esto también aplica cuando el destino es la propia Área Contable.
 
 ---
 
-## 6. Solicitudes y pedidos recibidos
+## 7. Solicitudes y pedidos
 
-El Depósito Central dispone de bandejas específicas para operación institucional.
+### Solicitudes
 
-### Solicitudes generales
+Los responsables de depósito pueden:
+- visualizar solicitudes institucionales;
+- registrar respuesta;
+- aprobar, rechazar, poner en proceso o finalizar según el flujo;
+- notificar al solicitante.
 
-El gestor puede:
-- visualizar solicitudes de las dependencias;
-- registrar respuesta operativa;
-- aprobar, rechazar, poner en proceso o finalizar según el flujo existente;
-- generar notificación al solicitante.
+La acción queda asociada al usuario concreto que la realizó.
 
-No se le concede un permiso genérico para borrar evidencia o administrar usuarios.
+No se les concede facultad genérica para borrar evidencia o administrar usuarios.
 
-### Pedidos mensuales de insumos
+### Pedidos mensuales
 
-El gestor puede:
-- visualizar pedidos institucionales;
-- tomar un pedido en revisión;
-- aprobar/rechazar conforme a la máquina de estados;
+Los responsables pueden:
+- visualizar pedidos;
+- ponerlos en revisión;
+- aprobar o rechazar según la máquina de estados;
 - registrar cantidades provistas;
 - concretar la entrega.
 
-La provisión reutiliza la lógica transaccional existente. Solo un pedido previamente `APROBADO` puede mover stock real. La entrega descuenta stock central y acredita stock de oficina dentro de la misma operación.
+Solo un pedido previamente `APROBADO` puede mover stock real. La provisión reutiliza la lógica transaccional existente, descuenta stock central y acredita stock de oficina en la misma operación.
+
+La aprobación y la entrega pueden ser realizadas por responsables diferentes, quedando cada etapa atribuida a su autor.
 
 ---
 
-## 7. Primera ola recomendada
+## 8. Auditoría operativa de Depósito Central
 
-La primera ola funcional prevista es:
+Además de la Bitácora global reservada a Dirección, los responsables habilitados disponen de una vista **Auditoría operativa** limitada al Depósito Central.
+
+La auditoría muestra, según el registro disponible:
+- fecha y hora;
+- empleado que realizó la acción;
+- oficina del empleado;
+- acción;
+- módulo;
+- detalle operativo.
+
+Incluye acciones relevantes como:
+- alta y edición de activos en depósito;
+- entrega/traslado de activos;
+- ingresos, devoluciones y ajustes de stock;
+- asignación de stock a oficinas;
+- respuestas a solicitudes;
+- cambios de estado y provisión de pedidos.
+
+Esta vista permite resolver responsabilidades internas sin entregar a Contable acceso a la Bitácora global de administración.
+
+---
+
+## 9. Seguridad y aislamiento
+
+P9.2A mantiene las siguientes guardas:
+- un `RESPONSABLE` de Informática u otra oficina común no puede administrar depósito;
+- un `USUARIO` de Contable no puede administrar depósito;
+- Contable no administra usuarios por gestionar depósito;
+- las pantallas normales de Contable siguen limitadas a su propia oficina;
+- la gestión central se realiza solo a través de `/api/deposito/*`;
+- no se decide permiso por el nombre visible de la oficina;
+- no se eliminan MFA, locks, idempotencia ni controles de autorización.
+
+---
+
+## 10. Primera ola funcional
+
+La primera ola prevista para P9.2B es:
 
 ```text
 Dirección
-  -> supervisión y administración del sistema
+  -> supervisión y administración
 
 Área Contable
-  -> RESPONSONSABLE de su propia oficina
-  -> gestión adicional del Depósito Central
+  -> uno o más RESPONSABLE
+  -> gestión del Depósito Central
+  -> inventario propio separado
 
 Área Informática
   -> primera oficina receptora ordinaria
 ```
 
-Esto permite validar un circuito completo con muy pocos usuarios:
+Con estas dos oficinas se puede validar:
 
 ```text
-Ingreso -> Depósito -> Solicitud/Pedido -> Gestión Contable
-       -> Entrega -> Informática -> Stock/Activo de oficina -> Trazabilidad
+Ingreso
+  -> Depósito
+  -> Solicitud/Pedido
+  -> Gestión Contable
+  -> Entrega
+  -> Informática
+  -> Stock/Activo de oficina
+  -> Auditoría y trazabilidad
 ```
 
-También permite comprobar el caso especial:
+También se prueba expresamente:
 
 ```text
-Depósito -> Contable
+Depósito -> Área Contable
 ```
 
-sin confundir las existencias centrales con el consumo propio del área gestora.
+sin mezclar depósito con consumo propio.
 
-La selección de **personas reales** todavía requiere aprobación explícita antes de crear usuarios en staging.
+La selección de personas reales continúa pendiente y no forma parte de P9.2A.
 
 ---
 
-## 8. Alcance de la primera ola de usuarios
+## 11. Manifiesto privado de primera ola
 
-La ola debe ser pequeña y observable. Como criterio técnico:
-- iniciar con `Área Contable` y `Área Informática`;
-- incorporar solo los usuarios necesarios para ejecutar recorridos críticos;
-- preferir inicialmente `RESPONSABLE` y `USUARIO`;
-- no crear nuevos `ADMIN` mediante el manifiesto de piloto;
-- mantener los administradores generales existentes bajo la política MFA obligatoria del entorno production-like.
-
-`pilot/wave.example.json` es únicamente un ejemplo sintético y no constituye una selección aprobada.
-
-La selección real se guarda en un archivo local/privado excluido de Git, por ejemplo:
+La selección real de P9.2B se guarda fuera de Git, por ejemplo:
 
 ```text
 pilot/wave-1.private.json
 ```
 
-Nunca versionar nombres, emails reales u otros datos personales de la ola piloto salvo necesidad institucional explícita y autorizada.
-
----
-
-## 9. Formato del manifiesto privado
-
-Partir de:
-
-```text
-pilot/wave.example.json
-```
-
-Campos principales:
-- `wave_id`;
-- `environment`: debe coincidir con `DEPLOY_ENV`; P9.2 solo admite `development` o `staging`;
-- `approved`;
-- `approved_by` y `approved_at`;
-- `selection_reason`;
-- `offices`;
-- `users`: nombre, apellido, email, rol y oficina esperados.
-
-Roles admitidos:
+Roles admitidos por onboarding:
 - `RESPONSABLE`;
 - `USUARIO`.
 
-`ADMIN` se excluye deliberadamente para impedir elevación de privilegios por onboarding.
+`ADMIN` está prohibido en el manifiesto para impedir elevación de privilegios.
 
 **No incluir contraseñas**, TOTP, recovery codes, JWT, cookies, secretos ni credenciales de base de datos.
 
----
-
-## 10. Preflight read-only
-
-Comando:
+El preflight se ejecuta con:
 
 ```bash
 npm run pilot:onboarding:check -- --manifest pilot/wave-1.private.json --mode plan
 ```
 
-El preflight:
-- valida formato y entorno;
-- confirma oficinas y roles;
-- confirma al menos un `ADMIN` activo;
-- exige que cada `ADMIN` pertenezca a oficina central;
-- en staging exige MFA en todos los `ADMIN` activos;
-- detecta emails existentes;
-- enmascara emails;
-- no crea, modifica ni elimina registros.
-
-Una ola no aprobada puede evaluarse en `plan`, pero **no habilita altas reales**.
+Es read-only y valida oficinas, roles, administradores centrales, MFA en staging, emails existentes y coherencia del manifiesto.
 
 ---
 
-## 11. Aprobación y alta real
+## 12. Alta real y verificación
 
-Antes del alta deben quedar definidos:
+Antes del alta deben quedar aprobados:
 1. personas seleccionadas;
-2. rol de cada usuario;
+2. rol;
 3. oficina;
-4. aprobación institucional;
+4. responsable institucional de la aprobación;
 5. fecha y motivo;
-6. canal seguro de credenciales iniciales.
+6. canal seguro para credenciales iniciales.
 
-La creación real se realiza únicamente desde Gestión de Usuarios por un Administrador General.
+El **alta real se realiza únicamente desde el módulo administrativo** de Gestión de Usuarios por un Administrador General.
 
-No cargar usuarios directamente con SQL, scripts de `INSERT`, edición manual de tablas ni acceso de emergencia salvo incident response documentado.
+No se cargan usuarios con SQL, `INSERT`, edición manual de tablas o scripts de provisión paralelos.
 
----
-
-## 12. Verificación post-alta
-
-Después de crear usuarios:
+Después del alta:
 
 ```bash
 npm run pilot:onboarding:check -- --manifest pilot/wave-1.private.json --mode verify
 ```
 
-`verify` exige `approved=true` y comprueba read-only:
-- existencia y actividad;
-- rol esperado;
-- oficina esperada;
-- administradores en oficina central;
-- MFA administrativo correcto en staging.
-
-Para la primera ola debe verificarse además funcionalmente:
-- Responsable Contable ve su propia oficina y el bloque separado Depósito Central;
-- Responsable Contable no administra usuarios;
-- Responsable Informática no puede entrar a `/api/deposito/*` ni a sus rutas frontend;
-- un activo de depósito puede entregarse a Informática con `TRASLADO` trazable;
-- un insumo distribuido descuenta central y acredita Informática;
-- Contable puede recibir stock para sí mediante una entrega real;
-- solicitudes y pedidos pueden gestionarse sin elevar al responsable a `ADMIN`.
+`verify` comprueba en modo read-only existencia, actividad, rol, oficina y MFA administrativo correspondiente.
 
 ---
 
 ## 13. Rollback operativo
 
-El onboarding es reversible sin borrar historial.
+El **rollback operativo** preferido es desactivar usuarios, no borrarlos.
 
-Ante error de asignación, incidente o retiro de un usuario:
-1. un Administrador General desactiva el usuario;
-2. se revocan sesiones activas;
+Ante error, retiro o incidente:
+1. Dirección desactiva el usuario;
+2. se revocan sus sesiones;
 3. se verifica que no pueda operar;
-4. se conserva bitácora e historial;
+4. se conserva historial y bitácora;
 5. se actualiza el manifiesto privado si cambia la ola;
-6. se vuelve a ejecutar `verify`.
+6. se repite `verify`.
 
-El rollback preferido es desactivar, no borrar.
-
-La capacidad de gestión de depósito pertenece a la configuración institucional de la oficina. Un cambio futuro de oficina gestora debe realizarse mediante cambio versionado/controlado, nunca cambiando un nombre para obtener permisos.
+Un cambio futuro de oficina gestora del depósito debe realizarse mediante cambio versionado/controlado, nunca renombrando una oficina para obtener permisos.
 
 ---
 
-## 14. Condiciones de stop
+## 14. Pruebas de P9.2A
 
-Detener nuevas altas si aparece cualquiera de estas condiciones:
-- un usuario ve información de otra oficina sin autorización;
-- Informática u otra oficina común accede a funciones del depósito;
+La suite incorpora contratos estáticos y prueba real sobre MySQL.
+
+Se valida al menos que:
+- existan `gestiona_deposito` y `es_deposito_central`;
+- autorización backend/frontend no dependa de nombres;
+- rutas de depósito exijan el guard específico;
+- existan pantallas separadas y Auditoría operativa;
+- el stock inicial de un insumo nuevo sea 0;
+- dos `RESPONSABLE` distintos de Contable puedan operar depósito;
+- un `USUARIO` de Contable no pueda hacerlo;
+- Informática no pueda hacerlo;
+- Contable no pueda administrar usuarios;
+- recepción y entrega patrimonial puedan tener autores distintos;
+- recepción y distribución de stock puedan tener autores distintos;
+- solicitudes y pedidos registren al empleado interviniente;
+- stock central y stock de oficina mantengan consistencia.
+
+Scripts:
+
+```text
+test:p9-deposito-contracts
+test:p9-deposito-integration
+```
+
+Ambos forman parte del Quality Gate correspondiente.
+
+---
+
+## 15. Condiciones de stop
+
+Detener la incorporación de usuarios reales si ocurre cualquiera de estos casos:
+- una oficina no autorizada accede al depósito;
+- un usuario común de Contable obtiene permisos de responsable;
 - Contable obtiene administración global por gestionar depósito;
-- bienes/stock de Contable se mezclan con existencias centrales;
-- una entrega no conserva movimiento/bitácora;
-- aparecen stock negativo, doble entrega o replay incorrecto;
+- bienes/stock propios de Contable se mezclan con existencias centrales;
+- una entrega o recepción no identifica al empleado que la realizó;
+- una operación crítica no queda auditada;
+- aparece stock negativo, doble entrega o replay incorrecto;
 - un `ADMIN` aparece fuera de oficina central;
 - un administrador de staging no tiene MFA;
 - existen errores repetidos de auth/MFA/permisos;
-- hay duda sobre el entorno activo.
+- existe duda sobre el entorno activo.
 
-Responder según `P9_1_INCIDENT_RESPONSE.md` cuando corresponda.
+Aplicar `P9_1_INCIDENT_RESPONSE.md` cuando corresponda.
 
 ---
 
-## 15. Evidencia y criterios de cierre de P9.2
+## 16. Estado de cierre
 
-Por cada ola conservar, sin publicar datos personales innecesarios:
-- `wave_id`;
-- oficinas seleccionadas;
-- cantidad de usuarios por rol/oficina;
-- aprobación institucional;
-- `plan` y `verify`;
-- validaciones funcionales;
-- incidentes;
-- reversión/desactivación cuando corresponda;
-- fecha de apertura/cierre.
+### P9.2A — Depósito Central + Área Contable
 
-P9.2 podrá cerrarse cuando:
-- P9.2A pase contratos, integración MySQL, frontend y Quality Gate;
-- la primera ola real quede explícitamente seleccionada/aprobada;
-- `plan` sea verde en staging;
-- las altas se hagan por módulo administrativo;
-- `verify` sea verde;
-- roles, scope, gestión de depósito y separación Contable/Depósito se validen funcionalmente;
-- MFA administrativo permanezca correcto;
-- rollback esté documentado y probado de forma controlada;
-- `ROADMAP.md` y documentación técnica estén actualizados;
-- PR sea mergeado y Gate post-merge quede verde.
+Implementación funcional completada en `ops/p9-controlled-onboarding`:
+- separación Contable/Depósito;
+- capacidades persistidas de oficina;
+- gestión multiusuario para responsables de Contable;
+- trazabilidad individual por `usuario_id`;
+- auditoría operativa visible para responsables;
+- bienes, insumos, solicitudes y pedidos bajo rutas dedicadas;
+- stock inicial trazable;
+- contratos y prueba MySQL multiusuario.
 
-Hasta completar la selección explícita y validación real en staging, P9.2 permanece abierto y P9.3 no se inicia.
+El cierre formal de P9.2A exige Quality Gate completo verde, integración del PR y Gate post-merge verde.
+
+### P9.2B — Primera ola Contable + Informática
+
+Queda como siguiente paso de P9.2:
+- seleccionar personas reales;
+- crear manifiesto privado;
+- registrar aprobación;
+- ejecutar `plan` en staging;
+- realizar altas solo desde Gestión de Usuarios;
+- ejecutar `verify`;
+- validar login, permisos, auditoría y rollback controlado.
+
+P9.2 permanece abierto hasta completar P9.2B. P9.3 no se inicia antes del cierre formal de P9.2.
