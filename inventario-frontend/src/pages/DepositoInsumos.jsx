@@ -54,11 +54,11 @@ export default function DepositoInsumos() {
       const [insumosRes, movimientosRes, oficinasRes] = await Promise.all([
         api.get("/deposito/insumos"),
         api.get("/deposito/movimientos"),
-        api.get("/oficinas"),
+        api.get("/oficinas/destinos-deposito"),
       ]);
       setInsumos(insumosRes.data || []);
       setMovimientos(movimientosRes.data || []);
-      setOficinas((oficinasRes.data || []).filter((oficina) => !oficina.es_deposito_central));
+      setOficinas(oficinasRes.data || []);
     } catch (err) {
       setError(err.response?.data?.mensaje || "Error al cargar insumos del depósito");
     }
