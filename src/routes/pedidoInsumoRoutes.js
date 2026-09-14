@@ -4,9 +4,11 @@ const router = express.Router();
 const { crearPedido } = require("../controllers/pedidoCreateController");
 const {
   listarPedidos,
-  actualizarProvision,
   exportarPedidoPDF,
 } = require("../controllers/pedidoInsumoController");
+const {
+  actualizarProvision,
+} = require("../controllers/pedidoProvisionController");
 const {
   actualizarEstadoPedidoSeguro,
 } = require("../controllers/pedidoEstadoController");
