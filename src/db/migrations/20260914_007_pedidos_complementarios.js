@@ -50,12 +50,11 @@ module.exports = {
       "UPDATE pedidos_insumos SET clave_mensual_unica = NULL WHERE tipo = 'COMPLEMENTARIO'",
     );
 
-    await removeIndexIfExists(
-      queryInterface,
-      "pedidos_insumos",
-      "uq_pedido_oficina_mes_anio",
-    );
-
+    // Crear primero el índice nuevo. En instalaciones existentes MySQL puede estar
+    // usando el índice único anterior como índice de soporte de la FK oficina_id;
+    // eliminarlo antes de que exista otro índice con oficina_id como prefijo hace
+    // que MySQL rechace el DROP INDEX. El índice nuevo mantiene ese soporte y
+    // permite retirar luego la unicidad antigua sin tocar la clave foránea.
     await addIndexIfMissing(
       queryInterface,
       "pedidos_insumos",
@@ -64,6 +63,12 @@ module.exports = {
         name: "uq_pedido_mensual_oficina_mes_anio",
         unique: true,
       },
+    );
+
+    await removeIndexIfExists(
+      queryInterface,
+      "pedidos_insumos",
+      "uq_pedido_oficina_mes_anio",
     );
   },
 };
