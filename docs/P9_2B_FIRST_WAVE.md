@@ -13,7 +13,7 @@ Entrada habilitada por:
 - Quality Gate post-merge #270 verde;
 - relectura de `ROADMAP.md` desde `main`.
 
-La primera ola **no comienza creando usuarios**. Primero staging debe ejecutar una revisión que contenga P9.2A y tener aplicada la migración 006.
+La primera ola **no comienza creando usuarios**. Primero staging debe ejecutar una revisión que contenga P9.2A, tener aplicada la migración 006 y contar con los catálogos institucionales base.
 
 ## 1. Objetivo
 
@@ -44,7 +44,7 @@ Composición mínima:
 
 Cada persona debe usar su propia cuenta. No se permite una cuenta compartida de Depósito.
 
-No se incorpora ningún `ADMIN` mediante el manifiesto. Dirección conserva la administración general con las cuentas centrales ya existentes.
+No se incorpora ningún `ADMIN` mediante el manifiesto. Dirección conserva la administración general con las cuentas centrales ya existentes o con el procedimiento administrativo/bootstrapping autorizado que corresponda.
 
 ## 3. Datos reales y privacidad
 
@@ -70,22 +70,72 @@ En los manifiestos reales **no se versionan**:
 ## 4. Gate técnico de staging antes del plan
 
 Estado observado al abrir P9.2B:
-- Railway staging ejecuta `cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044`;
-- esa revisión corresponde a P8.6;
-- P9.2A todavía no fue promovido a staging;
+- Railway staging ejecutaba `cb7b9fcbd39cdabc34b41552fdf407b1f8c8a044`;
+- esa revisión correspondía a P8.6;
+- P9.2A todavía no había sido promovido a staging;
 - staging venía con migraciones 001–005.
 
+Promoción controlada realizada el 14/09/2026:
+- backend y frontend promovidos a `d92ebe6d00e6889d1a20585d01bba1bb206ceebf`;
+- `DEPLOY_REVISION` alineada con ese SHA;
+- `deploy:preflight` aprobado para `staging` y `inventario_judicial_staging`;
+- backup persistente previo a migración creado en `/data/backups/pre-p9-2b-migrate-006.sql`;
+- backup verificado con SHA-256 `6050b7b5f2be118f70db4f08b41316f922067425ec1abd6be09e01f4d1de29d7` y 23746 bytes;
+- estado previo: migraciones 001–005 aplicadas y 006 pendiente;
+- migración `20260913_006_deposito_central_capabilities.js` aplicada mediante `deploy:migrate` usando ese backup;
+- estado posterior: migraciones 001–006 aplicadas y base al día;
+- backend volvió a `/health/ready` 200 con `environment=staging` y revisión exacta.
+
+### Stop condition detectada: catálogos base ausentes
+
+La validación read-only posterior a la migración devolvió:
+
+```text
+P9.2B_CAPABILITIES []
+P9.2B_OFFICES []
+```
+
+Es decir, la tabla `oficinas` de staging estaba vacía. La migración 006 creó correctamente las columnas y quedó registrada, pero sus `UPDATE` no podían marcar Área Contable/Depósito porque todavía no existían registros de oficinas.
+
+La incorporación de usuarios se detuvo en ese punto. **No se crearon usuarios y no se realizó ningún `UPDATE`/`INSERT` manual de oficinas.**
+
+### Bootstrap protegido de catálogos
+
+P9.2B incorpora un comando específico:
+
+```bash
+npm run pilot:staging:bootstrap -- --expected-revision <SHA_EXACTO>
+```
+
+Este comando:
+- solo admite `NODE_ENV=production` + `DEPLOY_ENV=staging`;
+- reutiliza el `deploy:preflight` de staging;
+- exige coincidencia exacta entre `DEPLOY_REVISION` y `--expected-revision`;
+- exige que la migración 006 ya esté aplicada;
+- ejecuta únicamente el seeder de roles, categorías y oficinas base;
+- ejecuta el seed dentro de una transacción;
+- comprueba que la cantidad de usuarios no cambie;
+- valida Dirección como oficina central;
+- valida Área Contable como única gestora del depósito;
+- valida Depósito como único depósito central;
+- valida Área Informática sin capacidades de depósito.
+
+El seed de catálogos no importa ni crea usuarios. Si cualquier guarda falla, la transacción se cancela.
+
+Este bootstrap es un cambio de datos de staging distinto de la migración 006 y requiere autorización explícita antes de ejecutarse.
+
 Por lo tanto, antes de `plan` se exige:
-1. seleccionar un SHA de `main` con Quality Gate verde que contenga P9.2A;
-2. establecer `DEPLOY_REVISION` con ese SHA exacto;
-3. ejecutar `deploy:preflight`;
-4. comprobar el estado de migraciones;
-5. crear y verificar **backup** de staging;
-6. aplicar la **migración 006** mediante el procedimiento protegido;
-7. verificar `db:status` con 001–006 aplicadas;
-8. comprobar `/health/live` y `/health/ready`;
-9. ejecutar smoke externo;
-10. confirmar que Área Contable tiene `gestiona_deposito=true` y existe exactamente un `es_deposito_central=true`.
+1. revisión exacta de staging identificada;
+2. `deploy:preflight` verde;
+3. backup previo verificado;
+4. migración 006 aplicada;
+5. catálogos institucionales base presentes mediante el bootstrap protegido si estaban ausentes;
+6. `db:status` con 001–006 aplicadas;
+7. `/health/live` y `/health/ready` verdes;
+8. smoke externo verde;
+9. Área Contable con `gestiona_deposito=true`;
+10. exactamente un `es_deposito_central=true`;
+11. Área Informática sin capacidad de depósito.
 
 Si cualquiera de estos puntos falla, la incorporación de usuarios se detiene.
 
@@ -199,7 +249,8 @@ Detener la ola y aplicar el runbook P9.1 si aparece cualquiera de estas situacio
 - mezcla entre stock propio de Contable y stock central;
 - errores 5xx repetidos en un flujo crítico;
 - revisión desplegada o entorno no identificables;
-- backup no verificable.
+- backup no verificable;
+- catálogos base ausentes o inconsistentes.
 
 ## 12. Evidencia necesaria para cerrar P9.2B
 
@@ -208,6 +259,7 @@ Antes de declarar P9.2B cerrado deben existir:
 - preflight aprobado;
 - backup previo verificado;
 - migración 006 aplicada y `db:status` verde;
+- catálogos base y capacidades P9.2A verificadas;
 - health + smoke verdes;
 - manifiesto privado aprobado, conservado fuera de Git;
 - `plan` verde;
