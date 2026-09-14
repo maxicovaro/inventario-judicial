@@ -27,6 +27,12 @@ const ESTADOS_PERMITIDOS_DESDE_PROVISION = [
   "ENTREGADO",
 ];
 
+const etiquetaPedido = (tipo) =>
+  tipo === "COMPLEMENTARIO" ? "pedido complementario" : "pedido mensual";
+
+const tituloPedido = (tipo) =>
+  tipo === "COMPLEMENTARIO" ? "Pedido complementario" : "Pedido mensual";
+
 const validarTransicionEstado = (estadoActual, nuevoEstado) => {
   if (
     !ESTADOS_VALIDOS.includes(estadoActual) ||
@@ -74,6 +80,8 @@ module.exports = {
   TRANSICIONES_PERMITIDAS,
   ESTADOS_PROVISIONABLES,
   ESTADOS_PERMITIDOS_DESDE_PROVISION,
+  etiquetaPedido,
+  tituloPedido,
   validarTransicionEstado,
   normalizarEnteroNoNegativo,
 };
