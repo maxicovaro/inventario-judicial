@@ -155,12 +155,17 @@ Contiene:
 - `Área Contable` como oficina normal con sus propios activos/insumos;
 - `Depósito` como ubicación institucional independiente;
 - capacidad explícita `gestiona_deposito` sin elevar al responsable a `ADMIN`;
+- múltiples `RESPONSABLE` de Contable con cuentas individuales;
+- trazabilidad por empleado mediante `usuario_id`;
+- auditoría operativa limitada al Depósito Central;
 - superficie `/api/deposito/*` y pantallas `/deposito-central/*`;
 - ingreso, custodia y traslado de activos;
 - stock central con entradas trazables y distribución transaccional;
 - gestión de solicitudes y pedidos institucionales;
 - primera ola funcional prevista `Área Contable + Área Informática`;
-- tests negativos para impedir gestión de depósito desde una oficina común.
+- tests negativos para impedir gestión de depósito desde una oficina común o un usuario sin rol suficiente.
+
+Cierre formal de P9.2A: `P9_2A_CLOSURE.md`.
 
 Ejemplo sintético de onboarding: `../pilot/wave.example.json`.
 
@@ -187,7 +192,7 @@ Para retomar el proyecto después de una pausa:
 6. Si el proveedor activo es Railway, leer también `RAILWAY_STAGING.md`.
 7. Para P8, leer `PERFORMANCE.md`, `P8_6_CLOSURE.md` y `P8_CLOSURE.md`.
 8. Para P9.1/incidentes, leer `P9_1_INCIDENT_RESPONSE.md` y la plantilla versionada.
-9. Para P9.2/onboarding y Depósito Central, leer `P9_2_CONTROLLED_ONBOARDING.md` y usar un manifiesto privado derivado del ejemplo.
+9. Para P9.2/onboarding y Depósito Central, leer `P9_2_CONTROLLED_ONBOARDING.md`; para el cierre de P9.2A, leer además `P9_2A_CLOSURE.md`.
 10. Verificar el último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
