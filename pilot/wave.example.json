@@ -1,27 +1,42 @@
 {
-  "wave_id": "wave-1",
+  "wave_id": "p9-2b-wave-1",
   "environment": "staging",
   "approved": false,
   "approved_by": null,
   "approved_at": null,
-  "selection_reason": "Ejemplo sintético. Reemplazar en un archivo privado no versionado luego de aprobar las oficinas piloto.",
+  "selection_reason": "Ejemplo sintético de la primera ola Contable + Informática. Copiar a un archivo .private.json y reemplazar únicamente con personas institucionalmente aprobadas.",
   "offices": [
-    "Unidad Judicial N° 1"
+    "Área Contable",
+    "Área Informática"
   ],
   "users": [
     {
       "nombre": "Responsable",
-      "apellido": "Piloto",
-      "email": "responsable.uj1@example.invalid",
+      "apellido": "Contable Uno",
+      "email": "responsable.contable1@example.invalid",
       "role": "RESPONSABLE",
-      "office": "Unidad Judicial N° 1"
+      "office": "Área Contable"
+    },
+    {
+      "nombre": "Responsable",
+      "apellido": "Contable Dos",
+      "email": "responsable.contable2@example.invalid",
+      "role": "RESPONSABLE",
+      "office": "Área Contable"
+    },
+    {
+      "nombre": "Responsable",
+      "apellido": "Informatica",
+      "email": "responsable.informatica@example.invalid",
+      "role": "RESPONSABLE",
+      "office": "Área Informática"
     },
     {
       "nombre": "Usuario",
-      "apellido": "Piloto",
-      "email": "usuario.uj1@example.invalid",
+      "apellido": "Informatica",
+      "email": "usuario.informatica@example.invalid",
       "role": "USUARIO",
-      "office": "Unidad Judicial N° 1"
+      "office": "Área Informática"
     }
   ]
 }
