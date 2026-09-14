@@ -5,6 +5,9 @@ const {
   verificarGestionDeposito,
 } = require("../middlewares/authMiddleware");
 const {
+  validarEntregaConProvision,
+} = require("../middlewares/pedidoProvisionGuard");
+const {
   obtenerContexto,
   listarActivosDeposito,
   crearActivoDeposito,
@@ -64,7 +67,11 @@ router.get("/solicitudes", listarSolicitudesDeposito);
 router.put("/solicitudes/:id/responder", responderSolicitudDeposito);
 
 router.get("/pedidos", listarPedidosDeposito);
-router.put("/pedidos/:id/proveer", proveerPedidoDeposito);
+router.put(
+  "/pedidos/:id/proveer",
+  validarEntregaConProvision,
+  proveerPedidoDeposito,
+);
 router.put("/pedidos/:id/estado", actualizarEstadoPedidoDeposito);
 
 module.exports = router;
