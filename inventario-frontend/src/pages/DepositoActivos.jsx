@@ -45,7 +45,7 @@ export default function DepositoActivos() {
         api.get("/deposito/contexto"),
         api.get("/deposito/activos"),
         api.get("/categorias"),
-        api.get("/oficinas"),
+        api.get("/oficinas/destinos-deposito"),
       ]);
       setContexto(contextoRes.data);
       setActivos(activosRes.data?.activos || []);
