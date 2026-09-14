@@ -17,6 +17,16 @@ const PedidoInsumo = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    tipo: {
+      type: DataTypes.ENUM("MENSUAL", "COMPLEMENTARIO"),
+      allowNull: false,
+      defaultValue: "MENSUAL",
+    },
+    clave_mensual_unica: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 1,
+    },
     fecha_envio: {
       type: DataTypes.DATE,
       allowNull: true,
@@ -50,9 +60,9 @@ const PedidoInsumo = sequelize.define(
     timestamps: false,
     indexes: [
       {
-        name: "uq_pedido_oficina_mes_anio",
+        name: "uq_pedido_mensual_oficina_mes_anio",
         unique: true,
-        fields: ["oficina_id", "mes", "anio"],
+        fields: ["oficina_id", "mes", "anio", "clave_mensual_unica"],
       },
     ],
   },
