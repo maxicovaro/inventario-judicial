@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
 
+const { crearPedido } = require("../controllers/pedidoCreateController");
 const {
-  crearPedido,
   listarPedidos,
   actualizarProvision,
   exportarPedidoPDF,
