@@ -6,6 +6,8 @@ const { registrarBitacora } = require("../utils/bitacora");
 const {
   ESTADOS_VALIDOS,
   validarTransicionEstado,
+  etiquetaPedido,
+  tituloPedido,
 } = require("../utils/pedidoRules");
 const {
   iniciarTransaccionIdempotente,
@@ -101,12 +103,14 @@ const actualizarEstadoPedidoSeguro = async (req, res) => {
       const oficina = pedido.oficina_id
         ? await Oficina.findByPk(pedido.oficina_id, { attributes: ["nombre"] })
         : null;
+      const etiqueta = etiquetaPedido(pedido.tipo);
+      const titulo = tituloPedido(pedido.tipo);
 
       try {
         await crearNotificacion({
           usuario_id: pedido.usuario_id,
-          titulo: "Actualización de pedido mensual",
-          mensaje: `Tu pedido mensual N° ${pedido.id} ahora se encuentra en estado: ${estado}.`,
+          titulo: `Actualización de ${titulo.toLowerCase()}`,
+          mensaje: `Tu ${etiqueta} N° ${pedido.id} ahora se encuentra en estado: ${estado}.`,
         });
       } catch (errorNotificacion) {
         console.error("Error al crear notificación:", errorNotificacion);
@@ -117,7 +121,7 @@ const actualizarEstadoPedidoSeguro = async (req, res) => {
           usuario_id: req.usuario.id,
           accion: "CAMBIAR_ESTADO",
           modulo: "PEDIDOS",
-          descripcion: `Cambió el estado del pedido mensual N° ${pedido.id} de ${estadoAnterior} a ${estado} (${oficina?.nombre || "-"})`,
+          descripcion: `Cambió el estado del ${etiqueta} N° ${pedido.id} de ${estadoAnterior} a ${estado} (${oficina?.nombre || "-"})`,
         });
       } catch (errorBitacora) {
         console.error("Error al registrar bitácora:", errorBitacora);
