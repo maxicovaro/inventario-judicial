@@ -1,8 +1,12 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { esAdminGeneral } from "../utils/permisos";
+import { esAdminGeneral, puedeGestionarDeposito } from "../utils/permisos";
 
-export default function PrivateRoute({ children, rolesPermitidos = [] }) {
+export default function PrivateRoute({
+  children,
+  rolesPermitidos = [],
+  requiereGestionDeposito = false,
+}) {
   const { estado, usuario } = useAuth();
 
   if (estado === "loading") {
@@ -18,6 +22,10 @@ export default function PrivateRoute({ children, rolesPermitidos = [] }) {
 
   if (estado !== "authenticated" || !usuario) {
     return <Navigate to="/" replace />;
+  }
+
+  if (requiereGestionDeposito && !puedeGestionarDeposito(usuario)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   if (rolesPermitidos.includes("ADMIN") && !esAdminGeneral(usuario)) {
