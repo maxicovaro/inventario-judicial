@@ -23,6 +23,7 @@ const DepositoActivos = lazy(() => import("../pages/DepositoActivos"));
 const DepositoInsumos = lazy(() => import("../pages/DepositoInsumos"));
 const DepositoSolicitudes = lazy(() => import("../pages/DepositoSolicitudes"));
 const DepositoPedidos = lazy(() => import("../pages/DepositoPedidos"));
+const DepositoAuditoria = lazy(() => import("../pages/DepositoAuditoria"));
 
 function RouteFallback() {
   return (
@@ -175,6 +176,15 @@ export default function AppRouter() {
             element={
               <PrivateRoute requiereGestionDeposito>
                 <DepositoPedidos />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/deposito-central/auditoria"
+            element={
+              <PrivateRoute requiereGestionDeposito>
+                <DepositoAuditoria />
               </PrivateRoute>
             }
           />
