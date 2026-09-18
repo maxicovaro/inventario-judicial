@@ -169,7 +169,26 @@ Contiene:
 
 Cierre formal de P9.2A: `P9_2A_CLOSURE.md`.
 
+Cierre y evidencia de la primera ola P9.2B: `P9_2B_FIRST_WAVE.md`.
+
 Ejemplo sintético de onboarding: `../pilot/wave.example.json`.
+
+### 11. P9.3 — Procedimiento operativo de administración
+
+`P9_3_ADMIN_PROCEDURE.md`
+
+Contiene:
+- matriz operativa por rol/capacidad;
+- gestión segura de usuarios;
+- altas, edición, traslados y bajas patrimoniales;
+- stock central y stock por oficina;
+- movimientos y ajustes;
+- solicitudes y pedidos mensuales/complementarios;
+- adjuntos y límites de carga;
+- backups y tareas rutinarias;
+- checklist diario/semanal;
+- condiciones de stop;
+- evidencia de revisión operativa real en staging y criterios de cierre P9.3.
 
 ## Evidencia técnica
 
@@ -194,8 +213,9 @@ Para retomar el proyecto después de una pausa:
 6. Si el proveedor activo es Railway, leer también `RAILWAY_STAGING.md`.
 7. Para P8, leer `PERFORMANCE.md`, `P8_6_CLOSURE.md` y `P8_CLOSURE.md`.
 8. Para P9.1/incidentes, leer `P9_1_INCIDENT_RESPONSE.md` y la plantilla versionada.
-9. Para P9.2/onboarding y Depósito Central, leer `P9_2_CONTROLLED_ONBOARDING.md`; para el cierre de P9.2A, leer además `P9_2A_CLOSURE.md`.
-10. Verificar el último Quality Gate antes de modificar/integrar.
+9. Para P9.2/onboarding y Depósito Central, leer `P9_2_CONTROLLED_ONBOARDING.md`; para la primera ola y su cierre, leer `P9_2B_FIRST_WAVE.md`.
+10. Para P9.3/operación administrativa, leer `P9_3_ADMIN_PROCEDURE.md` y `OPERATIONS.md`.
+11. Verificar el último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
 
