@@ -334,4 +334,21 @@ La revisión confirma además que:
 - no apareció ninguna condición de stop de P9.1;
 - el runbook coincide con las superficies administrativas reales observadas.
 
-Con esta evidencia, los criterios técnico-operativos de P9.3 quedan satisfechos. El cierre formal requiere todavía Quality Gate del HEAD actualizado, integración del PR #44 y Quality Gate post-merge verde.
+Con esta evidencia, los criterios técnico-operativos de P9.3 quedan satisfechos.
+
+
+## 17. Cierre formal de P9.3
+
+Evidencia definitiva:
+- PR #44 ✅;
+- HEAD final pre-merge `bfb2ec547994ca18f17c909710891c6ff457cf36`;
+- Quality Gate final #304 ✅;
+- merge squash `1ec716b8bd11b4f31ef5953ab1f1578ff1d32e8a` ✅;
+- Quality Gate post-merge #305 sobre ese SHA ✅;
+- revisión operativa real en staging aprobada para Usuarios, Bitácora, Activos, Stock por oficina, Movimientos y Adjuntos;
+- ninguna acción destructiva necesaria para validar el runbook;
+- contrato `test:p9-admin-procedure-contracts` integrado en `npm test`;
+- metodología repo-first aplicada y rama realineada con `main` antes del Gate final;
+- sin condiciones de stop abiertas.
+
+P9.3 queda técnicamente y operativamente cerrado. P9.4 puede abrirse únicamente después de integrar este cierre documental, obtener su Gate post-merge verde y releer `ROADMAP.md` desde `main`.

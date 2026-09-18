@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 18/09/2026. **P9.2 — Alta controlada de oficinas y usuarios** está formalmente cerrado con PR #43, Quality Gate #299, merge `a8a6000fea72decf51d9302557e4e22b58ac4814` y Quality Gate post-merge #300 verdes. La metodología repo-first quedó integrada mediante PR #45, merge `3b1a6b52edd36314c488ec1cb758f0fa6d014b95` y Gate post-merge #303. **P9.3 — Procedimiento operativo de administración** está en cierre: runbook/contrato implementados, revisión operativa en staging aprobada y PR #44 abierto. P9.4 permanece bloqueado hasta el cierre formal de P9.3.
+> Actualizada al 18/09/2026. **P9.3 — Procedimiento operativo de administración** completó implementación y validación: PR #44, Quality Gate #304, merge `1ec716b8bd11b4f31ef5953ab1f1578ff1d32e8a` y Quality Gate post-merge #305 verdes, además de revisión operativa real en staging. Este cierre documental debe integrarse y superar su Gate post-merge antes de abrir **P9.4 — Indicadores reales del piloto**.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -34,8 +34,8 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | **P9.2 Alta controlada de oficinas/usuarios** | ✅ **Completo** | PR #43; Gate #299; merge `a8a6000f...`; Gate post-merge #300 |
 | **P9.2A Depósito Central + Área Contable** | ✅ **Completo** | PR #33; Gate #267; merge `3fe4b3ae...`; Gate post-merge #268 |
 | **P9.2B Primera ola Contable + Informática** | ✅ **Completo** | 12 escenarios + rollback + verify final 4/4; staging `e8256927...` |
-| **P9.3 Procedimiento operativo de administración** | 🟡 **Cierre en curso** | PR #44; Gate inicial #301 verde; revisión operativa staging aprobada; Gate final actualizado pendiente |
-| P9.4 Indicadores reales del piloto | ⏳ Bloqueado | Después del cierre formal de P9.3 |
+| **P9.3 Procedimiento operativo de administración** | ✅ **Completo** | PR #44; Gate #304; merge `1ec716b8...`; Gate post-merge #305; staging validado |
+| **P9.4 Indicadores reales del piloto** | ⏳ **Siguiente** | Abrir solo tras integrar este cierre documental, Gate post-merge verde y releer ROADMAP |
 | P9.5 Backup/restore periódico del piloto | ⏳ Pendiente | Después de P9.4 |
 | P9.6 Criterios de salida a producción institucional | ⏳ Pendiente | Después de P9.5 |
 
@@ -486,47 +486,37 @@ Detalle: `docs/P9_2B_FIRST_WAVE.md`.
 
 Con el merge de este cierre documental y Gate post-merge verde, P9.2 queda formalmente cerrado.
 
-### P9.3 — Procedimiento operativo de administración 🟡 CIERRE EN CURSO
+### P9.3 — Procedimiento operativo de administración ✅ CERRADO
 
-Apertura:
-- 18/09/2026 después del cierre formal de P9.2;
-- `ROADMAP.md` releído desde `main@a8a6000fea72decf51d9302557e4e22b58ac4814`;
-- tras integrar la metodología repo-first, el bloque se reconstruyó y realineó contra `main@3b1a6b52edd36314c488ec1cb758f0fa6d014b95`.
-
-Implementación:
+Alcance consolidado:
 - runbook único para usuarios, bienes, stock, movimientos, solicitudes/pedidos, bajas, adjuntos, backups y tareas rutinarias;
-- matriz ADMIN / RESPONSABLE / gestor de Depósito / USUARIO;
+- matriz efectiva ADMIN / RESPONSABLE / gestor de Depósito / USUARIO;
 - fronteras explícitas entre Dirección, oficinas y Depósito Central;
 - integración con P9.1, `OPERATIONS.md` y `STAGING.md`;
-- contrato automático `test:p9-admin-procedure-contracts` incorporado a `npm test`.
+- contrato `test:p9-admin-procedure-contracts` incorporado a `npm test`.
 
-Validación operativa real en staging:
+Validación real:
 - Usuarios ✅;
 - Bitácora ✅;
-- Activos y acción formal de baja visibles para ADMIN ✅, sin ejecutar baja;
-- Stock por oficina con selección de oficinas ✅;
-- Movimientos históricos visibles ✅;
-- Adjuntos y vínculo a activo/solicitud disponibles ✅, sin cargar archivos;
-- no se detectaron condiciones de stop ni necesidad de alterar permisos o seguridad.
+- Activos y baja formal para ADMIN ✅;
+- Stock por oficina ✅;
+- Movimientos ✅;
+- Adjuntos ✅;
+- sin acciones destructivas ni condiciones de stop.
 
-Evidencia:
-- PR #44 abierto;
-- Quality Gate inicial #301 sobre la primera versión del PR ✅;
-- PR #45 de metodología integrado antes del cierre de P9.3;
-- revisión operativa manual aprobada el 18/09/2026;
-- rama P9.3 reconstruida sobre el nuevo `main` antes del Gate final.
+Evidencia definitiva:
+- PR #44 ✅;
+- HEAD pre-merge `bfb2ec547994ca18f17c909710891c6ff457cf36`;
+- Quality Gate #304 ✅;
+- merge `1ec716b8bd11b4f31ef5953ab1f1578ff1d32e8a` ✅;
+- Quality Gate post-merge #305 ✅;
+- metodología repo-first aplicada antes del cierre.
 
 Documento: `docs/P9_3_ADMIN_PROCEDURE.md`.
 
-Pendiente para cierre formal:
-- Quality Gate completo del HEAD realineado;
-- merge de PR #44;
-- Quality Gate post-merge verde;
-- actualización documental definitiva de cierre si corresponde.
+El estado CERRADO pasa a ser formal una vez integrado este cierre documental y con su Gate post-merge verde. Después se debe releer `ROADMAP.md` desde `main` antes de abrir P9.4.
 
-P9.4 no se abre mientras P9.3 permanezca sin cierre formal.
-
-### P9.4 — Indicadores reales del piloto ⏳
+### P9.4 — Indicadores reales del piloto ⏳ SIGUIENTE
 
 Previsto:
 - uso por oficina y flujo;
