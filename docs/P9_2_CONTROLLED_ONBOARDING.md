@@ -2,6 +2,8 @@
 
 ## Estado y objetivo
 
+P9.2 completó la primera ola controlada Contable + Informática y su rollback real en staging. El cierre técnico-operativo quedó validado el 18/09/2026; el cierre formal se hace efectivo al integrar la documentación de cierre y obtener su Quality Gate post-merge verde.
+
 P9.2 prepara la incorporación de la primera ola del piloto sin altas masivas, sin credenciales versionadas y sin crear caminos alternativos que eviten la autorización normal del sistema.
 
 La regla central de onboarding se mantiene: **el preflight es read-only y el alta real se realiza únicamente desde el módulo administrativo** por un Administrador General autenticado. Así se conservan autorización, política de contraseñas, bitácora, revocación de sesiones y validaciones de rol/oficina ya implementadas.
@@ -426,15 +428,23 @@ Implementación funcional completada en `ops/p9-controlled-onboarding`:
 
 El cierre formal de P9.2A exige Quality Gate completo verde, integración del PR y Gate post-merge verde.
 
-### P9.2B — Primera ola Contable + Informática
+### P9.2B — Primera ola Contable + Informática ✅ CIERRE TÉCNICO-OPERATIVO
 
-Queda como siguiente paso de P9.2:
-- seleccionar personas reales;
-- crear manifiesto privado;
-- registrar aprobación;
-- ejecutar `plan` en staging;
-- realizar altas solo desde Gestión de Usuarios;
-- ejecutar `verify`;
-- validar login, permisos, auditoría y rollback controlado.
+Completado en staging:
+- manifiesto privado aprobado y conservado fuera de Git;
+- `plan`/prerrequisitos de onboarding validados;
+- altas realizadas desde Gestión de Usuarios;
+- cuatro cuentas de la ola verificadas con rol y oficina exactos;
+- 12 escenarios funcionales mínimos completados;
+- pedidos complementarios, provisión, stock y trazabilidad corregidos y regresionados;
+- traslado patrimonial `Depósito -> Área Informática` validado;
+- separación `Depósito -> Área Contable` validada;
+- negativos de permisos y privilegios globales validados;
+- rollback por desactivación, revocación de sesión, reactivación y conservación de historial validado;
+- `verify` final posterior al rollback: 4/4 `VERIFICADO`, read-only.
 
-P9.2 permanece abierto hasta completar P9.2B. P9.3 no se inicia antes del cierre formal de P9.2.
+Revisión final de staging: `e82569270a60674fd9fd02444dfebcfbd35fe9eb`.
+
+Detalle completo: `docs/P9_2B_FIRST_WAVE.md`.
+
+Con la integración de este cierre documental y Quality Gate post-merge verde, **P9.2 queda cerrado**. El siguiente bloque elegible es **P9.3 — Procedimiento operativo de administración**, que debe abrirse solo después de releer `ROADMAP.md` desde `main`.
