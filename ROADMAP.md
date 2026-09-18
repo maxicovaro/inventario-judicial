@@ -561,6 +561,8 @@ No abrir como frentes paralelos salvo que bloqueen P9:
 
 ## Reglas de trabajo
 
+La metodología completa y obligatoria está versionada en `AGENTS.md`. Estas reglas son su resumen operativo.
+
 1. No desarrollar directamente sobre `main`.
 2. Cada bloque trabaja en rama propia.
 3. No mergear con Quality Gate fallando.
@@ -572,3 +574,8 @@ No abrir como frentes paralelos salvo que bloqueen P9:
 9. No abrir bloques posteriores mientras el bloque activo permanezca sin cerrar.
 10. Antes de abrir un bloque nuevo, releer este `ROADMAP.md`.
 11. Un bloque no está cerrado hasta alinear código, CI, documentación y estado real del entorno.
+12. Antes de modificar, reconstruir el estado desde repo/Git, `ROADMAP.md`, `AGENTS.md`, documentación, tests, CI y staging cuando aplique.
+13. Corregir causa raíz antes que parche y agregar regresión cuando un defecto real haya escapado a CI.
+14. Ejecutar autónomamente todas las pruebas posibles; pedir intervención manual sólo cuando sea inevitable.
+15. Evaluar superbloques sólo cuando compartan contexto y no comprometan seguridad, rollback, pruebas ni trazabilidad.
+16. No dejar deuda implícita: resolverla o registrarla explícitamente en la hoja de ruta.
