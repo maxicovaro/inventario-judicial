@@ -4,6 +4,8 @@ Este directorio centraliza la documentación viva del proyecto. El objetivo es q
 
 ## Fuente de verdad
 
+Antes de modificar el proyecto, leer también `../AGENTS.md`. Ese archivo define la metodología obligatoria de trabajo: reconstrucción repo-first, apertura/cierre de bloques, pruebas, PR/CI, staging, documentación y superbloques.
+
 ### 1. Estado y próximos pasos
 
 `../ROADMAP.md`
