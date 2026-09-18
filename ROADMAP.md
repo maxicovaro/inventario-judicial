@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 13/09/2026. **P9.1 — Soporte e incident response** está formalmente cerrado. **P9.2 — Alta controlada de oficinas y usuarios** continúa activo. Dentro de P9.2, **P9.2A — Modelo Depósito Central + Área Contable** quedó técnicamente cerrado con PR #33, Quality Gate final #267, merge `3fe4b3ae487d0dfb53f44e7654e4c18dcc39bd29` y Quality Gate post-merge #268 verde. Este cierre documental debe integrarse y superar su Gate post-merge antes de abrir P9.2B. **P9.2B — Primera ola Contable + Informática** es el siguiente subbloque elegible; P9.3 permanece bloqueado hasta el cierre formal de P9.2 completo.
+> Actualizada al 18/09/2026. **P9.2 — Alta controlada de oficinas y usuarios** completó su primera ola Contable + Informática, incluidos los 12 escenarios funcionales, rollback controlado y verify final 4/4 sobre staging. El cierre se formaliza mediante el PR documental de P9.2B y su Quality Gate post-merge. **P9.3 — Procedimiento operativo de administración** es el siguiente bloque elegible y no debe abrirse antes de releer este ROADMAP desde main.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -31,10 +31,10 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | P8.7 Cierre documental y criterios de piloto | ✅ Completo | PR #31; merge `5defc447...`; Gate post-merge #225 |
 | **P8 Rendimiento y escalabilidad** | ✅ **Completo** | `docs/P8_CLOSURE.md`; staging y Gate final verdes |
 | **P9.1 Soporte e incident response** | ✅ **Completo** | PR #32; Gate #228; merge `67dd2526...`; Gate post-merge #229 |
-| **P9.2 Alta controlada de oficinas/usuarios** | 🟡 **Activo** | P9.2A cerrado; P9.2B siguiente |
+| **P9.2 Alta controlada de oficinas/usuarios** | ✅ **Completo** | P9.2A + P9.2B validados; cierre documental y Gate post-merge obligatorios |
 | **P9.2A Depósito Central + Área Contable** | ✅ **Completo** | PR #33; Gate #267; merge `3fe4b3ae...`; Gate post-merge #268 |
-| P9.2B Primera ola Contable + Informática | ⏳ Siguiente | Abrir solo después del cierre documental post-merge de P9.2A |
-| P9.3 Procedimiento operativo de administración | ⏳ Bloqueado | Después del cierre formal de P9.2 |
+| **P9.2B Primera ola Contable + Informática** | ✅ **Completo** | 12 escenarios + rollback + verify final 4/4; staging `e8256927...` |
+| **P9.3 Procedimiento operativo de administración** | ⏳ **Siguiente** | Abrir solo tras cierre documental post-merge de P9.2 y relectura de ROADMAP |
 | P9.4 Indicadores reales del piloto | ⏳ Pendiente | Después de P9.3 |
 | P9.5 Backup/restore periódico del piloto | ⏳ Pendiente | Después de P9.4 |
 | P9.6 Criterios de salida a producción institucional | ⏳ Pendiente | Después de P9.5 |
@@ -380,7 +380,7 @@ Evidencia definitiva:
 
 Detalle: `docs/P9_1_INCIDENT_RESPONSE.md`.
 
-### P9.2 — Alta controlada de oficinas y usuarios 🟡 ACTIVO
+### P9.2 — Alta controlada de oficinas y usuarios ✅ CERRADO
 
 Objetivo: incorporar una primera ola pequeña, explícitamente aprobada y reversible sin bypass de las protecciones del módulo de usuarios.
 
@@ -454,24 +454,39 @@ Detalle de cierre: `docs/P9_2A_CLOSURE.md`.
 
 No abrir P9.2B hasta integrar este cierre documental, obtener Gate post-merge verde y releer `ROADMAP.md` desde `main`.
 
-#### P9.2B — Primera ola Contable + Informática ⏳ SIGUIENTE
+#### P9.2B — Primera ola Contable + Informática ✅ CERRADO
 
-Después del cierre documental formal de P9.2A:
-1. seleccionar personas reales de Área Contable y Área Informática;
-2. permitir más de un `RESPONSABLE` de Contable cuando corresponda;
-3. definir roles mínimos en manifiesto privado;
-4. registrar aprobación institucional;
-5. ejecutar `plan` sobre staging;
-6. aplicar migración 006 a staging mediante el procedimiento protegido de despliegue;
-7. realizar altas reales únicamente desde Gestión de Usuarios;
-8. ejecutar `verify`;
-9. validar login, rol, scope, gestión de depósito y auditoría;
-10. probar rollback controlado por desactivación;
-11. cerrar P9.2 con documentación, PR, merge y Gate post-merge.
+Evidencia técnico-operativa:
+- staging final sobre `e82569270a60674fd9fd02444dfebcfbd35fe9eb`;
+- migraciones 001–007 al día;
+- backups verificados antes de migraciones 006 y 007;
+- manifiesto privado aprobado fuera de Git;
+- cuatro cuentas piloto verificadas con rol/oficina exactos;
+- 12 escenarios funcionales mínimos completados;
+- pedidos complementarios y concurrencia corregidos;
+- provisión cero bloqueada;
+- trazabilidad MENSUAL/COMPLEMENTARIO preservada;
+- traslado `Depósito -> Área Informática` validado;
+- separación de stock `Depósito -> Área Contable` validada;
+- negativos de permisos y privilegios globales validados;
+- rollback por desactivación y revocación de sesión validado;
+- reactivación y conservación de historial/bitácora validadas;
+- `verify` final posterior al rollback: 4/4 `VERIFICADO`, sin modificar la base;
+- sin condiciones de stop abiertas.
 
-P9.3 no se inicia hasta completar P9.2B y cerrar P9.2.
+Correcciones relevantes integradas durante la ola:
+- PR #37: hidratación de capacidades de sesión;
+- PR #38: pedidos complementarios;
+- PR #39: migración 007 segura frente a FK;
+- PR #40: refresh de fuente frontend de staging;
+- PR #41: bloqueo de `ENTREGADO` con provisión cero;
+- PR #42: tipo real de pedido en movimientos/notificaciones/bitácora.
 
-### P9.3 — Procedimiento operativo de administración ⏳
+Detalle: `docs/P9_2B_FIRST_WAVE.md`.
+
+Con el merge de este cierre documental y Gate post-merge verde, P9.2 queda formalmente cerrado.
+
+### P9.3 — Procedimiento operativo de administración ⏳ SIGUIENTE
 
 Previsto:
 - usuarios;
@@ -541,6 +556,7 @@ No abrir como frentes paralelos salvo que bloqueen P9:
 - P9.1 incident response: `docs/P9_1_INCIDENT_RESPONSE.md`;
 - P9.2 onboarding y Depósito Central: `docs/P9_2_CONTROLLED_ONBOARDING.md`;
 - cierre P9.2A: `docs/P9_2A_CLOSURE.md`;
+- cierre P9.2B / primera ola: `docs/P9_2B_FIRST_WAVE.md`;
 - evidencia ejecutable: commits, PRs, Quality Gates y artifacts.
 
 ## Reglas de trabajo
