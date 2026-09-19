@@ -16,6 +16,10 @@ const assertIncludes = (source, fragments, label) => {
 const snapshot = read("scripts/pilot-metrics-snapshot.js");
 const idempotency = read("src/utils/idempotencia.js");
 const packageJson = JSON.parse(read("package.json"));
+const documentation = read("docs/P9_4_PILOT_INDICATORS.md");
+const docsIndex = read("docs/README.md");
+const roadmap = read("ROADMAP.md");
+const gitignore = read(".gitignore");
 
 assertIncludes(
   snapshot,
@@ -39,6 +43,36 @@ assertIncludes(
 
 if (/INSERT\s|UPDATE\s|DELETE\s|TRUNCATE\s|ALTER\s|DROP\s|CREATE\s+TABLE\s/i.test(snapshot)) {
   throw new Error("El snapshot P9.4 debe permanecer estrictamente read-only");
+}
+
+assertIncludes(
+  documentation,
+  [
+    "# P9.4 — Indicadores reales del piloto",
+    "snapshot read-only",
+    "logs HTTP",
+    "Railway",
+    "MTTA",
+    "MTTR",
+    "P9.5 no se abre",
+  ],
+  "docs/P9_4_PILOT_INDICATORS.md",
+);
+
+assertIncludes(
+  docsIndex,
+  ["P9_4_PILOT_INDICATORS.md", "P9.4"],
+  "docs/README.md",
+);
+
+assertIncludes(
+  roadmap,
+  ["P9.4 — Indicadores reales del piloto", "P9.5 permanece bloqueado"],
+  "ROADMAP.md",
+);
+
+if (!gitignore.includes("pilot-metrics-results/")) {
+  throw new Error("Los snapshots reales P9.4 deben permanecer fuera de Git");
 }
 
 assertIncludes(
