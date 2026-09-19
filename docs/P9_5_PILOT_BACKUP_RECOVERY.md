@@ -44,7 +44,8 @@ El runner:
 - reutiliza `scripts/db-backup.js`;
 - genera dump consistente con `--single-transaction`;
 - verifica SHA-256 y tamaño;
-- genera `latest.json` sin secretos ni PII;
+- captura tablas y conteos antes y después del dump; si cambian durante esa ventana, descarta el backup y exige reintento;
+- incorpora el snapshot estable de tablas/conteos a la metadata y a `latest.json`, sin secretos ni PII;
 - aplica retención sobre el directorio primario;
 - puede verificar una segunda copia mediante `PILOT_BACKUP_EXTERNAL_DIR`;
 - registra un evento estructurado `pilot_backup_completed`.
@@ -116,15 +117,15 @@ El drill:
 2. verifica el backup y su checksum;
 3. rechaza usar la base activa como destino;
 4. restaura en una base alternativa;
-5. compara el conjunto de tablas;
-6. compara `COUNT(*)` exacto de cada tabla entre origen y restauración;
+5. compara el conjunto de tablas con el snapshot estable registrado al crear el backup;
+6. compara `COUNT(*)` exacto de cada tabla restaurada contra ese snapshot, sin depender del estado vivo posterior de staging;
 7. mide RPO real desde `created_at` del backup;
-8. mide RTO real del restore + validación;
+8. mide RTO real incluyendo restore + validación;
 9. elimina la base temporal;
 10. escribe un reporte no sensible;
 11. falla si RPO/RTO exceden los objetivos.
 
-El drill no modifica datos de la base origen.
+El drill no modifica datos de la base origen ni compara contra su estado vivo posterior al backup. Esto evita falsos fallos cuando el piloto registra escrituras legítimas entre la creación del dump y el simulacro mensual.
 
 Si las credenciales normales de staging no permiten crear/eliminar una base alternativa, eso se considera una restricción de infraestructura a resolver mediante una identidad de restore separada. **No se amplían los privilegios del usuario de aplicación para facilitar el test.**
 
