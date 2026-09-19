@@ -190,6 +190,22 @@ Contiene:
 - condiciones de stop;
 - evidencia de revisión operativa real en staging y criterios de cierre P9.3.
 
+### 12. P9.4 — Indicadores reales del piloto
+
+`P9_4_PILOT_INDICATORS.md`
+
+Contiene:
+- fuentes reales de indicadores del piloto;
+- snapshot read-only de MySQL y `/data`;
+- uso por oficina y flujo;
+- auth/MFA/permisos;
+- errores y latencia desde Railway;
+- recursos backend/MySQL;
+- crecimiento de almacenamiento;
+- observabilidad de idempotencia;
+- relación con P8 y P9.1;
+- criterios de cierre P9.4.
+
 ## Evidencia técnica
 
 La documentación anterior define el estado consolidado. La evidencia detallada de que un cambio fue implementado/validado vive en:
@@ -215,7 +231,8 @@ Para retomar el proyecto después de una pausa:
 8. Para P9.1/incidentes, leer `P9_1_INCIDENT_RESPONSE.md` y la plantilla versionada.
 9. Para P9.2/onboarding y Depósito Central, leer `P9_2_CONTROLLED_ONBOARDING.md`; para la primera ola y su cierre, leer `P9_2B_FIRST_WAVE.md`.
 10. Para P9.3/operación administrativa, leer `P9_3_ADMIN_PROCEDURE.md` y `OPERATIONS.md`.
-11. Verificar el último Quality Gate antes de modificar/integrar.
+11. Para P9.4/indicadores del piloto, leer `P9_4_PILOT_INDICATORS.md`, `PERFORMANCE.md` y `P9_1_INCIDENT_RESPONSE.md`.
+12. Verificar el último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
 
