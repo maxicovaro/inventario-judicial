@@ -306,6 +306,8 @@ La metodología operativa de indicadores vive en `P9_4_PILOT_INDICATORS.md`.
 
 Durante el piloto:
 - usar `npm run pilot:metrics:snapshot` sólo en staging/test;
+- ejecutarlo desde shell/CLI de operador o tarea puntual;
+- **No ejecutar el snapshot modificando el `startCommand` del servicio ni anteponiéndolo a `npm start`**; el arranque y healthcheck deben permanecer independientes;
 - no versionar snapshots reales;
 - usar Railway para recursos y logs HTTP/runtime;
 - conservar `/health/live` y `/health/ready` como señal primaria de disponibilidad;
