@@ -469,4 +469,26 @@ No se observaron:
 - presión relevante de CPU/memoria/disco;
 - stop conditions P9.1.
 
-La evidencia funcional, de recursos, logs, health y almacenamiento requerida por P9.4 está disponible. El bloque permanece formalmente abierto hasta integrar el PR y obtener Quality Gate post-merge verde.
+La evidencia funcional, de recursos, logs, health y almacenamiento requerida por P9.4 está disponible.
+
+
+---
+
+## 14. Cierre formal P9.4
+
+P9.4 queda técnicamente completo con la siguiente evidencia:
+
+- PR #47 integrado;
+- merge: `d1aa207e170e8a5c919f387ca9ea19b217a5529d`;
+- Quality Gate final pre-merge #313: **SUCCESS**;
+- Quality Gate post-merge #314: **SUCCESS**;
+- primera captura real de staging registrada;
+- deployment estable `d95d1768-748d-4ce6-a82c-0135e9b7619d`;
+- runtime `staging@b6de2f789ad76545203c4e1e2cf6286559af1776`;
+- `startCommand=npm start`;
+- sin migraciones ni cambios destructivos;
+- sin stop conditions abiertas.
+
+El hallazgo del `startCommand` temporal quedó resuelto y convertido en regla operativa documentada. El snapshot tiene además una regresión de terminación real dentro del Quality Gate.
+
+Una vez integrado este cierre documental y con su Gate post-merge verde, **P9.4 se considera formalmente cerrado** y P9.5 pasa a ser el siguiente bloque elegible. Antes de abrir P9.5 se debe releer `ROADMAP.md` desde `main`.
