@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 19/09/2026. **P9.3 — Procedimiento operativo de administración** está formalmente cerrado con PR #46, merge `42b4c88b87b472534355353a5b4ebd40cec0715f` y Quality Gate post-merge #307 verde. **P9.4 — Indicadores reales del piloto** está activo en rama `ops/p9-4-pilot-indicators`. P9.5 permanece bloqueado hasta el cierre formal de P9.4.
+> Actualizada al 19/09/2026. **P9.4 — Indicadores reales del piloto** queda formalmente cerrado con PR #47, merge `d1aa207e170e8a5c919f387ca9ea19b217a5529d`, Quality Gate #313 pre-merge y Quality Gate #314 post-merge verdes. **P9.5 — Backup/restore periódico del piloto** pasa a ser el siguiente bloque elegible una vez integrado este cierre documental y con su Gate post-merge verde.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -35,8 +35,8 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | **P9.2A Depósito Central + Área Contable** | ✅ **Completo** | PR #33; Gate #267; merge `3fe4b3ae...`; Gate post-merge #268 |
 | **P9.2B Primera ola Contable + Informática** | ✅ **Completo** | 12 escenarios + rollback + verify final 4/4; staging `e8256927...` |
 | **P9.3 Procedimiento operativo de administración** | ✅ **Completo** | PR #44; Gate #304; merge `1ec716b8...`; Gate post-merge #305; staging validado |
-| **P9.4 Indicadores reales del piloto** | 🟡 **Cierre en curso** | captura real completada; Gate #311 verde; staging `b6de2f78...` / deployment `d95d1768...` SUCCESS; pendiente merge + Gate post-merge |
-| **P9.5 Backup/restore periódico del piloto** | ⏳ **Bloqueado** | Después del cierre formal de P9.4 |
+| **P9.4 Indicadores reales del piloto** | ✅ **Completo** | PR #47; merge `d1aa207e...`; Gate #313/#314; captura real + staging `b6de2f78...` / `d95d1768...` SUCCESS |
+| **P9.5 Backup/restore periódico del piloto** | ⏳ **Siguiente** | Abrir sólo tras integrar este cierre documental, Gate post-merge verde y releer ROADMAP |
 | P9.6 Criterios de salida a producción institucional | ⏳ Pendiente | Después de P9.5 |
 
 ---
@@ -516,50 +516,50 @@ Documento: `docs/P9_3_ADMIN_PROCEDURE.md`.
 
 El estado CERRADO pasa a ser formal una vez integrado este cierre documental y con su Gate post-merge verde. Después se debe releer `ROADMAP.md` desde `main` antes de abrir P9.4.
 
-### P9.4 — Indicadores reales del piloto 🟡 ACTIVO
+### P9.4 — Indicadores reales del piloto ✅ CERRADO
 
-Objetivo:
-- medir uso real por oficina y flujo;
-- errores/5xx y latencia observada;
-- health e identidad del deployment;
-- auth/MFA/permisos;
-- crecimiento de MySQL y `/data`;
-- conflictos/replays de idempotencia;
-- recursos backend/MySQL;
-- MTTA/MTTR e incidentes por severidad.
-
-Diseño:
+Alcance consolidado:
 - snapshot read-only de MySQL y almacenamiento;
-- logs HTTP/runtime y métricas desde Railway;
-- P8 como baseline reproducible;
-- P9.1 como fuente de incident response;
-- sin migraciones ni tabla paralela de métricas;
-- sin PII innecesaria en snapshots.
+- uso por oficina/flujo;
+- auth/MFA;
+- pedidos, solicitudes y movimientos;
+- tamaño de MySQL, uploads, backups y adjuntos;
+- observabilidad de idempotencia;
+- logs runtime y latencia real;
+- recursos Railway backend/MySQL;
+- estado de incidentes P9.1;
+- contrato P9.4 dentro de `npm test`;
+- smoke real del snapshot contra MySQL CI con timeout.
 
-Implementación en curso:
-- `scripts/pilot-metrics-snapshot.js`;
-- `npm run pilot:metrics:snapshot`;
-- eventos estructurados `idempotency_replay`, `idempotency_conflict` e `idempotency_in_progress`;
-- contrato `test:p9-pilot-indicators-contracts`;
-- documento `docs/P9_4_PILOT_INDICATORS.md`.
-
-Evidencia de cierre disponible:
-- HEAD validado `b6de2f789ad76545203c4e1e2cf6286559af1776`;
-- Quality Gate #311 verde, incluido snapshot P9.4 real contra MySQL CI;
+Evidencia funcional y operativa:
+- HEAD funcional validado `b6de2f789ad76545203c4e1e2cf6286559af1776`;
+- Quality Gate funcional #311 verde;
 - primera captura real de staging completada;
-- deployment final `d95d1768-748d-4ce6-a82c-0135e9b7619d` SUCCESS;
-- `/ready=200`, runtime `staging@b6de2f78...`;
-- métricas Railway backend/MySQL de 7 días;
-- 562 requests de aplicación en muestra no truncada, 0 5xx, p95 65,31 ms;
-- estado de incidentes P9.1: 0 issues SEV/incident registrados;
-- método de captura aislado del `startCommand` documentado.
+- deployment final estable `d95d1768-748d-4ce6-a82c-0135e9b7619d` SUCCESS;
+- runtime `staging@b6de2f78...`;
+- `/ready=200`, DB conectada y `server_started`;
+- 562 requests de aplicación en muestra no truncada;
+- 0 respuestas 5xx;
+- p95 65,31 ms;
+- 5 usuarios piloto activos con matriz prevista y ADMIN 1/1 con MFA;
+- MySQL ~0,84 MiB, 12 backups, sin uploads/adjuntos nuevos;
+- 0 issues P9.1 `SEV`/`incident` registrados; MTTA/MTTR N/A;
+- sin stop conditions P9.1.
 
-Pendiente para cierre formal:
-- Quality Gate del HEAD documental final;
-- merge de PR #47;
-- Quality Gate post-merge verde.
+Cierre Git:
+- PR #47 integrado;
+- merge `d1aa207e170e8a5c919f387ca9ea19b217a5529d`;
+- Quality Gate pre-merge #313 ✅;
+- Quality Gate post-merge #314 ✅.
 
-P9.5 permanece bloqueado mientras P9.4 siga activo.
+Hallazgo resuelto:
+- no ejecutar la captura alterando el `startCommand` de Railway;
+- usar shell/CLI/tarea puntual y mantener arranque/healthcheck independientes;
+- staging quedó restaurado con `npm start`.
+
+Documento: `docs/P9_4_PILOT_INDICATORS.md`.
+
+P9.5 sólo se abre después de integrar este cierre documental, confirmar su Gate post-merge verde y releer `ROADMAP.md` desde `main`.
 
 ### P9.5 — Backup y recuperación durante el piloto ⏳
 
