@@ -70,6 +70,14 @@ const select = (sql, replacements = {}) =>
     logging: false,
   });
 
+const writeStdout = (text) =>
+  new Promise((resolve, reject) => {
+    process.stdout.write(text, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+
 const normalizeRows = (rows) =>
   rows.map((row) =>
     Object.fromEntries(
@@ -304,17 +312,26 @@ const main = async () => {
     fs.writeFileSync(resolved, json, "utf8");
     console.log(`✓ Snapshot P9.4 generado: ${resolved}`);
   } else {
-    process.stdout.write(json);
+    await writeStdout(json);
   }
 };
 
+const finish = async (exitCode) => {
+  let finalCode = exitCode;
+
+  try {
+    await sequelize.close();
+  } catch (error) {
+    console.error(`✗ No se pudo cerrar la conexión del snapshot: ${error.message}`);
+    finalCode = 1;
+  }
+
+  process.exit(finalCode);
+};
+
 main()
+  .then(() => finish(0))
   .catch((error) => {
     console.error(`✗ Snapshot P9.4 falló: ${error.message}`);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    try {
-      await sequelize.close();
-    } catch {}
+    return finish(1);
   });
