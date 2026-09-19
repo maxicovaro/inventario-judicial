@@ -35,7 +35,7 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | **P9.2A Depósito Central + Área Contable** | ✅ **Completo** | PR #33; Gate #267; merge `3fe4b3ae...`; Gate post-merge #268 |
 | **P9.2B Primera ola Contable + Informática** | ✅ **Completo** | 12 escenarios + rollback + verify final 4/4; staging `e8256927...` |
 | **P9.3 Procedimiento operativo de administración** | ✅ **Completo** | PR #44; Gate #304; merge `1ec716b8...`; Gate post-merge #305; staging validado |
-| **P9.4 Indicadores reales del piloto** | 🟡 **Activo** | snapshot read-only + Railway + health + incidentes; primera captura real de staging pendiente |
+| **P9.4 Indicadores reales del piloto** | 🟡 **Cierre en curso** | captura real completada; Gate #311 verde; staging `b6de2f78...` / deployment `d95d1768...` SUCCESS; pendiente merge + Gate post-merge |
 | **P9.5 Backup/restore periódico del piloto** | ⏳ **Bloqueado** | Después del cierre formal de P9.4 |
 | P9.6 Criterios de salida a producción institucional | ⏳ Pendiente | Después de P9.5 |
 
@@ -543,14 +543,21 @@ Implementación en curso:
 - contrato `test:p9-pilot-indicators-contracts`;
 - documento `docs/P9_4_PILOT_INDICATORS.md`.
 
-Pendiente para cierre:
-- Quality Gate del HEAD del bloque;
-- despliegue controlado a staging del SHA aprobado;
-- primera captura real;
-- métricas/logs Railway con cobertura declarada;
-- health/revisión/deployment confirmados;
-- estado de incidentes;
-- PR, merge y Gate post-merge.
+Evidencia de cierre disponible:
+- HEAD validado `b6de2f789ad76545203c4e1e2cf6286559af1776`;
+- Quality Gate #311 verde, incluido snapshot P9.4 real contra MySQL CI;
+- primera captura real de staging completada;
+- deployment final `d95d1768-748d-4ce6-a82c-0135e9b7619d` SUCCESS;
+- `/ready=200`, runtime `staging@b6de2f78...`;
+- métricas Railway backend/MySQL de 7 días;
+- 562 requests de aplicación en muestra no truncada, 0 5xx, p95 65,31 ms;
+- estado de incidentes P9.1: 0 issues SEV/incident registrados;
+- método de captura aislado del `startCommand` documentado.
+
+Pendiente para cierre formal:
+- Quality Gate del HEAD documental final;
+- merge de PR #47;
+- Quality Gate post-merge verde.
 
 P9.5 permanece bloqueado mientras P9.4 siga activo.
 
