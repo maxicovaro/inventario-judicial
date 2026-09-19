@@ -47,6 +47,8 @@ npm run pilot:metrics:snapshot -- \
 
 `pilot-metrics-results/` está excluido de Git.
 
+**Regla operativa:** ejecutar el snapshot desde una shell/CLI de operador o tarea puntual. **No** anteponerlo al `startCommand` del servicio Railway ni encadenarlo con `&& npm start`: el ciclo de arranque y healthcheck debe permanecer independiente de la recolección de métricas.
+
 El comando solo admite `DEPLOY_ENV=staging` o `DEPLOY_ENV=test`. No debe ejecutarse contra producción institucional.
 
 ---
@@ -316,3 +318,155 @@ P9.4 puede cerrarse cuando:
 - Quality Gate post-merge queda verde.
 
 P9.5 no se abre antes de cumplir esos criterios.
+
+
+---
+
+## 13. Primera captura real de staging — 19/09/2026
+
+### Revisión y entorno
+
+- HEAD P9.4 validado: `b6de2f789ad76545203c4e1e2cf6286559af1776`;
+- Quality Gate #311: **SUCCESS** completo;
+- el Gate incluye `Run P9.4 pilot metrics snapshot smoke` contra MySQL CI con timeout de 30 s;
+- deployment final de staging: `d95d1768-748d-4ce6-a82c-0135e9b7619d`;
+- estado final Railway: **SUCCESS**;
+- `DEPLOY_ENV=staging`;
+- revisión reportada por runtime: `b6de2f789ad76545203c4e1e2cf6286559af1776`;
+- `startCommand` final restaurado: `npm start`;
+- preflight aprobado;
+- conexión `inventario_judicial_staging` confirmada;
+- `server_started` confirmado;
+- `/health/ready` observado en **200** con 8,72 ms;
+- `/health/live` no pudo invocarse externamente desde el conector de esta sesión por una limitación de resolución/acceso; el contrato `live/ready` permanece cubierto por CI y no se registra una llamada externa inexistente.
+
+No se ejecutaron migraciones ni escrituras de negocio para P9.4.
+
+### Ventana del snapshot
+
+- generado: `2026-09-19T21:54:17.635Z`;
+- desde: `2026-09-12T21:54:17.635Z`;
+- hasta: `2026-09-19T21:54:17.635Z`;
+- entorno: `staging`;
+- revisión: `b6de2f789ad76545203c4e1e2cf6286559af1776`.
+
+El snapshot fue estrictamente read-only y su salida real quedó registrada en Railway. La salida multilínea puede intercalarse en el visor de logs; por eso los snapshots futuros deben preferir `--output` desde shell/CLI y conservarse fuera de Git.
+
+### Usuarios y MFA
+
+| Oficina | Rol | Usuarios | Activos |
+| --- | --- | ---: | ---: |
+| Área Contable | RESPONSABLE | 2 | 2 |
+| Área Informática | RESPONSABLE | 1 | 1 |
+| Área Informática | USUARIO | 1 | 1 |
+| Dirección de Policía Judicial | ADMIN | 1 | 1 |
+
+ADMIN:
+- activos: **1**;
+- con MFA: **1**;
+- fuera de Dirección: **0**.
+
+### Actividad funcional observada
+
+Auth en Bitácora:
+- LOGIN: **21**;
+- LOGOUT: **16**;
+- LOGIN_FALLIDO: **1**;
+- MFA_HABILITADO: **1**;
+- MFA_VERIFICADO: **1**.
+
+Solicitudes creadas en la ventana: **0**.
+
+Pedidos enviados por Área Informática:
+- MENSUAL / ENTREGADO: **1**;
+- COMPLEMENTARIO / ENVIADO: **1**;
+- COMPLEMENTARIO / ENTREGADO: **2**.
+
+Movimientos de stock:
+- EGRESO -> Área Informática: **3 movimientos / 6 unidades**;
+- INGRESO central: **2 movimientos / 15 unidades**;
+- EGRESO -> Área Contable: **1 movimiento / 1 unidad**.
+
+### Consistencia e idempotencia
+
+- operaciones idempotentes persistidas observadas en el snapshot: **0**;
+- eventos runtime `idempotency_replay`, `idempotency_conflict` e `idempotency_in_progress` en los deployments principales consultados: **0**;
+- no se observaron señales de doble operación, stock negativo, corrupción ni bypass de permisos.
+
+### Crecimiento y almacenamiento
+
+- tamaño estimado MySQL: **884.736 bytes** (~0,84 MiB);
+- uploads: **0 archivos / 0 bytes**;
+- backups: **12 archivos / 145.351 bytes**;
+- último backup observado: `2026-09-14T19:01:43.489Z`;
+- adjuntos creados en la ventana: **0 / 0 bytes**.
+
+### Tráfico runtime y latencia
+
+Fuente: eventos estructurados `http_request_completed` del backend, segmentados por deployment/ventana para evitar el límite del conector.
+
+Muestra:
+- requests de aplicación observadas: **562**;
+- segmentos truncados: **0**;
+- cobertura efectiva con actividad: `2026-09-13T23:03:36.435Z` a `2026-09-18T13:14:57.511Z`;
+- 200: **131**;
+- 201: **8**;
+- 202: **4**;
+- 304: **402**;
+- 401: **16**;
+- 403: **1**;
+- 5xx: **0**.
+
+Negaciones auth observadas:
+- 401 `/me`: 9;
+- 401 `/login`: 5;
+- 401 `/mfa/confirm`: 1;
+- 401 `/no-leidas/count`: 1;
+- 403 `/login`: 1.
+
+Latencia de requests de aplicación:
+- p50: **12,05 ms**;
+- p95: **65,31 ms**;
+- p99: **388,18 ms**;
+- máximo: **468,69 ms**.
+
+No se observaron 5xx en la muestra.
+
+### Recursos Railway — 7 días
+
+Backend:
+- CPU_USAGE promedio: **0,000115**; máximo: **0,00409**;
+- memoria promedio: **0,099 GB**; máximo: **0,784 GB**;
+- disco promedio: **0,0337 GB**; máximo: **0,0340 GB**.
+
+MySQL:
+- CPU_USAGE promedio: **0,00396**; máximo: **0,00503**;
+- memoria promedio: **0,454 GB**; máximo: **0,519 GB**;
+- disco promedio: **0,1591 GB**; máximo: **0,1593 GB**.
+
+No se detectó una señal de presión de recursos que requiera abrir optimización fuera de P8.
+
+### Incidentes P9.1
+
+Búsqueda de issues del repositorio por `incident` y `SEV`:
+- SEV-1 registrados: **0**;
+- SEV-2 registrados: **0**;
+- SEV-3 registrados: **0**.
+
+Por ausencia de incidentes registrados, MTTA y MTTR quedan **N/A**, no cero.
+
+Los deployments temporales fallidos usados durante la captura P9.4 fueron pruebas controladas de staging sin migraciones ni cambios de datos. La causa fue intentar encadenar el snapshot al `startCommand`; se abandonó ese método, se restauró `npm start` y staging terminó estable en el SHA aprobado. Esto se registra como hallazgo operativo, no como incidente del piloto.
+
+### Evaluación de la captura
+
+No se observaron:
+- 5xx;
+- pérdida/corrupción de datos;
+- bypass de autorización;
+- stock negativo;
+- doble operación física;
+- conflicto/replay idempotente inesperado;
+- presión relevante de CPU/memoria/disco;
+- stop conditions P9.1.
+
+La evidencia funcional, de recursos, logs, health y almacenamiento requerida por P9.4 está disponible. El bloque permanece formalmente abierto hasta integrar el PR y obtener Quality Gate post-merge verde.
