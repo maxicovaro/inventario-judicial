@@ -82,6 +82,30 @@ jobs:
       - name: Verify migration status
         run: npm run db:status
 
+      - name: Run P9.4 pilot metrics snapshot smoke
+        run: |
+          rm -rf pilot-metrics-results
+          timeout 30s npm run pilot:metrics:snapshot -- --days 7 --output pilot-metrics-results/ci.json
+          node - <<'NODE'
+          const fs = require("fs");
+          const data = JSON.parse(
+            fs.readFileSync("pilot-metrics-results/ci.json", "utf8"),
+          );
+          if (data.schema_version !== 1) {
+            throw new Error("Snapshot P9.4 con schema_version inesperado");
+          }
+          if (data.environment !== "test") {
+            throw new Error(`Snapshot P9.4 ejecutado fuera de test: ${data.environment}`);
+          }
+          if (!data.window?.from || !data.window?.to) {
+            throw new Error("Snapshot P9.4 sin ventana temporal válida");
+          }
+          if (!data.storage?.mysql || !data.usage || !data.consistency) {
+            throw new Error("Snapshot P9.4 incompleto");
+          }
+          console.log("✓ Snapshot P9.4 CI finalizó y produjo JSON válido.");
+          NODE
+
       - name: Run MySQL integration flows
         run: npm run test:integration
 
