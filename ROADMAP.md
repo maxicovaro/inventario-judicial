@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 19/09/2026. **P9.4 — Indicadores reales del piloto** queda formalmente cerrado con PR #47, merge `d1aa207e170e8a5c919f387ca9ea19b217a5529d`, Quality Gate #313 pre-merge y Quality Gate #314 post-merge verdes. **P9.5 — Backup/restore periódico del piloto** pasa a ser el siguiente bloque elegible una vez integrado este cierre documental y con su Gate post-merge verde.
+> Actualizada al 19/09/2026. **P9.4 — Indicadores reales del piloto** está formalmente cerrado con PR #47/#48 y Gates post-merge #314/#317 verdes. **P9.5 — Backup y recuperación durante el piloto** está activo en rama `ops/p9-5-pilot-backup-recovery`. P9.6 permanece bloqueado hasta el cierre formal de P9.5.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -36,8 +36,8 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | **P9.2B Primera ola Contable + Informática** | ✅ **Completo** | 12 escenarios + rollback + verify final 4/4; staging `e8256927...` |
 | **P9.3 Procedimiento operativo de administración** | ✅ **Completo** | PR #44; Gate #304; merge `1ec716b8...`; Gate post-merge #305; staging validado |
 | **P9.4 Indicadores reales del piloto** | ✅ **Completo** | PR #47; merge `d1aa207e...`; Gate #313/#314; captura real + staging `b6de2f78...` / `d95d1768...` SUCCESS |
-| **P9.5 Backup/restore periódico del piloto** | ⏳ **Siguiente** | Abrir sólo tras integrar este cierre documental, Gate post-merge verde y releer ROADMAP |
-| P9.6 Criterios de salida a producción institucional | ⏳ Pendiente | Después de P9.5 |
+| **P9.5 Backup/restore periódico del piloto** | 🟡 **Activo** | backup lógico + checksum + retención + restore drill + segunda capa Railway; implementación en curso |
+| P9.6 Criterios de salida a producción institucional | ⏳ **Bloqueado** | Después del cierre formal de P9.5 |
 
 ---
 
@@ -561,14 +561,45 @@ Documento: `docs/P9_4_PILOT_INDICATORS.md`.
 
 Regla de transición aplicada: **P9.5 permanece bloqueado** hasta el cierre formal de P9.4. P9.5 sólo se abre después de integrar este cierre documental, confirmar su Gate post-merge verde y releer `ROADMAP.md` desde `main`.
 
-### P9.5 — Backup y recuperación durante el piloto ⏳
+### P9.5 — Backup y recuperación durante el piloto 🟡 ACTIVO
 
-Previsto:
-- backup periódico;
-- checksum;
-- copia fuera del host cuando corresponda;
-- restore drill periódico;
-- seguimiento de RPO/RTO.
+Regla de transición cumplida: **P9.5 permanece bloqueado** hasta el cierre formal de P9.4. P9.4 ya fue cerrado con PR #47/#48 y Quality Gate post-merge #317 verde.
+
+Objetivo:
+- backup lógico periódico con checksum;
+- retención controlada;
+- segunda capa de backup independiente del runtime primario;
+- restore drill periódico sobre base alternativa;
+- medición real de RPO/RTO;
+- programación operativa reproducible en staging.
+
+Implementación en curso:
+- `scripts/pilot-backup-run.js`;
+- `scripts/pilot-restore-drill.js`;
+- `npm run pilot:backup:run`;
+- `npm run pilot:restore:drill`;
+- contrato `test:p9-backup-recovery-contracts`;
+- Quality Gate con backup+restore real sobre MySQL descartable;
+- documento `docs/P9_5_PILOT_BACKUP_RECOVERY.md`.
+
+Guardas:
+- sólo `staging/test`;
+- no restore sobre DB activa;
+- no elevar privilegios del usuario de aplicación para facilitar el drill;
+- dumps/snapshots reales fuera de Git;
+- P9.1 prevalece ante checksum inválido, restore inconsistente o incumplimiento material de RPO/RTO.
+
+Pendiente para cierre:
+- Quality Gate de implementación;
+- configurar y evidenciar periodicidad real en Railway;
+- backup lógico real de staging verificado;
+- segunda capa de backup real;
+- restore drill real de staging;
+- RPO/RTO reales;
+- PR/merge/Gate post-merge;
+- cierre documental formal.
+
+P9.6 permanece bloqueado mientras P9.5 siga activo.
 
 ### P9.6 — Criterios de salida del piloto ⏳
 
