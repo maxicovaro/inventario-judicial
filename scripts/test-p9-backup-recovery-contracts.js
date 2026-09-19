@@ -140,6 +140,7 @@ assertIncludes(
   workflow,
   [
     "Run P9.5 backup and restore drill",
+    'PILOT_BACKUP_REQUIRE_SECONDARY: "true"',
     "npm run pilot:backup:run",
     "npm run pilot:restore:drill",
     "Restore drill P9.5 CI finalizó",
