@@ -150,6 +150,7 @@ jobs:
           RESTORE_DB_PORT: 3306
           RESTORE_DB_USER: root
           RESTORE_DB_PASSWORD: root_ci_password
+          PILOT_BACKUP_REQUIRE_SECONDARY: "true"
         run: |
           rm -rf pilot-backup-results
           npm run pilot:backup:run -- \
@@ -168,6 +169,7 @@ jobs:
             manifest.schema_version !== 1 ||
             !manifest.sha256 ||
             !manifest.external_copy?.verified ||
+            !manifest.secondary_copy_verified ||
             !manifest.source_snapshot?.tables ||
             !manifest.source_snapshot?.counts
           ) {
