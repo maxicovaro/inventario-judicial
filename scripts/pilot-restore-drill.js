@@ -49,7 +49,13 @@ const safeTargetName = () => {
 
 const resolveBackup = () => {
   const explicitBackup = argValue("--backup");
-  if (explicitBackup) return path.resolve(explicitBackup);
+  if (explicitBackup) {
+    return {
+      backupPath: path.resolve(explicitBackup),
+      manifest: null,
+      manifestPath: null,
+    };
+  }
 
   const manifestArg =
     argValue("--manifest") ||
@@ -68,7 +74,11 @@ const resolveBackup = () => {
     throw new Error("El manifiesto no contiene backup_path");
   }
 
-  return path.resolve(path.dirname(manifestPath), manifest.backup_path);
+  return {
+    backupPath: path.resolve(path.dirname(manifestPath), manifest.backup_path),
+    manifest,
+    manifestPath,
+  };
 };
 
 const runRestore = (backupPath, target) => {
@@ -146,9 +156,22 @@ const writeReport = (reportPath, report) => {
 const main = async () => {
   const environment = ensureAllowedEnvironment();
   const source = databaseConfig();
-  const backupPath = resolveBackup();
-  const verified = verifyBackupFile(backupPath);
+  const resolved = resolveBackup();
+  const verified = verifyBackupFile(resolved.backupPath);
+  const sourceSnapshot =
+    verified.metadata.source_snapshot || resolved.manifest?.source_snapshot || null;
   const target = safeTargetName();
+
+  if (
+    !sourceSnapshot ||
+    !Array.isArray(sourceSnapshot.tables) ||
+    !sourceSnapshot.counts ||
+    typeof sourceSnapshot.counts !== "object"
+  ) {
+    throw new Error(
+      "El backup no contiene source_snapshot verificable para comparar tablas y conteos",
+    );
+  }
 
   if (target.toLowerCase() === source.name.toLowerCase()) {
     throw new Error("El restore drill nunca puede usar la base activa como destino");
@@ -180,62 +203,54 @@ const main = async () => {
   const rpoHours =
     (startedAt.getTime() - backupCreatedAt.getTime()) / (60 * 60 * 1000);
 
-  let sourceConnection;
   let targetConnection;
   let adminConnection;
   let failure = null;
   let failureStage = null;
   let tableCount = 0;
   let rowCount = 0;
-  let restoreFinishedAt = null;
+  let exactTableCountsMatch = false;
+  let validationFinishedAt = null;
   let cleanupOk = false;
 
   try {
     failureStage = "restore";
-    runRestore(backupPath, target);
-    restoreFinishedAt = new Date();
+    runRestore(resolved.backupPath, target);
 
     failureStage = "validation";
-    sourceConnection = await mysql.createConnection({
-      host: source.host,
-      port: source.port,
-      user: source.user,
-      password: source.password,
-      database: source.name,
-    });
     targetConnection = await mysql.createConnection(
       connectionConfig(source, target),
     );
 
-    const sourceTables = await listTables(sourceConnection, source.name);
     const targetTables = await listTables(targetConnection, target);
 
-    if (JSON.stringify(sourceTables) !== JSON.stringify(targetTables)) {
-      throw new Error("El esquema restaurado no contiene el mismo conjunto de tablas");
+    if (JSON.stringify(sourceSnapshot.tables) !== JSON.stringify(targetTables)) {
+      throw new Error(
+        "El esquema restaurado no coincide con el snapshot registrado al crear el backup",
+      );
     }
 
-    const sourceCounts = await tableCounts(sourceConnection, sourceTables);
     const targetCounts = await tableCounts(targetConnection, targetTables);
 
-    if (!sameObject(sourceCounts, targetCounts)) {
-      throw new Error("Los conteos de filas del restore no coinciden con el origen");
+    if (!sameObject(sourceSnapshot.counts, targetCounts)) {
+      throw new Error(
+        "Los conteos de filas del restore no coinciden con el snapshot del backup",
+      );
     }
 
-    tableCount = sourceTables.length;
-    rowCount = Object.values(sourceCounts).reduce(
+    exactTableCountsMatch = true;
+    tableCount = targetTables.length;
+    rowCount = Object.values(targetCounts).reduce(
       (total, value) => total + Number(value),
       0,
     );
+    validationFinishedAt = new Date();
   } catch (error) {
     failure = error;
   } finally {
     try {
       if (targetConnection) await targetConnection.end();
     } catch {}
-    try {
-      if (sourceConnection) await sourceConnection.end();
-    } catch {}
-
     try {
       failureStage = failure ? failureStage : "cleanup";
       adminConnection = await mysql.createConnection({
@@ -261,9 +276,9 @@ const main = async () => {
   }
 
   const finishedAt = new Date();
-  const effectiveRestoreFinish = restoreFinishedAt || finishedAt;
+  const effectiveValidationFinish = validationFinishedAt || finishedAt;
   const rtoMinutes =
-    (effectiveRestoreFinish.getTime() - startedAt.getTime()) / (60 * 1000);
+    (effectiveValidationFinish.getTime() - startedAt.getTime()) / (60 * 1000);
 
   const rpoMet = rpoHours <= rpoTargetHours;
   const rtoMet = rtoMinutes <= rtoTargetMinutes;
@@ -284,7 +299,7 @@ const main = async () => {
     validation: {
       table_count: tableCount,
       row_count: rowCount,
-      exact_table_counts_match: !failure || failureStage === "cleanup",
+      exact_table_counts_match: exactTableCountsMatch,
       target_cleanup_ok: cleanupOk,
     },
     objectives: {
