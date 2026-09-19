@@ -7,6 +7,10 @@ const {
   metadataPathFor,
   verifyBackupFile,
 } = require("./db-cli-utils");
+const {
+  s3Configured,
+  uploadEncryptedBackup,
+} = require("./pilot-backup-s3");
 
 require("dotenv").config();
 
@@ -30,6 +34,11 @@ const ensureAllowedEnvironment = () => {
   }
   return environment;
 };
+
+const boolEnv = (name) =>
+  ["1", "true", "yes"].includes(
+    String(process.env[name] || "").trim().toLowerCase(),
+  );
 
 const parsePositiveInt = (value, fallback, label) => {
   const parsed = Number(value ?? fallback);
@@ -244,6 +253,25 @@ const main = async () => {
     };
   }
 
+  let bucketCopy = {
+    enabled: false,
+    verified: false,
+    encrypted: false,
+  };
+
+  if (s3Configured()) {
+    bucketCopy = await uploadEncryptedBackup(verified);
+  }
+
+  const secondaryVerified =
+    Boolean(externalCopy.verified) || Boolean(bucketCopy.verified);
+
+  if (boolEnv("PILOT_BACKUP_REQUIRE_SECONDARY") && !secondaryVerified) {
+    throw new Error(
+      "PILOT_BACKUP_REQUIRE_SECONDARY exige una segunda copia verificada",
+    );
+  }
+
   const manifestPath = path.resolve(
     argValue("--manifest") ||
       process.env.PILOT_BACKUP_MANIFEST ||
@@ -269,6 +297,8 @@ const main = async () => {
       deleted,
     },
     external_copy: externalCopy,
+    bucket_copy: bucketCopy,
+    secondary_copy_verified: secondaryVerified,
   };
 
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
@@ -282,6 +312,8 @@ const main = async () => {
       sha256: verified.sha256,
       retained: Math.min(listBackups(outputDirectory).length, keep),
       external_copy_verified: externalCopy.verified,
+      bucket_copy_verified: bucketCopy.verified,
+      secondary_copy_verified: secondaryVerified,
       duration_ms: manifest.duration_ms,
     }),
   );
