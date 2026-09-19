@@ -9,3 +9,4 @@ backups/
 performance-results/
 pilot/*.private.json
 pilot/*.local.json
+pilot-metrics-results/

@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { Op } = require("sequelize");
 const { OperacionIdempotente } = require("../models");
+const logger = require("./logger");
 
 const HEADER = "Idempotency-Key";
 const KEY_PATTERN = /^[A-Za-z0-9._:-]{8,100}$/;
@@ -130,6 +131,11 @@ const iniciarTransaccionIdempotente = async ({
     }
 
     if (existente.request_hash !== requestHash) {
+      logger.warn("idempotency_conflict", {
+        request_id: req.requestId,
+        usuario_id: req.usuario.id,
+        scope,
+      });
       return {
         transaction: null,
         operacion: null,
@@ -144,6 +150,11 @@ const iniciarTransaccionIdempotente = async ({
     }
 
     if (!existente.status_code || existente.response_body === null) {
+      logger.warn("idempotency_in_progress", {
+        request_id: req.requestId,
+        usuario_id: req.usuario.id,
+        scope,
+      });
       return {
         transaction: null,
         operacion: null,
@@ -155,6 +166,13 @@ const iniciarTransaccionIdempotente = async ({
         },
       };
     }
+
+    logger.info("idempotency_replay", {
+      request_id: req.requestId,
+      usuario_id: req.usuario.id,
+      scope,
+      status: existente.status_code,
+    });
 
     return {
       transaction: null,
