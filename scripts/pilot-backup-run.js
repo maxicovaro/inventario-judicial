@@ -1,7 +1,9 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const mysql = require("mysql2/promise");
 const {
+  databaseConfig,
   metadataPathFor,
   verifyBackupFile,
 } = require("./db-cli-utils");
@@ -84,6 +86,62 @@ const pruneBackups = (directory, keep) => {
   return deleted;
 };
 
+const quoteIdentifier = (value) =>
+  `\`${String(value).replace(/\`/g, "\`\`")}\``;
+
+const listTables = async (connection, database) => {
+  const [rows] = await connection.query(
+    `SELECT TABLE_NAME
+       FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = ?
+        AND TABLE_TYPE = 'BASE TABLE'
+      ORDER BY TABLE_NAME`,
+    [database],
+  );
+  return rows.map((row) => row.TABLE_NAME);
+};
+
+const tableCounts = async (connection, tables) => {
+  const counts = {};
+  for (const table of tables) {
+    const [rows] = await connection.query(
+      `SELECT COUNT(*) AS total FROM ${quoteIdentifier(table)}`,
+    );
+    counts[table] = Number(rows[0].total);
+  }
+  return counts;
+};
+
+const captureDatabaseShape = async () => {
+  const config = databaseConfig();
+  const connection = await mysql.createConnection({
+    host: config.host,
+    port: config.port,
+    user: config.user,
+    password: config.password,
+    database: config.name,
+  });
+
+  try {
+    const tables = await listTables(connection, config.name);
+    const counts = await tableCounts(connection, tables);
+    return {
+      tables,
+      counts,
+      total_rows: Object.values(counts).reduce(
+        (total, value) => total + Number(value),
+        0,
+      ),
+    };
+  } finally {
+    await connection.end();
+  }
+};
+
+const sameShape = (left, right) =>
+  JSON.stringify(left.tables) === JSON.stringify(right.tables) &&
+  JSON.stringify(left.counts) === JSON.stringify(right.counts);
+
 const copyVerifiedPair = (verified, externalDirectory) => {
   fs.mkdirSync(externalDirectory, { recursive: true });
 
@@ -103,7 +161,7 @@ const copyVerifiedPair = (verified, externalDirectory) => {
   return copied;
 };
 
-const main = () => {
+const main = async () => {
   const environment = ensureAllowedEnvironment();
   const startedAt = new Date();
   const defaultOutput =
@@ -139,7 +197,33 @@ const main = () => {
     `inventario-${environment}-${timestamp()}.sql`,
   );
 
+  const sourceShapeBefore = await captureDatabaseShape();
   runNode(["scripts/db-backup.js", "--output", backupPath]);
+  const sourceShapeAfter = await captureDatabaseShape();
+
+  if (!sameShape(sourceShapeBefore, sourceShapeAfter)) {
+    fs.rmSync(backupPath, { force: true });
+    fs.rmSync(metadataPathFor(backupPath), { force: true });
+    throw new Error(
+      "La base cambió durante la ventana del backup; se descarta el dump y debe reintentarse",
+    );
+  }
+
+  const initialVerification = verifyBackupFile(backupPath);
+  const enrichedMetadata = {
+    ...initialVerification.metadata,
+    source_snapshot: {
+      captured_at: new Date().toISOString(),
+      tables: sourceShapeAfter.tables,
+      counts: sourceShapeAfter.counts,
+      total_rows: sourceShapeAfter.total_rows,
+    },
+  };
+  fs.writeFileSync(
+    initialVerification.metadataPath,
+    `${JSON.stringify(enrichedMetadata, null, 2)}\n`,
+    "utf8",
+  );
 
   const verified = verifyBackupFile(backupPath);
   const deleted = pruneBackups(outputDirectory, keep);
@@ -179,6 +263,7 @@ const main = () => {
     backup_path: path.relative(path.dirname(manifestPath), verified.backupPath),
     bytes: verified.bytes,
     sha256: verified.sha256,
+    source_snapshot: verified.metadata.source_snapshot,
     retention: {
       keep,
       deleted,
@@ -202,9 +287,7 @@ const main = () => {
   );
 };
 
-try {
-  main();
-} catch (error) {
+main().catch((error) => {
   console.error(`✗ Backup periódico P9.5 falló: ${error.message}`);
   process.exitCode = 1;
-}
+});
