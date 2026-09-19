@@ -559,7 +559,7 @@ Hallazgo resuelto:
 
 Documento: `docs/P9_4_PILOT_INDICATORS.md`.
 
-P9.5 sólo se abre después de integrar este cierre documental, confirmar su Gate post-merge verde y releer `ROADMAP.md` desde `main`.
+Regla de transición aplicada: **P9.5 permanece bloqueado** hasta el cierre formal de P9.4. P9.5 sólo se abre después de integrar este cierre documental, confirmar su Gate post-merge verde y releer `ROADMAP.md` desde `main`.
 
 ### P9.5 — Backup y recuperación durante el piloto ⏳
 
