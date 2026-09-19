@@ -56,32 +56,37 @@ En staging, el directorio primario previsto es:
 /data/backups/pilot-daily
 ```
 
-El volumen del backend conserva esos archivos frente a redeploys, pero **no debe contarse por sí solo como única copia de recuperación**.
+El volumen dedicado del servicio de backup conserva esos archivos frente a redeploys, pero **no debe contarse por sí solo como única copia de recuperación**.
 
-### Capa B — Backup nativo del volumen MySQL
+### Capa B — Copia cifrada en Storage Bucket S3 compatible
 
-Railway permite backups de volumen:
-- diarios;
-- semanales;
-- mensuales.
+En el staging de costo cero, los backups/PITR nativos del volumen MySQL de Railway no están disponibles porque el proveedor los reserva para el plan Pro. P9.5 no requiere contratar ese plan.
 
-Para el piloto se prevé habilitar como mínimo:
-- **Daily**;
-- **Weekly**.
+La segunda capa operativa del piloto usa un Storage Bucket privado S3 compatible. Antes de salir del contenedor:
+- el dump ya verificado se cifra con **AES-256-GCM**;
+- la clave de 32 bytes se mantiene exclusivamente como secreto de entorno;
+- se suben el objeto cifrado y metadata no sensible;
+- el runner vuelve a descargar el objeto;
+- lo descifra en memoria;
+- compara bytes y SHA-256 con el backup de origen;
+- recién entonces declara `bucket_copy.verified=true`;
+- aplica retención inicial de 7 copias cifradas.
 
-Esta capa está administrada por el proveedor y se mantiene separada del runtime de la aplicación. Limitación: Railway documenta que estos backups sólo pueden restaurarse dentro del mismo proyecto+entorno. Por eso no sustituyen un dump lógico verificable.
+El bucket es almacenamiento de objetos separado del volumen `/data`. No se versionan credenciales, clave de cifrado ni dumps reales.
 
-### Capa C — Copia externa opcional del dump
+Railway Storage Buckets usan red pública HTTPS. El cifrado previo evita que el SQL viaje o quede almacenado en claro aun cuando el bucket ya tenga cifrado en reposo del proveedor.
 
-`PILOT_BACKUP_EXTERNAL_DIR` permite copiar el par:
+### Capa C — Copia por directorio externo opcional
+
+`PILOT_BACKUP_EXTERNAL_DIR` se conserva para entornos de prueba o un montaje externo autorizado y permite copiar el par:
 - `*.sql`;
 - `*.sql.sha256.json`.
 
 La copia se vuelve a verificar con SHA-256 antes de declararse válida.
 
-Un directorio del mismo volumen **no cuenta** como copia fuera del host. Esta opción sólo cumple la capa externa cuando apunta a un almacenamiento/montaje distinto y autorizado.
+Un directorio del mismo volumen **no cuenta** como copia independiente. En staging, `PILOT_BACKUP_REQUIRE_SECONDARY=true` obliga a que exista una segunda copia verificada mediante bucket S3 o destino externo autorizado antes de declarar el backup exitoso.
 
-No se agregará un proveedor ficticio ni credenciales de almacenamiento al repositorio. Si antes de producción institucional se exige copia off-provider, debe conectarse un destino aprobado y cifrado.
+Si antes de producción institucional se exige una copia off-provider, debe conectarse un destino institucional aprobado; el bucket del piloto no reemplaza esa decisión.
 
 ---
 
@@ -95,12 +100,13 @@ PILOT_BACKUP_KEEP=7
 
 El runner conserva los 7 backups lógicos más recientes en el directorio primario y elimina pares antiguos `sql + metadata`.
 
-La retención del backup nativo Railway se gestiona por la política del proveedor:
-- Daily;
-- Weekly;
-- Monthly cuando corresponda.
+La copia cifrada del bucket usa inicialmente:
 
-La retención debe revisarse antes de producción institucional.
+```text
+PILOT_BACKUP_S3_KEEP=7
+```
+
+El runner conserva las 7 copias cifradas más recientes y elimina pares antiguos `*.sql.enc + *.meta.json`. La retención debe revisarse antes de producción institucional.
 
 ---
 
@@ -138,6 +144,16 @@ PILOT_BACKUP_DIR
 PILOT_BACKUP_KEEP=7
 PILOT_BACKUP_MANIFEST
 PILOT_BACKUP_EXTERNAL_DIR
+PILOT_BACKUP_REQUIRE_SECONDARY=true
+PILOT_BACKUP_S3_ENDPOINT
+PILOT_BACKUP_S3_BUCKET
+PILOT_BACKUP_S3_REGION
+PILOT_BACKUP_S3_ACCESS_KEY_ID
+PILOT_BACKUP_S3_SECRET_ACCESS_KEY
+PILOT_BACKUP_S3_PREFIX
+PILOT_BACKUP_S3_KEEP=7
+PILOT_BACKUP_S3_FORCE_PATH_STYLE=false
+PILOT_BACKUP_ENCRYPTION_KEY
 PILOT_RESTORE_TARGET
 PILOT_RESTORE_REPORT
 PILOT_RPO_TARGET_HOURS=24
@@ -178,9 +194,11 @@ Los resultados de CI pueden publicarse como artifact sintético. Los resultados 
 
 Frecuencia objetivo:
 - backup lógico: **diario**;
-- backup nativo MySQL: **Daily + Weekly**;
+- segunda copia cifrada al bucket: **en la misma ejecución diaria**;
 - restore drill real: **mensual** y antes de ampliar el piloto;
 - backup adicional: antes de toda migración/cambio destructivo.
+
+Los backups/PITR nativos del volumen MySQL quedan como mejora opcional de un plan pago y no forman parte del criterio de cierre del piloto de costo cero.
 
 Railway Cron es apto para tareas cortas que terminan y cierran conexiones. Si se usa un cron service para el dump lógico, debe finalizar después del backup y no quedar `Active`.
 
@@ -201,8 +219,8 @@ Registrar:
 - SHA-256;
 - bytes;
 - cantidad retenida;
-- estado del backup nativo Railway;
-- resultado de la última copia externa cuando exista;
+- estado de la última copia cifrada en bucket;
+- resultado de la última copia externa por directorio cuando exista;
 - último restore drill;
 - RPO real;
 - RTO real;
