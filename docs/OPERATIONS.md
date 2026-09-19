@@ -298,3 +298,18 @@ Antes de declarar recuperado un SEV-1/SEV-2, registrar y validar según correspo
 - acción preventiva vinculada a issue/roadmap.
 
 La plantilla oficial de registro es `.github/ISSUE_TEMPLATE/incident.md` cuando GitHub esté disponible y el contenido pueda registrarse sin exponer información sensible.
+
+
+## 20. P9.4 — Indicadores reales del piloto
+
+La metodología operativa de indicadores vive en `P9_4_PILOT_INDICATORS.md`.
+
+Durante el piloto:
+- usar `npm run pilot:metrics:snapshot` sólo en staging/test;
+- no versionar snapshots reales;
+- usar Railway para recursos y logs HTTP/runtime;
+- conservar `/health/live` y `/health/ready` como señal primaria de disponibilidad;
+- usar P8 para comparaciones reproducibles de rendimiento;
+- usar P9.1 para severidad, stop conditions, MTTA/MTTR y RPO/RTO.
+
+P9.4 no sustituye el runbook de incidentes ni habilita consultas destructivas.
