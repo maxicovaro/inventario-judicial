@@ -20,6 +20,7 @@ const documentation = read("docs/P9_4_PILOT_INDICATORS.md");
 const docsIndex = read("docs/README.md");
 const roadmap = read("ROADMAP.md");
 const gitignore = read(".gitignore");
+const qualityWorkflow = read(".github/workflows/quality.yml");
 
 assertIncludes(
   snapshot,
@@ -74,6 +75,22 @@ assertIncludes(
 if (!gitignore.includes("pilot-metrics-results/")) {
   throw new Error("Los snapshots reales P9.4 deben permanecer fuera de Git");
 }
+
+assertIncludes(
+  qualityWorkflow,
+  [
+    "Run P9.4 pilot metrics snapshot smoke",
+    "timeout 30s npm run pilot:metrics:snapshot",
+    "Snapshot P9.4 CI finalizó",
+  ],
+  ".github/workflows/quality.yml",
+);
+
+assertIncludes(
+  snapshot,
+  ["await writeStdout(json)", "process.exit(finalCode)"],
+  "terminación determinista del snapshot P9.4",
+);
 
 assertIncludes(
   idempotency,
