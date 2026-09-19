@@ -327,7 +327,7 @@ Durante el piloto:
 - conservar checksum SHA-256 y metadata junto al dump;
 - mantener `PILOT_BACKUP_KEEP=7` como retención lógica inicial;
 - no considerar dos carpetas del mismo volumen como dos copias independientes;
-- usar una segunda capa real fuera del runtime primario, como backup nativo del volumen MySQL o almacenamiento externo autorizado;
+- usar una segunda capa real fuera del runtime primario; en el staging de costo cero, la opción operativa es un Storage Bucket S3 compatible con cifrado cliente AES-256-GCM y reverificación SHA-256; los backups/PITR nativos de volumen de Railway quedan como mejora opcional de plan pago;
 - ejecutar `npm run pilot:restore:drill` siempre contra una base alternativa;
 - no elevar privilegios del usuario de aplicación sólo para facilitar el drill;
 - medir RPO y RTO reales y compararlos con 24 h / 4 h;
