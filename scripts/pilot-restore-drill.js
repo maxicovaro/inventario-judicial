@@ -5,6 +5,7 @@ const { spawnSync } = require("child_process");
 const mysql = require("mysql2/promise");
 const {
   databaseConfig,
+  mysql2SslOptions,
   validateDatabaseName,
   verifyBackupFile,
 } = require("./db-cli-utils");
@@ -144,12 +145,25 @@ const runRestore = (backupPath, target) => {
   }
 };
 
-const connectionConfig = (source, target) => ({
-  host: process.env.RESTORE_DB_HOST || source.host,
-  port: Number(process.env.RESTORE_DB_PORT || source.port),
-  user: process.env.RESTORE_DB_USER || source.user,
-  password: process.env.RESTORE_DB_PASSWORD || source.password,
-  database: target,
+const restoreDatabaseConfig = (source, target) =>
+  databaseConfig("RESTORE_DB", {
+    host: source.host,
+    port: source.port,
+    name: target,
+    user: source.user,
+    password: source.password,
+    ssl: source.ssl,
+    sslRejectUnauthorized: source.sslRejectUnauthorized,
+    sslCaPath: source.sslCaPath,
+  });
+
+const connectionConfig = (config, includeDatabase = true) => ({
+  host: config.host,
+  port: config.port,
+  user: config.user,
+  password: config.password,
+  ...(includeDatabase ? { database: config.name } : {}),
+  ...(config.ssl ? { ssl: mysql2SslOptions(config) } : {}),
 });
 
 const quoteIdentifier = (value) => `\`${String(value).replace(/\`/g, "\`\`")}\``;
@@ -193,6 +207,7 @@ const main = async () => {
   const sourceSnapshot =
     verified.metadata.source_snapshot || resolved.manifest?.source_snapshot || null;
   const target = safeTargetName();
+  const restoreConfig = restoreDatabaseConfig(source, target);
 
   if (
     !sourceSnapshot ||
@@ -252,7 +267,7 @@ const main = async () => {
 
     failureStage = "validation";
     targetConnection = await mysql.createConnection(
-      connectionConfig(source, target),
+      connectionConfig(restoreConfig),
     );
 
     const targetTables = await listTables(targetConnection, target);
@@ -286,12 +301,9 @@ const main = async () => {
     } catch {}
     try {
       failureStage = failure ? failureStage : "cleanup";
-      adminConnection = await mysql.createConnection({
-        host: process.env.RESTORE_DB_HOST || source.host,
-        port: Number(process.env.RESTORE_DB_PORT || source.port),
-        user: process.env.RESTORE_DB_USER || source.user,
-        password: process.env.RESTORE_DB_PASSWORD || source.password,
-      });
+      adminConnection = await mysql.createConnection(
+        connectionConfig(restoreConfig, false),
+      );
       await adminConnection.query(
         `DROP DATABASE IF EXISTS ${quoteIdentifier(target)}`,
       );
