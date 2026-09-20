@@ -17,6 +17,8 @@ services:
         value: production
       - key: DEPLOY_ENV
         value: staging
+      - key: STAGING_TOPOLOGY
+        value: external-free
       - key: SERVE_FRONTEND_STATIC
         value: "true"
       - key: FRONTEND_DIST_DIR
