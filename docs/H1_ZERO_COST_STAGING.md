@@ -146,6 +146,12 @@ El backend:
 - descarga luego de comprobar autorización;
 - borra objeto + registro mediante el flujo protegido.
 
+### Restore portable de dumps MySQL
+
+H1 debe poder restaurar un backup verificado aunque la estación local no tenga `mysql.exe` instalado. El cliente MySQL nativo sigue siendo la vía preferida cuando existe; si no está disponible, `db-restore.js` usa un fallback `mysql2` restringido.
+
+El fallback no envía el dump completo como una consulta multi-statement. Parsea el formato real de `mysqldump`, elimina comentarios de control y locks, conserva correctamente comillas/escapes y ejecuta sólo sentencias permitidas (`DROP TABLE`, `CREATE TABLE`, `INSERT`) una por una. Cualquier sentencia inesperada bloquea el restore antes de continuar. El Quality Gate fuerza además el escenario `mysql` ausente contra una base MySQL descartable para evitar regresiones.
+
 ### DB TLS
 
 En `STAGING_TOPOLOGY=external-free`, preflight exige:
