@@ -1,27 +1,18 @@
-const fs = require("fs");
 const sharp = require("sharp");
 const { Op } = require("sequelize");
 
 const { Adjunto, Activo, Solicitud } = require("../models");
 const { esAdminGeneral } = require("../utils/permisos");
 const {
-  ensureUploadsDir,
-  resolveUploadPath,
+  createStoredFilename,
+  deleteUpload,
+  readUpload,
+  saveUpload,
 } = require("../utils/uploadStorage");
 
 const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 const mismoId = (a, b) => Number(a) === Number(b);
-
-const borrarArchivoFisico = (nombreArchivo) => {
-  if (!nombreArchivo) return;
-
-  const filePath = resolveUploadPath(nombreArchivo);
-
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-  }
-};
 
 const verificarPermisoActivo = async (activo_id, req, esDireccion) => {
   if (!activo_id) return null;
@@ -84,11 +75,9 @@ const verificarPermisoAdjunto = async (adjunto, req, esDireccion) => {
 };
 
 const subirAdjunto = async (req, res) => {
-  let archivoFinalParaBorrar = null;
+  let archivoGuardado = null;
 
   try {
-    ensureUploadsDir();
-
     const esDireccion = esAdminGeneral(req.usuario);
     const { activo_id, solicitud_id } = req.body;
 
@@ -98,19 +87,13 @@ const subirAdjunto = async (req, res) => {
       });
     }
 
-    archivoFinalParaBorrar = req.file.filename;
-
     if (!activo_id && !solicitud_id) {
-      borrarArchivoFisico(archivoFinalParaBorrar);
-
       return res.status(400).json({
         mensaje: "Debe indicar activo_id o solicitud_id",
       });
     }
 
     if (activo_id && solicitud_id) {
-      borrarArchivoFisico(archivoFinalParaBorrar);
-
       return res.status(400).json({
         mensaje:
           "El adjunto debe pertenecer a un activo o a una solicitud, no a ambos",
@@ -120,44 +103,37 @@ const subirAdjunto = async (req, res) => {
     await verificarPermisoActivo(activo_id, req, esDireccion);
     await verificarPermisoSolicitud(solicitud_id, req, esDireccion);
 
-    let nombreArchivo = req.file.originalname;
-    let rutaArchivo = req.file.filename;
-    let tipoArchivo = req.file.mimetype;
-    let tamanioArchivo = req.file.size;
-
-    const filePath = resolveUploadPath(req.file.filename);
-
-    if (IMAGE_MIME_TYPES.includes(req.file.mimetype)) {
-      const compressedFilename = `compressed-${Date.now()}.jpg`;
-      const compressedPath = resolveUploadPath(compressedFilename);
-
-      await sharp(filePath)
-        .resize({ width: 1600, withoutEnlargement: true })
-        .jpeg({ quality: 75 })
-        .toFile(compressedPath);
-
-      borrarArchivoFisico(req.file.filename);
-
-      archivoFinalParaBorrar = compressedFilename;
-
-      const stats = fs.statSync(compressedPath);
-
-      nombreArchivo = req.file.originalname;
-      rutaArchivo = compressedFilename;
-      tipoArchivo = "image/jpeg";
-      tamanioArchivo = stats.size;
+    if (!Buffer.isBuffer(req.file.buffer)) {
+      throw new Error("El archivo recibido no está disponible en memoria");
     }
 
+    let contenido = req.file.buffer;
+    let tipoArchivo = req.file.mimetype;
+    let rutaArchivo = createStoredFilename(req.file.originalname);
+
+    if (IMAGE_MIME_TYPES.includes(req.file.mimetype)) {
+      contenido = await sharp(contenido)
+        .resize({ width: 1600, withoutEnlargement: true })
+        .jpeg({ quality: 75 })
+        .toBuffer();
+
+      rutaArchivo = createStoredFilename(req.file.originalname, ".jpg");
+      tipoArchivo = "image/jpeg";
+    }
+
+    await saveUpload(rutaArchivo, contenido, tipoArchivo);
+    archivoGuardado = rutaArchivo;
+
     const nuevoAdjunto = await Adjunto.create({
-      nombre_archivo: nombreArchivo,
+      nombre_archivo: req.file.originalname,
       ruta_archivo: rutaArchivo,
       tipo_archivo: tipoArchivo,
-      tamanio: tamanioArchivo,
+      tamanio: contenido.length,
       activo_id: activo_id || null,
       solicitud_id: solicitud_id || null,
     });
 
-    archivoFinalParaBorrar = null;
+    archivoGuardado = null;
 
     const adjuntoPublico = nuevoAdjunto.toJSON();
     delete adjuntoPublico.ruta_archivo;
@@ -167,8 +143,10 @@ const subirAdjunto = async (req, res) => {
       adjunto: adjuntoPublico,
     });
   } catch (error) {
-    if (archivoFinalParaBorrar) {
-      borrarArchivoFisico(archivoFinalParaBorrar);
+    if (archivoGuardado) {
+      try {
+        await deleteUpload(archivoGuardado);
+      } catch {}
     }
 
     return res.status(error.status || 500).json({
@@ -253,15 +231,18 @@ const descargarAdjunto = async (req, res) => {
 
     await verificarPermisoAdjunto(adjunto, req, esDireccion);
 
-    const filePath = resolveUploadPath(adjunto.ruta_archivo);
+    const contenido = await readUpload(adjunto.ruta_archivo);
 
-    if (!fs.existsSync(filePath)) {
+    if (!contenido) {
       return res.status(404).json({
         mensaje: "El archivo físico no existe",
       });
     }
 
-    return res.download(filePath, adjunto.nombre_archivo);
+    res.attachment(adjunto.nombre_archivo);
+    res.type(adjunto.tipo_archivo || "application/octet-stream");
+    res.setHeader("Content-Length", String(contenido.length));
+    return res.send(contenido);
   } catch (error) {
     return res.status(error.status || 500).json({
       mensaje: error.status ? error.message : "Error al descargar adjunto",
@@ -285,8 +266,7 @@ const eliminarAdjunto = async (req, res) => {
 
     await verificarPermisoAdjunto(adjunto, req, esDireccion);
 
-    borrarArchivoFisico(adjunto.ruta_archivo);
-
+    await deleteUpload(adjunto.ruta_archivo);
     await adjunto.destroy();
 
     return res.status(200).json({
