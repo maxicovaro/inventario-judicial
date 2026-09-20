@@ -513,6 +513,12 @@ Desde H1, staging usa Serverless para reducir el costo de los tres servicios per
 - `mysql`: Serverless habilitado;
 - `pilot-backup-cron`: permanece como cron puntual, no como servicio 24/7.
 
+Además, Railway Free permite **un solo Volume por proyecto**. La topología objetivo H1 conserva únicamente `mysql-data` y migra:
+- adjuntos del backend al **bucket privado** `pilot-backup-bucket` bajo prefijo `uploads/staging/`;
+- backups diarios a filesystem efímero `/tmp`, con persistencia durable únicamente en la copia cifrada y verificada del bucket.
+
+Los detalles históricos de P7 sobre `backend-data` y `/data/uploads` describen el staging original; no son la topología efectiva objetivo de H1.
+
 Motivo: con las métricas reales de 7 días, el costo continuo estimado ronda USD 6,11/mes y no cabe en el crédito Free de USD 1/mes. El presupuesto H1 proyecta ~USD 0,41/mes con 1,5 h activas/día.
 
 Consideraciones operativas:
