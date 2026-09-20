@@ -206,6 +206,20 @@ Contiene:
 - relación con P8 y P9.1;
 - criterios de cierre P9.4.
 
+### 13. P9.5 — Backup y recuperación periódica del piloto
+
+`P9_5_PILOT_BACKUP_RECOVERY.md`
+
+Contiene:
+- backup lógico periódico con checksum;
+- retención del piloto;
+- segunda capa de backup fuera del runtime primario;
+- restore drill sobre base alternativa;
+- comparación exacta de tablas/conteos;
+- medición de RPO/RTO;
+- programación prevista en Railway;
+- stop conditions y criterios de cierre P9.5.
+
 ## Evidencia técnica
 
 La documentación anterior define el estado consolidado. La evidencia detallada de que un cambio fue implementado/validado vive en:
@@ -232,7 +246,8 @@ Para retomar el proyecto después de una pausa:
 9. Para P9.2/onboarding y Depósito Central, leer `P9_2_CONTROLLED_ONBOARDING.md`; para la primera ola y su cierre, leer `P9_2B_FIRST_WAVE.md`.
 10. Para P9.3/operación administrativa, leer `P9_3_ADMIN_PROCEDURE.md` y `OPERATIONS.md`.
 11. Para P9.4/indicadores del piloto, leer `P9_4_PILOT_INDICATORS.md`, `PERFORMANCE.md` y `P9_1_INCIDENT_RESPONSE.md`.
-12. Verificar el último Quality Gate antes de modificar/integrar.
+12. Para P9.5/backup periódico y recovery, leer `P9_5_PILOT_BACKUP_RECOVERY.md`, `OPERATIONS.md` y `RAILWAY_STAGING.md`.
+13. Verificar el último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
 

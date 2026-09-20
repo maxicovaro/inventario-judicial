@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 19/09/2026. **P9.4 — Indicadores reales del piloto** queda formalmente cerrado con PR #47, merge `d1aa207e170e8a5c919f387ca9ea19b217a5529d`, Quality Gate #313 pre-merge y Quality Gate #314 post-merge verdes. **P9.5 — Backup/restore periódico del piloto** pasa a ser el siguiente bloque elegible una vez integrado este cierre documental y con su Gate post-merge verde.
+> Actualizada al 20/09/2026. **P9.5 — Backup y recuperación durante el piloto** completó implementación, Quality Gate y validación real de staging en rama `ops/p9-5-pilot-backup-recovery`; está en cierre técnico pre-merge del PR #49. P9.6 permanece bloqueado hasta merge + Quality Gate post-merge y cierre formal desde `main`.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -36,8 +36,8 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | **P9.2B Primera ola Contable + Informática** | ✅ **Completo** | 12 escenarios + rollback + verify final 4/4; staging `e8256927...` |
 | **P9.3 Procedimiento operativo de administración** | ✅ **Completo** | PR #44; Gate #304; merge `1ec716b8...`; Gate post-merge #305; staging validado |
 | **P9.4 Indicadores reales del piloto** | ✅ **Completo** | PR #47; merge `d1aa207e...`; Gate #313/#314; captura real + staging `b6de2f78...` / `d95d1768...` SUCCESS |
-| **P9.5 Backup/restore periódico del piloto** | ⏳ **Siguiente** | Abrir sólo tras integrar este cierre documental, Gate post-merge verde y releer ROADMAP |
-| P9.6 Criterios de salida a producción institucional | ⏳ Pendiente | Después de P9.5 |
+| **P9.5 Backup/restore periódico del piloto** | 🟠 **Cierre pre-merge** | Gate #330 verde; backup real + bucket cifrado + restore PASS + cron diario; PR #49 pendiente de merge/post-merge |
+| P9.6 Criterios de salida a producción institucional | ⏳ **Bloqueado** | Se habilita sólo tras cierre formal de P9.5 desde `main` |
 
 ---
 
@@ -561,14 +561,59 @@ Documento: `docs/P9_4_PILOT_INDICATORS.md`.
 
 Regla de transición aplicada: **P9.5 permanece bloqueado** hasta el cierre formal de P9.4. P9.5 sólo se abre después de integrar este cierre documental, confirmar su Gate post-merge verde y releer `ROADMAP.md` desde `main`.
 
-### P9.5 — Backup y recuperación durante el piloto ⏳
+### P9.5 — Backup y recuperación durante el piloto 🟠 CIERRE PRE-MERGE
 
-Previsto:
-- backup periódico;
-- checksum;
-- copia fuera del host cuando corresponda;
-- restore drill periódico;
-- seguimiento de RPO/RTO.
+Regla de transición cumplida: P9.4 fue cerrado formalmente antes de abrir P9.5.
+
+Implementación consolidada:
+- `scripts/pilot-backup-run.js`;
+- `scripts/pilot-backup-s3.js`;
+- `scripts/pilot-restore-drill.js`;
+- `npm run pilot:backup:run`;
+- `npm run pilot:restore:drill`;
+- checksum SHA-256 + snapshot estable de tablas/conteos;
+- retención primaria de 7 dumps;
+- segunda copia cifrada AES-256-GCM en Storage Bucket S3 compatible;
+- descarga, descifrado en memoria y reverificación SHA-256;
+- contrato `test:p9-backup-recovery-contracts`;
+- Quality Gate con backup+restore real sobre MySQL descartable;
+- documento `docs/P9_5_PILOT_BACKUP_RECOVERY.md`.
+
+Evidencia técnica:
+- PR #49;
+- HEAD pre-cierre `7bdeeec815be4d4e78320063891fb73e1bcb92ee`;
+- Quality Gate #330 ✅;
+- backup real staging: deployment `66bd32ef-5f88-4b6b-82ba-7e428a7150db` ✅;
+- dump 44.533 bytes;
+- SHA-256 `1887757832441ad96f46ddec8f7b057c3313e9a700c98196a2fe64df11682e92`;
+- `bucket_copy_verified=true`;
+- `secondary_copy_verified=true`;
+- restore drill real: deployment `3f4d5547-7284-478d-b4d5-00c42f399047` ✅;
+- resultado `PASS`;
+- 19 tablas / 168 filas;
+- RPO 0,2203 h <= 24 h;
+- RTO 0,0373 min <= 240 min;
+- `target_cleanup_ok=true`;
+- cron final: `0 6 * * *` UTC = 03:00 Argentina;
+- deployment final de configuración `cf9ef12f-fe83-4d00-9eb7-10d7d0781cd3` ✅;
+- objetivo de costo de bolsillo $0 preservado: backups/PITR nativos Pro sustituidos por bucket privado con cifrado cliente.
+
+Guardas preservadas:
+- sólo `staging/test`;
+- no restore sobre DB activa;
+- identidad de restore separada y temporal;
+- credenciales administrativas retiradas tras el drill;
+- usuario normal de aplicación sin privilegios ampliados;
+- dumps/resultados reales fuera de Git;
+- P9.1 prevalece ante checksum inválido, restore inconsistente o incumplimiento material de RPO/RTO.
+
+Pendiente exclusivamente para cierre formal:
+- Gate del commit documental final;
+- merge PR #49;
+- Quality Gate post-merge;
+- registrar desde `main` el cierre formal y habilitar P9.6.
+
+P9.6 permanece bloqueado hasta completar esos puntos.
 
 ### P9.6 — Criterios de salida del piloto ⏳
 

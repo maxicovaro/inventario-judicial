@@ -144,6 +144,61 @@ jobs:
           RESTORE_DB_PASSWORD: root_ci_password
         run: npm run test:backup-restore
 
+      - name: Run P9.5 backup and restore drill
+        env:
+          RESTORE_DB_HOST: 127.0.0.1
+          RESTORE_DB_PORT: 3306
+          RESTORE_DB_USER: root
+          RESTORE_DB_PASSWORD: root_ci_password
+          PILOT_BACKUP_REQUIRE_SECONDARY: "true"
+        run: |
+          rm -rf pilot-backup-results
+          npm run pilot:backup:run -- \
+            --output-dir pilot-backup-results/daily \
+            --external-dir pilot-backup-results/external \
+            --keep 2 \
+            --manifest pilot-backup-results/latest.json
+          npm run pilot:restore:drill -- \
+            --manifest pilot-backup-results/latest.json \
+            --report pilot-backup-results/restore-drill.json
+          node - <<'NODE'
+          const fs = require("fs");
+          const manifest = JSON.parse(fs.readFileSync("pilot-backup-results/latest.json", "utf8"));
+          const drill = JSON.parse(fs.readFileSync("pilot-backup-results/restore-drill.json", "utf8"));
+          if (
+            manifest.schema_version !== 1 ||
+            !manifest.sha256 ||
+            !manifest.external_copy?.verified ||
+            !manifest.secondary_copy_verified ||
+            !manifest.source_snapshot?.tables ||
+            !manifest.source_snapshot?.counts
+          ) {
+            throw new Error(
+              "Backup P9.5 CI incompleto, snapshot ausente o copia secundaria no verificada",
+            );
+          }
+          if (
+            drill.schema_version !== 1 ||
+            drill.status !== "PASS" ||
+            !drill.validation?.exact_table_counts_match ||
+            !drill.validation?.target_cleanup_ok ||
+            !drill.objectives?.rpo_met ||
+            !drill.objectives?.rto_met
+          ) {
+            throw new Error("Restore drill P9.5 CI no cumplió el contrato");
+          }
+          console.log("✓ Restore drill P9.5 CI finalizó con RPO/RTO dentro de objetivo.");
+          NODE
+
+      - name: Upload P9.5 backup/restore artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p9-5-backup-restore
+          path: pilot-backup-results/
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Run P8.0 API baseline
         run: |
           npm run perf:fixtures

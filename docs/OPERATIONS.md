@@ -315,3 +315,22 @@ Durante el piloto:
 - usar P9.1 para severidad, stop conditions, MTTA/MTTR y RPO/RTO.
 
 P9.4 no sustituye el runbook de incidentes ni habilita consultas destructivas.
+
+
+## 21. P9.5 — Backup periódico y restore drill
+
+La metodología específica vive en `P9_5_PILOT_BACKUP_RECOVERY.md`.
+
+Durante el piloto:
+
+- ejecutar backup periódico sólo en `staging/test` mediante `npm run pilot:backup:run`;
+- conservar checksum SHA-256 y metadata junto al dump;
+- mantener `PILOT_BACKUP_KEEP=7` como retención lógica inicial;
+- no considerar dos carpetas del mismo volumen como dos copias independientes;
+- usar una segunda capa real fuera del runtime primario; en el staging de costo cero, la opción operativa es un Storage Bucket S3 compatible con cifrado cliente AES-256-GCM y reverificación SHA-256; los backups/PITR nativos de volumen de Railway quedan como mejora opcional de plan pago;
+- ejecutar `npm run pilot:restore:drill` siempre contra una base alternativa;
+- no elevar privilegios del usuario de aplicación sólo para facilitar el drill;
+- medir RPO y RTO reales y compararlos con 24 h / 4 h;
+- activar P9.1 si checksum, restore, RPO/RTO o integridad incumplen las stop conditions.
+
+El restore drill debe eliminar su base temporal al finalizar. Una base de drill residual sin control se trata como fallo operativo y no como éxito parcial.
