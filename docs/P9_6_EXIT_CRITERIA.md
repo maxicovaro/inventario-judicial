@@ -2,7 +2,7 @@
 
 ## Estado y propósito
 
-P9.6 está **activo** desde main@4a0dcc1de6941e3cd4507a107a00a93e34920983, después del cierre formal de P9.5 y de releer ROADMAP.md y AGENTS.md.
+P9.6 está en **cierre técnico pre-merge**. Se abrió desde main@4a0dcc1de6941e3cd4507a107a00a93e34920983 después del cierre formal de P9.5 y de releer ROADMAP.md y AGENTS.md. La implementación, Quality Gate y evaluación real ya están completas; resta integrar el PR y obtener el Gate post-merge.
 
 El objetivo es convertir la evidencia acumulada de P8 y P9 en un gate de salida explícito, reproducible y auditable antes de considerar producción institucional.
 
@@ -237,3 +237,119 @@ P9.6 puede cerrarse cuando:
 - Quality Gate post-merge queda verde.
 
 El cierre técnico de P9.6 no equivale a desplegar producción.
+
+
+---
+
+## 11. Evaluación real de salida — 20/09/2026
+
+Hora de corte: **2026-09-20 11:50:44 Argentina / 14:50:44 UTC**.
+
+Resultado:
+- technical_status: **PASS**;
+- institutional_status: **PENDING**;
+- decision: **ELIGIBLE_FOR_INSTITUTIONAL_APPROVAL**;
+- criterios: **34/34 PASS**;
+- fallos: **0**.
+
+### Estabilidad — 6/6 PASS
+
+- proyecto Railway de staging: servicios backend, frontend y MySQL en estado terminal SUCCESS;
+- backend configurado con healthcheck real en /health/ready;
+- última observación runtime de /ready en el deployment vigente: HTTP 200;
+- muestra HTTP representativa P9.4: 562 requests;
+- ventana representativa: 13/09/2026 a 18/09/2026;
+- 5xx en esa muestra: 0;
+- p95 observado: 65,31 ms;
+- SEV-1 abiertos al corte: 0;
+- SEV-2 abiertos al corte: 0.
+
+La actividad posterior al último redeploy fue insuficiente para construir otra muestra de >=100 requests; no se presenta esa muestra pequeña como equivalente. Se conserva la muestra P9.4 con su ventana declarada y se combina únicamente con el estado/deployment actual.
+
+### Seguridad — 4/4 PASS
+
+Evidencia P9.4/P9.6:
+- ADMIN activos: 1;
+- ADMIN con MFA: 1/1;
+- ADMIN fuera de Dirección: 0;
+- incidentes abiertos auth/MFA/permisos: 0;
+- Quality Gate #336: verde, incluyendo auth hardening, MFA, autorización, MySQL y E2E.
+
+### Integridad — 8/8 PASS
+
+- stop conditions abiertas: 0;
+- pérdida/corrupción de datos: 0;
+- bypass de autorización: 0;
+- señales de stock negativo: 0;
+- operaciones físicas duplicadas: 0;
+- operaciones idempotentes incompletas observadas: 0;
+- primera ola: 12/12 escenarios funcionales;
+- usuarios primera ola: 4/4 verificados.
+
+### Adopción — 4/4 PASS
+
+Última captura funcional read-only P9.4: 19/09/2026.
+
+- usuarios piloto activos no ADMIN: 4;
+- usuarios piloto verificados: 4;
+- oficinas piloto con actividad real: 2, Área Contable y Área Informática;
+- flujos ejercitados: pedidos mensuales/complementarios, provisión, movimientos de stock, traslado de activo y separación Depósito/Contable.
+
+La adopción evaluada es la del alcance piloto autorizado; no se extrapola a toda la institución.
+
+### Capacidad operativa — 7/7 PASS
+
+Backup real P9.5:
+- evento: 20/09/2026 13:53:28 UTC;
+- edad al corte P9.6: **0,9543 h**;
+- dump: 44.533 bytes;
+- checksum SHA-256 verificado;
+- bucket_copy_verified=true;
+- secondary_copy_verified=true.
+
+Restore drill:
+- resultado: PASS;
+- RPO: 0,2203 h <= 24 h;
+- RTO: 0,0373 min <= 240 min;
+- 19 tablas / 168 filas;
+- target_cleanup_ok=true.
+
+Programación:
+- pilot-backup-cron: SUCCESS;
+- cron: 0 6 * * * UTC = 03:00 Argentina;
+- volumen /data y bucket privado presentes;
+- procedimientos P9.1/P9.3/P9.5 disponibles.
+
+### Rendimiento — 5/5 PASS
+
+- p95 runtime de referencia: 65,31 ms <= 500 ms;
+- 7 días de métricas actuales sin señal de presión relevante;
+- backend: CPU máx. ~0,01255; memoria máx. ~0,285 GB; disco máx. ~0,034 GB;
+- MySQL: CPU máx. ~0,00797; memoria máx. ~0,528 GB; disco máx. ~0,161 GB;
+- carga P8 validada hasta concurrencia 20;
+- error rate controlado: 0 %;
+- regresiones P8 dentro de Quality Gate #336: verdes.
+
+### Trazabilidad de la revisión desplegada
+
+El backend de staging continúa sobre una revisión anterior a main. La comparación contra la rama P9.6 muestra diferencias únicamente en:
+- documentación;
+- CI;
+- archivos de configuración/ejemplo;
+- scripts operativos P9.5/P9.6;
+- package.json por comandos de operación/test.
+
+No existen diferencias en src/, server.js, inventario-frontend/ ni migraciones. Por ello no existe un cambio de runtime de aplicación pendiente que invalide esta evaluación.
+
+### Decisión P9.6
+
+El sistema queda **técnicamente elegible para aprobación institucional**.
+
+No existe en este bloque una aprobación institucional formal con rol + referencia. Por lo tanto:
+- institutional_status permanece **PENDING**;
+- no se declara APPROVED_FOR_PRODUCTION_PLANNING;
+- no se despliega producción;
+- cualquier avance a producción requiere una decisión institucional explícita y un bloque de planificación/despliegue protegido.
+
+Esta evaluación aplica los mismos criterios versionados por scripts/pilot-exit-gate.js. El comportamiento ejecutable del evaluador y sus casos negativos quedaron validados por Quality Gate #336.
+
