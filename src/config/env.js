@@ -95,6 +95,13 @@ const env = {
   DB_NAME: requerir("DB_NAME"),
   DB_USER: requerir("DB_USER"),
   DB_PASSWORD: requerir("DB_PASSWORD"),
+  DB_SSL: booleano("DB_SSL", process.env.DB_SSL, false),
+  DB_SSL_REJECT_UNAUTHORIZED: booleano(
+    "DB_SSL_REJECT_UNAUTHORIZED",
+    process.env.DB_SSL_REJECT_UNAUTHORIZED,
+    true,
+  ),
+  DB_SSL_CA_PATH: process.env.DB_SSL_CA_PATH?.trim() || "",
   JWT_SECRET: requerir("JWT_SECRET"),
   CORS_ORIGIN:
     process.env.CORS_ORIGIN?.trim() ||
