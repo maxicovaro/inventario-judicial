@@ -166,13 +166,13 @@ const requestBuffer = (options) =>
         const body = Buffer.concat(chunks);
         if (response.statusCode < 200 || response.statusCode >= 300) {
           const detail = body.toString("utf8").slice(0, 512).trim();
-          reject(
-            new Error(
-              `S3 respondió HTTP ${response.statusCode}${
-                detail ? `: ${detail}` : ""
-              }`,
-            ),
+          const error = new Error(
+            `S3 respondió HTTP ${response.statusCode}${
+              detail ? `: ${detail}` : ""
+            }`,
           );
+          error.statusCode = response.statusCode;
+          reject(error);
           return;
         }
         resolve({
