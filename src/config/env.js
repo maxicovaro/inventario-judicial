@@ -72,6 +72,19 @@ const booleano = (nombre, valor, fallback) => {
   throw new Error(`${nombre} debe ser true o false`);
 };
 
+const serveFrontendStatic = booleano(
+  "SERVE_FRONTEND_STATIC",
+  process.env.SERVE_FRONTEND_STATIC,
+  false,
+);
+const renderExternalHostname = String(
+  process.env.RENDER_EXTERNAL_HOSTNAME || "",
+).trim();
+const inferredRenderOrigin =
+  DEPLOY_ENV === "staging" && serveFrontendStatic && renderExternalHostname
+    ? `https://${renderExternalHostname}`
+    : "";
+
 const transportesAuthPermitidos = new Set(["hybrid", "cookie"]);
 const authTokenTransport = String(
   process.env.AUTH_TOKEN_TRANSPORT ||
@@ -87,7 +100,10 @@ if (!transportesAuthPermitidos.has(authTokenTransport)) {
 const env = {
   NODE_ENV,
   DEPLOY_ENV,
-  DEPLOY_REVISION: process.env.DEPLOY_REVISION?.trim() || "",
+  DEPLOY_REVISION:
+    process.env.DEPLOY_REVISION?.trim() ||
+    process.env.RENDER_GIT_COMMIT?.trim() ||
+    "",
   IS_PRODUCTION: NODE_ENV === "production",
   PORT: numeroPositivo("PORT", process.env.PORT, 3000),
   DB_HOST: requerir("DB_HOST"),
@@ -105,7 +121,11 @@ const env = {
   JWT_SECRET: requerir("JWT_SECRET"),
   CORS_ORIGIN:
     process.env.CORS_ORIGIN?.trim() ||
+    inferredRenderOrigin ||
     (NODE_ENV === "development" ? "http://localhost:5173" : ""),
+  SERVE_FRONTEND_STATIC: serveFrontendStatic,
+  FRONTEND_DIST_DIR:
+    process.env.FRONTEND_DIST_DIR?.trim() || "inventario-frontend/dist",
   AUTH_TOKEN_TRANSPORT: authTokenTransport,
   TRUST_PROXY_HOPS: numeroNoNegativo(
     "TRUST_PROXY_HOPS",
