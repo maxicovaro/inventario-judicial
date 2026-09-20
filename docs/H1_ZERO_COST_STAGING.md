@@ -2,181 +2,241 @@
 
 ## Estado y objetivo
 
-H1 mantiene el staging de Inventario Judicial utilizable después del Trial de Railway sin contratar Hobby/Pro ni tocar producción.
+H1 está **activo**. Su objetivo es conservar un staging funcional después del Trial de Railway sin contratar Hobby/Pro, sin agregar una tarjeta como requisito técnico y sin tocar producción.
 
-Restricción operativa:
-
+Restricciones:
 - costo de bolsillo: **USD 0**;
-- crédito Railway Free disponible: **USD 1/mes**;
-- no agregar tarjeta ni upgrade como requisito técnico;
-- producción institucional permanece fuera de alcance;
-- los controles P7–P9, MySQL, volúmenes, backup cifrado y restore no se debilitan.
+- la aprobación institucional y producción permanecen fuera de alcance;
+- MFA, cookie HttpOnly/SameSite=Strict, autorización backend, MySQL, backup/restore y trazabilidad P7–P9 no se debilitan;
+- Railway no se destruye hasta que el reemplazo gratuito pase migración, smoke, persistencia, adjuntos y backup.
 
 ## 1. Baseline real de Railway
 
 Ventana observada: 7 días, 169 muestras horarias.
 
-| Servicio | RAM media | CPU media | Observación |
-| --- | ---: | ---: | --- |
-| backend | 0,099678 GB | 0,0001192 vCPU | carga muy baja |
-| frontend | 0,038065 GB | 0,00004153 vCPU | Caddy estático |
-| mysql | 0,461872 GB | 0,0039689 vCPU | principal costo continuo |
-| pilot-backup-cron | ~0 | ~0 | ejecución puntual |
+| Servicio | RAM media | CPU media |
+| --- | ---: | ---: |
+| backend | 0,099678 GB | 0,0001192 vCPU |
+| frontend | 0,038065 GB | 0,00004153 vCPU |
+| mysql | 0,461872 GB | 0,0039689 vCPU |
+| pilot-backup-cron | ~0 | ~0 |
 
-Almacenamiento usado observado:
+Uso de Volumes observado:
+- backend-data: ~0,0340 GB;
+- mysql-data: ~0,1608 GB;
+- pilot-backup-cron-volume: ~0,0324 GB;
+- total: ~0,2273 GB.
 
-- backend volume: ~0,0340 GB;
-- MySQL volume: ~0,1608 GB;
-- backup-cron volume: ~0,0324 GB;
-- total volumes: ~0,2273 GB;
-- bucket P9.5: muy por debajo de 1 MB al corte.
+Con las tarifas públicas de Railway del 20/09/2026, el staging 24x7 equivale a aproximadamente **USD 6,1/mes**, contra **USD 1/mes** de crédito del plan Free.
 
-Tarifas Railway usadas por el modelo H1:
+Railway Free además admite **1 Volume por proyecto**; el staging del Trial tiene 3. Por lo tanto la topología actual no puede ser el estado final H1.
 
-- RAM: USD 10 / GB-mes;
-- CPU: USD 20 / vCPU-mes;
-- volumen: USD 0,15 / GB-mes;
-- bucket: USD 0,015 / GB-mes.
+## 2. Experimento Serverless Railway — descartado como solución H1
 
-Resultado:
+Se habilitó `sleepApplication=true` y se redeployó:
+- mysql: `4dcda2fd-b1e6-4c6d-9214-a67466594d7e`;
+- backend: `c02d4fd2-496d-45e4-aaf4-c76a26ab1a2b`;
+- frontend: `1c496c70-4fa7-4d4a-af93-124f820937c3`.
 
-- compute continuo estimado: **USD 6,0787/mes**;
-- almacenamiento persistente observado: **USD 0,0341/mes**;
-- total 24/7 estimado: **USD 6,1128/mes**.
+Después de más de una hora sin uso funcional:
+- no apareció ningún deployment `SLEEPING`;
+- backend seguía en ~0,087 GB;
+- frontend seguía en ~0,029 GB;
+- MySQL seguía en ~0,387 GB y CPU no nula.
 
-Conclusión: mantener frontend + backend + MySQL despiertos 24/7 no es compatible con Railway Free.
+Conclusión: **no se usa una proyección de duty-cycle para declarar H1 PASS**. La propia guía actual de Railway clasifica bases de datos como mal candidato para Serverless porque conexiones/background traffic pueden impedir el sueño.
 
-Restricción adicional descubierta en la documentación actual de Railway:
-- Trial: hasta 3 Volumes por proyecto;
-- Free: **máximo 1 Volume por proyecto**.
+El archivo `pilot/staging-free-budget.example.json` representa ahora el estado real 24x7 y debe resultar `OVER_BUDGET`.
 
-El staging original tiene 3 Volumes, por lo que H1 debe reducirlos a uno antes de depender del plan Free.
+## 3. Topología objetivo external-free
 
-## 2. Estrategia
+H1 migra únicamente el **staging**, nunca producción.
 
-H1 usa **Railway Serverless** en los tres servicios permanentes:
+### Web full-stack: Render Free
 
-- frontend;
-- backend;
-- mysql.
+Un único Web Service sirve:
+- React compilado;
+- API Express;
+- health endpoints.
 
-La topología persistente objetivo es:
-- `mysql-data`: único Volume del proyecto, montado en `/var/lib/mysql`;
-- adjuntos: bucket privado S3 compatible, prefijo `uploads/staging/`, siempre servidos por backend después de autorización;
-- backup diario: dump/checksum en `/tmp`, copia durable cifrada AES-256-GCM en bucket y restore capaz de recuperar directamente desde esa copia;
-- `backend-data` y `pilot-backup-cron-volume`: se retiran sólo después de validar los reemplazos.
+Motivo de unificar frontend/backend:
+- conserva mismo origen para `__Host-` cookie;
+- mantiene `SameSite=Strict`;
+- elimina CORS entre dos proveedores;
+- evita un segundo proceso permanentemente activo.
 
-Railway considera inactivo un servicio sin tráfico saliente y normalmente lo duerme después de aproximadamente 5–10 minutos. Un request posterior vuelve a despertarlo.
+Contrato versionado:
+- `render.yaml`;
+- plan `free`;
+- auto-deploy sólo después de CI verde;
+- `VITE_API_URL=/api`;
+- `SERVE_FRONTEND_STATIC=true`;
+- `/health/ready` como healthcheck.
 
-El servicio `pilot-backup-cron` no necesita Serverless: ya se ejecuta únicamente según su cron diario.
+Render Free duerme el web service tras inactividad y usa filesystem efímero. Por eso ningún dato durable queda en disco local.
 
-### Cold start
+### Base: TiDB Cloud Starter
 
-En staging se acepta:
+TiDB Cloud Starter se usa como destino MySQL-compatible de staging:
+- cuota gratuita inicial: 5 GiB row storage + 5 GiB columnar;
+- 50 millones de Request Units por mes;
+- no requiere tarjeta para comenzar dentro de la cuota gratuita;
+- conexión MySQL nativa sobre TLS.
 
-- demora inicial al despertar;
-- posibilidad documentada por Railway de un primer 502 durante el wake;
-- reintento del primer acceso.
+La base actual (~0,16 GB en volumen Railway y <1 MiB de datos lógicos en capturas previas) queda ampliamente por debajo del límite de almacenamiento. Esto no reemplaza una prueba real de migraciones.
 
-Esto no se traslada automáticamente a una eventual producción institucional.
+H1 agrega:
+- `DB_SSL=true`;
+- TLS >= 1.2;
+- verificación de certificado;
+- CA configurable;
+- TLS también para mysql2, mysqldump/mysql CLI, backup y restore.
 
-## 3. Presupuesto operativo
+### Objetos y backups: Railway Storage Bucket
 
-El modelo reproducible es:
+Se reutiliza `pilot-backup-bucket`:
+- privado;
+- S3-compatible;
+- adjuntos bajo prefijo `uploads/staging-free/`;
+- backups cifrados AES-256-GCM bajo prefijo P9.5;
+- sin URLs públicas directas: descarga siempre pasa por autorización backend.
 
-~~~bash
-npm run staging:free:budget -- \
-  --evidence pilot/staging-free-budget.example.json \
-  --output staging-free-results/budget.json
-~~~
+El bucket Free permite hasta 10 GB-mes y consume el crédito Railway Free. El uso actual es mínimo.
 
-Con la evidencia actual y una proyección conservadora de **1,5 horas activas/día** para frontend/backend/MySQL:
+### Backup periódico: Railway cron residual
 
-- costo proyectado: **~USD 0,414/mes**;
-- margen frente al crédito Free: **~USD 0,586/mes**;
-- máximo uniforme aproximado compatible con USD 1: **3,81 h activas/día**.
+`pilot-backup-cron` se conserva como ejecución corta:
+- cron diario;
+- sin Volume;
+- output primario en `/tmp`;
+- DB externa vía TLS;
+- copia durable cifrada al bucket;
+- proceso termina al finalizar.
 
-El valor de 3,81 h/día es un presupuesto, no un SLA. Si el uso real crece, debe recalcularse con métricas nuevas.
+El presupuesto residual conservador está en:
+`pilot/staging-free-budget-target.example.json`.
 
-## 4. Riesgo de memoria MySQL
+Con 0 Volumes, ~0,01 GB de bucket y un cron deliberadamente sobredimensionado a 0,25 GB / 0,1 vCPU durante 0,1 h/día, el modelo queda con margen > USD 0,90 respecto del crédito mensual Railway Free.
 
-Railway documenta un máximo Free de 0,5 GB RAM por servicio. En Trial, MySQL mostró:
+## 4. Compatibilidad y seguridad
 
-- promedio: ~0,462 GB;
-- pico observado: ~0,525 GB.
+### Same-origin
 
-Ese pico está cerca del límite y debe validarse después del redeploy Serverless. H1 no modifica parámetros internos de MySQL de manera especulativa.
+El backend sólo sirve la SPA cuando:
+`SERVE_FRONTEND_STATIC=true`.
 
-Regla:
+Por defecto continúa comportándose como API, por lo que Railway actual y una futura producción no cambian.
 
-1. medir memoria después del cambio;
-2. si MySQL presenta OOM/restarts o no cabe en Free, **no** desactivar controles ni reducir seguridad;
-3. tratar el ajuste de memoria o migración de staging como contingencia separada y reversible.
+Cuando sirve SPA:
+- assets y navegación React usan CSP específica;
+- API/health conservan CSP cerrada;
+- `connect-src 'self'`;
+- cookie, Origin y CORS siguen en el mismo origen HTTPS.
 
-## 5. Sleep-friendly
+### Object storage
 
-El backend usa Sequelize sin keepalive periódico configurado explícitamente. No existe un job de aplicación que consulte MySQL de forma continua.
+`UPLOAD_STORAGE_MODE=s3` es obligatorio para staging external-free.
 
-El frontend es Caddy estático y sólo proxyfica tráfico real a backend.
+El backend:
+- recibe el upload en memoria;
+- comprime imágenes como antes;
+- persiste en S3;
+- guarda sólo la clave interna en DB;
+- nunca expone `ruta_archivo`;
+- descarga luego de comprobar autorización;
+- borra objeto + registro mediante el flujo protegido.
 
-Esto hace razonable Serverless, pero la prueba real sleep/wake es obligatoria porque Railway detecta actividad por tráfico, no por intención de configuración.
+### DB TLS
 
-## 6. Backup y persistencia
+En `STAGING_TOPOLOGY=external-free`, preflight exige:
+- `DB_SSL=true`;
+- `DB_SSL_REJECT_UNAUTHORIZED=true`;
+- `SERVE_FRONTEND_STATIC=true`;
+- storage S3 configurado.
 
-H1 preserva P9.5:
+No se permite “resolver” una incompatibilidad deshabilitando validación TLS.
 
-- volumen MySQL `/var/lib/mysql`, único Volume permanente;
-- bucket privado para adjuntos;
-- bucket privado con copia de backup cifrada AES-256-GCM;
-- runner de backup sin Volume, usando `/tmp`;
-- backup lógico diario;
-- SHA-256;
-- segunda copia verificada;
-- restore drill separado.
+## 5. Migración segura
 
-Dormir un servicio no equivale a eliminar su volumen.
+Orden obligatorio:
 
-El bucket consume el mismo crédito Free. Si se consume USD 1 completo, Railway puede suspender acceso hasta el siguiente ciclo, por lo que H1 mantiene retención pequeña y dumps compactos.
+1. Gate H1 completamente verde.
+2. Crear TiDB Cloud Starter gratuito.
+3. Crear Render Free desde `render.yaml`, sin tarjeta.
+4. Configurar secretos únicamente en los dashboards.
+5. Generar backup final verificado de Railway.
+6. Restaurar el backup en TiDB.
+7. Aplicar/verificar migraciones 001–007.
+8. Comparar tablas/conteos y usuarios/oficinas piloto.
+9. Desplegar Render sobre el SHA H1 aprobado.
+10. Ejecutar health + smoke + auth/MFA + permisos.
+11. Probar adjunto real: alta, descarga y borrado.
+12. Probar backup desde TiDB hacia bucket y restore desde bucket sobre base alternativa.
+13. Verificar cold start/wake de Render y persistencia posterior.
+14. Recién entonces detener compute Railway antiguo.
+15. Eliminar `backend-data` y `pilot-backup-cron-volume` sólo después de confirmar que no contienen el único ejemplar de ningún dato.
+16. Conservar cero Volumes en Railway si MySQL ya fue migrado.
 
-## 7. Criterios de aceptación H1
+No se elimina MySQL Railway antes del paso 13.
 
-H1 se cierra sólo cuando:
+## 6. Rollback
 
-- modelo de presupuesto versionado y cubierto por tests;
-- Quality Gate verde;
-- Serverless aplicado realmente a frontend/backend/MySQL;
-- proyecto reducido a **un único Volume** (`mysql-data`);
-- adjuntos reales probados en bucket privado: alta, descarga y borrado con autorización preservada;
-- backup cron probado sin Volume y restore recuperado desde bucket cifrado;
-- los tres servicios alcanzan estado de sueño por inactividad;
-- un acceso real despierta el flujo frontend -> backend -> MySQL;
-- health/smoke posteriores al wake son verdes;
-- datos piloto persisten;
-- backup/cron y bucket continúan configurados;
-- memoria MySQL posterior al cambio queda observada y documentada;
-- costo proyectado queda <= USD 1/mes;
-- existe contingencia explícita si Railway Free deja de ser suficiente;
-- PR, merge y Gate post-merge verdes.
+Hasta el cutover:
+- Railway sigue siendo la referencia de staging.
 
-## 8. Contingencia sin costo
+Después del cutover y antes de eliminar el MySQL antiguo:
+- si Render/TiDB falla, volver el frontend al staging Railway y reactivar servicios previos;
+- no copiar cambios parciales hacia atrás sin una estrategia de consistencia;
+- si hubo escrituras en TiDB, congelar el staging y hacer backup antes de decidir retorno.
 
-Si Railway Free no permite continuidad suficiente, el orden es:
+Una vez retirado MySQL Railway:
+- recuperación parte del backup cifrado verificado del bucket hacia una DB alternativa.
 
-1. no contratar automáticamente un plan;
-2. conservar dumps + bucket cifrado y código en GitHub;
-3. detener staging antes de consumir crédito;
-4. evaluar un reemplazo gratuito compatible en un bloque propio;
-5. restaurar siempre desde backup verificado sobre una base alternativa antes del cutover.
+## 7. Criterios de cierre H1
 
-No se migra de MySQL ni se reescribe la aplicación sólo por anticipación.
+H1 sólo se cierra cuando:
 
-## 9. Evidencia de cierre
+- Quality Gate H1 verde;
+- baseline Railway queda explícitamente `OVER_BUDGET`;
+- topología external-free versionada;
+- TLS DB cubierto por contratos/tests;
+- SPA same-origin cubierta por contratos/tests;
+- TiDB Starter real creado sin plan pago;
+- backup Railway restaurado correctamente en TiDB;
+- migraciones y conteos validados;
+- Render Free real desplegado sobre SHA aprobado;
+- health/live + ready verdes;
+- login, MFA y permisos críticos verdes;
+- adjuntos S3: alta/descarga/borrado verdes;
+- backup cron opera sin Volume contra TiDB;
+- restore desde bucket cifrado PASS;
+- Render demuestra sleep/wake real;
+- datos piloto persisten tras wake;
+- Railway queda reducido al consumo residual compatible con USD 1;
+- no quedan más de los Volumes permitidos por Free;
+- costo de bolsillo confirmado en USD 0;
+- documentación/ROADMAP alineados;
+- PR mergeado y Gate post-merge verde.
 
-Esta sección se completa con:
+## 8. Stop conditions
 
-- deployment IDs que aplicaron Serverless;
-- estados SLEEPING observados;
-- evidencia de wake;
-- health/smoke;
-- métricas de memoria posteriores;
-- Gate/PR/merge definitivos.
+Detener H1 y no retirar Railway si:
+- TiDB no acepta alguna migración/regla de integridad requerida;
+- una FK/unique/transaction cambia de semántica;
+- TLS sólo funciona desactivando verificación;
+- Render Free supera memoria o presenta inestabilidad que invalida el staging;
+- auth/cookie/MFA falla por la nueva topología;
+- adjuntos dejan de respetar alcance por oficina/usuario;
+- backup/restore no puede demostrarse;
+- algún proveedor exige plan pago/tarjeta para completar el estado objetivo.
+
+En cualquiera de esos casos se conserva staging Railway mientras exista crédito y se evalúa otra alternativa gratuita en la misma rama o en un bloque explícito.
+
+## 9. Fuentes operativas verificadas
+
+Consultadas el 20/09/2026:
+- Railway Pricing / Plans / Volumes / Storage Buckets / Serverless;
+- Render Free / Blueprint Spec;
+- TiDB Cloud Starter plan, límites y TLS.
+
+Los límites de terceros pueden cambiar. H1 los trata como evidencia fechada, no como contrato permanente.
