@@ -233,6 +233,20 @@ Contiene:
 - guardas que impiden desplegar producción desde el gate;
 - criterios de cierre P9.6.
 
+### 15. H1 — Continuidad de staging a costo $0
+
+`H1_ZERO_COST_STAGING.md`
+
+Contiene:
+- baseline real de consumo Railway;
+- cálculo de costo continuo vs. crédito Free;
+- estrategia Serverless para frontend/backend/MySQL;
+- presupuesto reproducible de horas activas;
+- riesgos de memoria MySQL;
+- prueba obligatoria sleep/wake;
+- continuidad de backup/restore y bucket;
+- contingencia sin suscripción paga.
+
 ## Evidencia técnica
 
 La documentación anterior define el estado consolidado. La evidencia detallada de que un cambio fue implementado/validado vive en:
@@ -261,7 +275,8 @@ Para retomar el proyecto después de una pausa:
 11. Para P9.4/indicadores del piloto, leer `P9_4_PILOT_INDICATORS.md`, `PERFORMANCE.md` y `P9_1_INCIDENT_RESPONSE.md`.
 12. Para P9.5/backup periódico y recovery, leer `P9_5_PILOT_BACKUP_RECOVERY.md`, `OPERATIONS.md` y `RAILWAY_STAGING.md`.
 13. Para P9.6/gate de salida, leer `P9_6_EXIT_CRITERIA.md`, P9.1, P9.4, P9.5 y P8.
-14. Verificar el último Quality Gate antes de modificar/integrar.
+14. Para H1/continuidad gratuita de staging, leer `H1_ZERO_COST_STAGING.md`, `RAILWAY_STAGING.md` y P9.5.
+15. Verificar el último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
 

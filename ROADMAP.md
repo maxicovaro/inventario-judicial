@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 20/09/2026. **P9.6 — Criterios de salida del piloto** quedó integrado en `main` mediante PR #51 y Quality Gate post-merge #338 verde. Este commit registra su cierre formal. El sistema queda **técnicamente elegible para aprobación institucional**, pero la aprobación institucional permanece `PENDING` y producción no está autorizada ni desplegada.
+> Actualizada al 20/09/2026. P9.6 está formalmente cerrado. La aprobación institucional y cualquier planificación de producción se difieren para el final. **H1 — Continuidad de staging a costo $0** está activo en rama `ops/h1-zero-cost-staging`, abierto desde `main@892e21f142dc6af41898f39390ccfb248c132fe2` después de releer `ROADMAP.md` y `AGENTS.md`.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -38,6 +38,7 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | **P9.4 Indicadores reales del piloto** | ✅ **Completo** | PR #47; merge `d1aa207e...`; Gate #313/#314; captura real + staging `b6de2f78...` / `d95d1768...` SUCCESS |
 | **P9.5 Backup/restore periódico del piloto** | ✅ **Completo** | PR #49; merge `41cb640b...`; Gate #332/#333; backup real + bucket cifrado + restore PASS + cron diario |
 | **P9.6 Criterios de salida a producción institucional** | ✅ **Completo** | PR #51; merge `24089be4...`; Gate #337/#338; 34/34 PASS; técnicamente elegible; aprobación institucional PENDING |
+| **H1 Continuidad de staging a costo $0** | 🟡 **Activo — pivot external-free** | Railway Serverless no durmió MySQL; preparar Render Free + TiDB Starter + bucket/cron residual Railway |
 
 ---
 
@@ -683,6 +684,57 @@ Cierre formal:
 - producción: **no autorizada y no desplegada**.
 
 **P9.6 queda formalmente cerrado.** No se abre automáticamente un bloque de producción. El próximo paso depende de una aprobación institucional explícita con rol aprobador y referencia de decisión. Sólo después de esa aprobación corresponde definir, en una rama/bloque separado, la planificación protegida de producción.
+
+---
+
+## H — Hardening post-piloto sin producción
+
+### H1 — Continuidad de staging a costo $0 🟡 ACTIVO
+
+Objetivo:
+- conservar staging después del Trial sin suscripción paga ni tarjeta obligatoria;
+- costo de bolsillo **USD 0**;
+- preservar seguridad, integridad, backup/restore y evidencia P7–P9;
+- no tocar producción.
+
+Hallazgo real:
+- Railway 24x7 equivale a ~USD 6,1/mes frente a USD 1 de crédito Free;
+- Serverless fue aplicado a backend/frontend/MySQL;
+- tras >1 h no se observó ningún deployment SLEEPING;
+- MySQL continuó consumiendo ~0,387 GB de RAM;
+- la hipótesis Railway-only queda descartada como cierre H1;
+- Railway Free admite 1 Volume/proyecto y el Trial actual conserva 3.
+
+Topología objetivo:
+- **Render Free**: un único web service full-stack que sirve React + Express same-origin;
+- **TiDB Cloud Starter**: base MySQL-compatible gratuita con TLS verificable;
+- **Railway Storage Bucket**: adjuntos privados + backups cifrados;
+- **Railway cron residual**: backup diario corto, sin Volume, contra TiDB vía TLS;
+- Railway antiguo permanece intacto hasta que el reemplazo complete smoke, persistencia y recovery.
+
+Implementación versionada:
+- storage S3 abstracto para adjuntos;
+- backup/restore recuperable desde bucket cifrado;
+- TLS opcional para Sequelize, mysql2 y CLI;
+- SPA same-origin opt-in;
+- `render.yaml` plan Free y deploy tras CI verde;
+- preflight específico `STAGING_TOPOLOGY=external-free`;
+- modelo económico con baseline `OVER_BUDGET` y target residual `PASS`;
+- documento `docs/H1_ZERO_COST_STAGING.md`.
+
+Pendiente para cierre:
+- Gate de implementación verde;
+- crear TiDB Starter y Render Free reales;
+- backup/restauración/migraciones/conteos sobre TiDB;
+- deploy SHA aprobado en Render;
+- health, auth/MFA/permisos y adjuntos verdes;
+- backup cron sin Volume y restore desde bucket PASS;
+- sleep/wake de Render y persistencia demostrados;
+- retirar compute/Volumes Railway antiguos sólo después de todo lo anterior;
+- confirmar costo de bolsillo USD 0;
+- PR/merge/Gate post-merge.
+
+Producción y aprobación institucional quedan fuera de H1.
 
 ---
 

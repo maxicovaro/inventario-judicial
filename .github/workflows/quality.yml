@@ -231,6 +231,63 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      - name: Run H1 zero-cost staging budget
+        run: |
+          rm -rf staging-free-results
+          mkdir -p staging-free-results
+
+          set +e
+          npm run staging:free:budget -- \
+            --evidence pilot/staging-free-budget.example.json \
+            --output staging-free-results/railway-current.json
+          current_status=$?
+          set -e
+          if [ "$current_status" -ne 2 ]; then
+            echo "El baseline Railway actual debe resultar OVER_BUDGET (exit 2), obtuvo $current_status"
+            exit 1
+          fi
+
+          npm run staging:free:budget -- \
+            --evidence pilot/staging-free-budget-target.example.json \
+            --output staging-free-results/railway-residual-target.json
+
+          node - <<'NODE'
+          const fs = require("fs");
+          const current = JSON.parse(
+            fs.readFileSync("staging-free-results/railway-current.json", "utf8"),
+          );
+          const target = JSON.parse(
+            fs.readFileSync("staging-free-results/railway-residual-target.json", "utf8"),
+          );
+          if (
+            current.schema_version !== 1 ||
+            current.environment !== "staging" ||
+            current.status !== "OVER_BUDGET" ||
+            !(current.totals.continuous_monthly_usd > 5)
+          ) {
+            throw new Error("Baseline Railway H1 no refleja el sobrepresupuesto real");
+          }
+          if (
+            target.schema_version !== 1 ||
+            target.environment !== "staging" ||
+            target.status !== "PASS" ||
+            !(target.totals.projected_monthly_usd < 1) ||
+            !(target.totals.projected_headroom_usd > 0.9)
+          ) {
+            throw new Error("Target residual H1 no cabe con margen en Railway Free");
+          }
+          console.log("✓ H1: Railway continuo queda bloqueado y el residuo objetivo cabe en Free.");
+          NODE
+
+      - name: Upload H1 zero-cost budget artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h1-zero-cost-staging-budget
+          path: staging-free-results/
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Run P8.0 API baseline
         run: |
           npm run perf:fixtures

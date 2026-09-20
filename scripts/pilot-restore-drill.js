@@ -1,12 +1,18 @@
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const mysql = require("mysql2/promise");
 const {
   databaseConfig,
+  mysql2SslOptions,
   validateDatabaseName,
   verifyBackupFile,
 } = require("./db-cli-utils");
+const {
+  downloadLatestEncryptedBackup,
+  s3Configured,
+} = require("./pilot-backup-s3");
 
 require("dotenv").config();
 
@@ -47,13 +53,15 @@ const safeTargetName = () => {
   return validateDatabaseName(`inventario_restore_drill_${suffix}`);
 };
 
-const resolveBackup = () => {
+const resolveBackup = async () => {
   const explicitBackup = argValue("--backup");
   if (explicitBackup) {
     return {
       backupPath: path.resolve(explicitBackup),
       manifest: null,
       manifestPath: null,
+      source: "explicit",
+      cleanupDirectory: null,
     };
   }
 
@@ -61,24 +69,49 @@ const resolveBackup = () => {
     argValue("--manifest") ||
     process.env.PILOT_BACKUP_MANIFEST ||
     (runtimeEnvironment() === "staging"
-      ? "/data/backups/pilot-daily/latest.json"
+      ? "/tmp/pilot-backups/daily/latest.json"
       : "pilot-backup-results/latest.json");
 
   const manifestPath = path.resolve(manifestArg);
-  if (!fs.existsSync(manifestPath)) {
-    throw new Error(`No existe el manifiesto de backup: ${manifestPath}`);
+  if (fs.existsSync(manifestPath)) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    if (!manifest.backup_path) {
+      throw new Error("El manifiesto no contiene backup_path");
+    }
+
+    return {
+      backupPath: path.resolve(path.dirname(manifestPath), manifest.backup_path),
+      manifest,
+      manifestPath,
+      source: "manifest",
+      cleanupDirectory: null,
+    };
   }
 
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  if (!manifest.backup_path) {
-    throw new Error("El manifiesto no contiene backup_path");
+  if (!s3Configured()) {
+    throw new Error(
+      `No existe el manifiesto local (${manifestPath}) y no hay bucket P9.5 configurado`,
+    );
   }
 
-  return {
-    backupPath: path.resolve(path.dirname(manifestPath), manifest.backup_path),
-    manifest,
-    manifestPath,
-  };
+  const cleanupDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "inventario-restore-source-"),
+  );
+  try {
+    const recovered = await downloadLatestEncryptedBackup({
+      outputDirectory: cleanupDirectory,
+    });
+    return {
+      backupPath: recovered.backupPath,
+      manifest: null,
+      manifestPath: null,
+      source: "encrypted-bucket",
+      cleanupDirectory,
+    };
+  } catch (error) {
+    fs.rmSync(cleanupDirectory, { recursive: true, force: true });
+    throw error;
+  }
 };
 
 const runRestore = (backupPath, target) => {
@@ -112,12 +145,25 @@ const runRestore = (backupPath, target) => {
   }
 };
 
-const connectionConfig = (source, target) => ({
-  host: process.env.RESTORE_DB_HOST || source.host,
-  port: Number(process.env.RESTORE_DB_PORT || source.port),
-  user: process.env.RESTORE_DB_USER || source.user,
-  password: process.env.RESTORE_DB_PASSWORD || source.password,
-  database: target,
+const restoreDatabaseConfig = (source, target) =>
+  databaseConfig("RESTORE_DB", {
+    host: source.host,
+    port: source.port,
+    name: target,
+    user: source.user,
+    password: source.password,
+    ssl: source.ssl,
+    sslRejectUnauthorized: source.sslRejectUnauthorized,
+    sslCaPath: source.sslCaPath,
+  });
+
+const connectionConfig = (config, includeDatabase = true) => ({
+  host: config.host,
+  port: config.port,
+  user: config.user,
+  password: config.password,
+  ...(includeDatabase ? { database: config.name } : {}),
+  ...(config.ssl ? { ssl: mysql2SslOptions(config) } : {}),
 });
 
 const quoteIdentifier = (value) => `\`${String(value).replace(/\`/g, "\`\`")}\``;
@@ -156,11 +202,12 @@ const writeReport = (reportPath, report) => {
 const main = async () => {
   const environment = ensureAllowedEnvironment();
   const source = databaseConfig();
-  const resolved = resolveBackup();
+  const resolved = await resolveBackup();
   const verified = verifyBackupFile(resolved.backupPath);
   const sourceSnapshot =
     verified.metadata.source_snapshot || resolved.manifest?.source_snapshot || null;
   const target = safeTargetName();
+  const restoreConfig = restoreDatabaseConfig(source, target);
 
   if (
     !sourceSnapshot ||
@@ -212,6 +259,7 @@ const main = async () => {
   let exactTableCountsMatch = false;
   let validationFinishedAt = null;
   let cleanupOk = false;
+  let sourceCleanupOk = resolved.cleanupDirectory ? false : true;
 
   try {
     failureStage = "restore";
@@ -219,7 +267,7 @@ const main = async () => {
 
     failureStage = "validation";
     targetConnection = await mysql.createConnection(
-      connectionConfig(source, target),
+      connectionConfig(restoreConfig),
     );
 
     const targetTables = await listTables(targetConnection, target);
@@ -253,12 +301,9 @@ const main = async () => {
     } catch {}
     try {
       failureStage = failure ? failureStage : "cleanup";
-      adminConnection = await mysql.createConnection({
-        host: process.env.RESTORE_DB_HOST || source.host,
-        port: Number(process.env.RESTORE_DB_PORT || source.port),
-        user: process.env.RESTORE_DB_USER || source.user,
-        password: process.env.RESTORE_DB_PASSWORD || source.password,
-      });
+      adminConnection = await mysql.createConnection(
+        connectionConfig(restoreConfig, false),
+      );
       await adminConnection.query(
         `DROP DATABASE IF EXISTS ${quoteIdentifier(target)}`,
       );
@@ -273,6 +318,21 @@ const main = async () => {
         if (adminConnection) await adminConnection.end();
       } catch {}
     }
+
+    if (resolved.cleanupDirectory) {
+      try {
+        fs.rmSync(resolved.cleanupDirectory, {
+          recursive: true,
+          force: true,
+        });
+        sourceCleanupOk = true;
+      } catch (error) {
+        if (!failure) {
+          failure = error;
+          failureStage = "source_cleanup";
+        }
+      }
+    }
   }
 
   const finishedAt = new Date();
@@ -282,7 +342,8 @@ const main = async () => {
 
   const rpoMet = rpoHours <= rpoTargetHours;
   const rtoMet = rtoMinutes <= rtoTargetMinutes;
-  const success = !failure && cleanupOk && rpoMet && rtoMet;
+  const success =
+    !failure && cleanupOk && sourceCleanupOk && rpoMet && rtoMet;
 
   const report = {
     schema_version: 1,
@@ -294,6 +355,7 @@ const main = async () => {
     backup_created_at: backupCreatedAt.toISOString(),
     backup_file: path.basename(verified.backupPath),
     backup_sha256: verified.sha256,
+    backup_source: resolved.source,
     restored_database: target,
     source_database: source.name,
     validation: {
@@ -301,6 +363,7 @@ const main = async () => {
       row_count: rowCount,
       exact_table_counts_match: exactTableCountsMatch,
       target_cleanup_ok: cleanupOk,
+      source_cleanup_ok: sourceCleanupOk,
     },
     objectives: {
       rpo_target_hours: rpoTargetHours,
@@ -324,7 +387,9 @@ const main = async () => {
       rto_actual_minutes: report.objectives.rto_actual_minutes,
       table_count: report.validation.table_count,
       row_count: report.validation.row_count,
+      backup_source: report.backup_source,
       target_cleanup_ok: report.validation.target_cleanup_ok,
+      source_cleanup_ok: report.validation.source_cleanup_ok,
     }),
   );
 

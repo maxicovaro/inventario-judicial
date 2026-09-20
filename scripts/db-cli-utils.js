@@ -13,13 +13,53 @@ const required = (name, fallback) => {
   return String(value).trim();
 };
 
+const boolValue = (value, fallback = false) => {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return Boolean(fallback);
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "si"].includes(normalized)) return true;
+  if (["0", "false", "no"].includes(normalized)) return false;
+  throw new Error("La configuración TLS de MySQL debe ser true o false");
+};
+
 const databaseConfig = (prefix = "DB", fallback = {}) => ({
   host: required(`${prefix}_HOST`, fallback.host),
   port: Number(required(`${prefix}_PORT`, fallback.port || 3306)),
   name: required(`${prefix}_NAME`, fallback.name),
   user: required(`${prefix}_USER`, fallback.user),
   password: required(`${prefix}_PASSWORD`, fallback.password),
+  ssl: boolValue(process.env[`${prefix}_SSL`], fallback.ssl),
+  sslRejectUnauthorized: boolValue(
+    process.env[`${prefix}_SSL_REJECT_UNAUTHORIZED`],
+    fallback.sslRejectUnauthorized ?? true,
+  ),
+  sslCaPath: String(
+    process.env[`${prefix}_SSL_CA_PATH`] ?? fallback.sslCaPath ?? "",
+  ).trim(),
 });
+
+const mysqlCliTlsArgs = (config) => {
+  if (!config.ssl) return [];
+  const args = [
+    config.sslRejectUnauthorized
+      ? "--ssl-mode=VERIFY_IDENTITY"
+      : "--ssl-mode=REQUIRED",
+  ];
+  if (config.sslCaPath) args.push(`--ssl-ca=${config.sslCaPath}`);
+  return args;
+};
+
+const mysql2SslOptions = (config) => {
+  if (!config.ssl) return undefined;
+  return {
+    minVersion: "TLSv1.2",
+    rejectUnauthorized: config.sslRejectUnauthorized,
+    ...(config.sslCaPath
+      ? { ca: fs.readFileSync(config.sslCaPath) }
+      : {}),
+  };
+};
 
 const validateDatabaseName = (name) => {
   if (!/^[A-Za-z0-9_]+$/.test(name)) {
@@ -110,6 +150,8 @@ module.exports = {
   databaseConfig,
   metadataPathFor,
   mysqlEnvironment,
+  mysqlCliTlsArgs,
+  mysql2SslOptions,
   run,
   sha256File,
   validateDatabaseName,

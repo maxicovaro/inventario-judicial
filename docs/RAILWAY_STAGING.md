@@ -504,6 +504,36 @@ El proyecto no define un `migrate:down` genérico. No inventar reversión manual
 
 Seguir `docs/OPERATIONS.md`.
 
+## H1 — Modo Serverless de staging gratuito
+
+Desde H1, staging usa Serverless para reducir el costo de los tres servicios permanentes:
+
+- `frontend`: Serverless habilitado;
+- `backend`: Serverless habilitado;
+- `mysql`: Serverless habilitado;
+- `pilot-backup-cron`: permanece como cron puntual, no como servicio 24/7.
+
+Además, Railway Free permite **un solo Volume por proyecto**. La topología objetivo H1 conserva únicamente `mysql-data` y migra:
+- adjuntos del backend al **bucket privado** `pilot-backup-bucket` bajo prefijo `uploads/staging/`;
+- backups diarios a filesystem efímero `/tmp`, con persistencia durable únicamente en la copia cifrada y verificada del bucket.
+
+Los detalles históricos de P7 sobre `backend-data` y `/data/uploads` describen el staging original; no son la topología efectiva objetivo de H1.
+
+Motivo: con las métricas reales de 7 días, el costo continuo estimado ronda USD 6,11/mes y no cabe en el crédito Free de USD 1/mes. El presupuesto H1 proyecta ~USD 0,41/mes con 1,5 h activas/día.
+
+Consideraciones operativas:
+
+- Railway normalmente duerme un servicio tras 5–10 minutos sin tráfico saliente;
+- el primer request puede experimentar cold start y, según Railway, eventualmente un 502 inicial;
+- en staging se permite reintentar el primer acceso;
+- el volumen MySQL no se elimina al dormir el contenedor;
+- la red privada sigue siendo obligatoria;
+- no agregar monitores externos que consulten health en intervalos cortos, porque impedirían el sueño;
+- antes de una sesión de prueba crítica, abrir staging y esperar a que frontend/backend/MySQL queden listos;
+- después de la sesión no mantener tráfico sintético de uptime.
+
+Evidencia y presupuesto: `docs/H1_ZERO_COST_STAGING.md`.
+
 ## Criterio de cierre P7.2
 
 Completado técnicamente:

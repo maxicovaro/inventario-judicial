@@ -67,8 +67,12 @@ const validateDeployment = (input = process.env) => {
     errors.push("NODE_ENV debe ser production en staging y production");
   }
 
-  if (!text(input.DEPLOY_REVISION)) {
-    errors.push("Falta DEPLOY_REVISION con el commit o versión a desplegar");
+  const deployRevision =
+    text(input.DEPLOY_REVISION) || text(input.RENDER_GIT_COMMIT);
+  if (!deployRevision) {
+    errors.push(
+      "Falta DEPLOY_REVISION o RENDER_GIT_COMMIT con el commit o versión a desplegar",
+    );
   }
 
   if (text(input.AUTH_TOKEN_TRANSPORT).toLowerCase() !== "cookie") {
@@ -87,7 +91,14 @@ const validateDeployment = (input = process.env) => {
     errors.push("MFA_ENCRYPTION_KEY debe ser Base64 de exactamente 32 bytes");
   }
 
-  parseHttpsOrigin("CORS_ORIGIN", input.CORS_ORIGIN, errors);
+  const serveFrontendStatic = parseBoolean(input.SERVE_FRONTEND_STATIC) === true;
+  const renderHostname = text(input.RENDER_EXTERNAL_HOSTNAME);
+  const corsOrigin =
+    text(input.CORS_ORIGIN) ||
+    (deployEnv === "staging" && serveFrontendStatic && renderHostname
+      ? `https://${renderHostname}`
+      : "");
+  parseHttpsOrigin("CORS_ORIGIN", corsOrigin, errors);
 
   const trustProxyHops = parseNonNegativeInteger(input.TRUST_PROXY_HOPS);
   if (trustProxyHops === null) {
@@ -105,6 +116,52 @@ const validateDeployment = (input = process.env) => {
   }
 
   if (deployEnv === "staging") {
+    const stagingTopology = text(input.STAGING_TOPOLOGY).toLowerCase();
+    if (stagingTopology === "external-free") {
+      if (parseBoolean(input.DB_SSL) !== true) {
+        errors.push("DB_SSL debe ser true en staging external-free");
+      }
+      if (parseBoolean(input.DB_SSL_REJECT_UNAUTHORIZED) !== true) {
+        errors.push(
+          "DB_SSL_REJECT_UNAUTHORIZED debe ser true en staging external-free",
+        );
+      }
+      if (serveFrontendStatic !== true) {
+        errors.push(
+          "SERVE_FRONTEND_STATIC debe ser true en staging external-free para mantener same-origin",
+        );
+      }
+    }
+
+    if (text(input.UPLOAD_STORAGE_MODE).toLowerCase() !== "s3") {
+      errors.push(
+        "UPLOAD_STORAGE_MODE debe ser s3 en staging H1 para no depender de un segundo Volume",
+      );
+    }
+
+    const requiredUploadS3 = [
+      "UPLOAD_S3_ENDPOINT",
+      "UPLOAD_S3_BUCKET",
+      "UPLOAD_S3_REGION",
+      "UPLOAD_S3_ACCESS_KEY_ID",
+      "UPLOAD_S3_SECRET_ACCESS_KEY",
+    ];
+    for (const name of requiredUploadS3) {
+      if (!text(input[name])) errors.push(`Falta ${name} para storage S3 de staging`);
+    }
+
+    const uploadEndpoint = text(input.UPLOAD_S3_ENDPOINT);
+    if (uploadEndpoint) {
+      try {
+        const url = new URL(uploadEndpoint);
+        if (url.protocol !== "https:" || url.pathname !== "/" || url.search || url.hash) {
+          errors.push("UPLOAD_S3_ENDPOINT debe ser un endpoint HTTPS sin path/query");
+        }
+      } catch {
+        errors.push("UPLOAD_S3_ENDPOINT debe ser una URL HTTPS válida");
+      }
+    }
+
     const productionDbName = text(input.PRODUCTION_DB_NAME);
     if (!productionDbName) {
       errors.push("PRODUCTION_DB_NAME es obligatorio en staging como guarda de separación");
@@ -119,11 +176,15 @@ const validateDeployment = (input = process.env) => {
     summary: {
       deploy_env: deployEnv || null,
       node_env: text(input.NODE_ENV) || null,
-      revision: text(input.DEPLOY_REVISION) || null,
+      revision: deployRevision || null,
       auth_transport: text(input.AUTH_TOKEN_TRANSPORT) || null,
       admin_mfa: parseBoolean(input.REQUIRE_ADMIN_MFA),
       trust_proxy_hops: trustProxyHops,
       db_name: text(input.DB_NAME) || null,
+      upload_storage_mode: text(input.UPLOAD_STORAGE_MODE).toLowerCase() || null,
+      staging_topology: text(input.STAGING_TOPOLOGY).toLowerCase() || null,
+      db_ssl: parseBoolean(input.DB_SSL),
+      serve_frontend_static: serveFrontendStatic,
     },
   };
 };

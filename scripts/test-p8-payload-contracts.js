@@ -25,7 +25,10 @@ assert.match(catalogo, /numero_serie/);
 
 assert.match(adjuntosController, /attributes:\s*\{\s*exclude:\s*\["ruta_archivo"\]/);
 assert.match(adjuntosController, /delete adjuntoPublico\.ruta_archivo/);
-assert.match(adjuntosController, /res\.download\(filePath, adjunto\.nombre_archivo\)/);
+assert.match(adjuntosController, /readUpload\(adjunto\.ruta_archivo\)/);
+assert.match(adjuntosController, /res\.attachment\(adjunto\.nombre_archivo\)/);
+assert.match(adjuntosController, /res\.type\(adjunto\.tipo_archivo/);
+assert.match(adjuntosController, /return res\.send\(contenido\)/);
 
 assert.match(uploadMiddleware, /fileSize:\s*10\s*\*\s*1024\s*\*\s*1024/);
 assert.match(uploadMiddleware, /application\/pdf/);

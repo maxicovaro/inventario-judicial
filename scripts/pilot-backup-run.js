@@ -5,6 +5,7 @@ const mysql = require("mysql2/promise");
 const {
   databaseConfig,
   metadataPathFor,
+  mysql2SslOptions,
   verifyBackupFile,
 } = require("./db-cli-utils");
 const {
@@ -129,6 +130,7 @@ const captureDatabaseShape = async () => {
     user: config.user,
     password: config.password,
     database: config.name,
+    ...(config.ssl ? { ssl: mysql2SslOptions(config) } : {}),
   });
 
   try {
@@ -175,7 +177,7 @@ const main = async () => {
   const startedAt = new Date();
   const defaultOutput =
     environment === "staging"
-      ? "/data/backups/pilot-daily"
+      ? "/tmp/pilot-backups/daily"
       : "pilot-backup-results/daily";
 
   const outputDirectory = path.resolve(
