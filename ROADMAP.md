@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 20/09/2026. **P9.5 — Backup y recuperación durante el piloto** está formalmente cerrado. **P9.6 — Criterios de salida del piloto** está activo en rama `ops/p9-6-pilot-exit-gate`, abierto después de releer `ROADMAP.md` y `AGENTS.md` desde `main@4a0dcc1de6941e3cd4507a107a00a93e34920983`.
+> Actualizada al 20/09/2026. **P9.6 — Criterios de salida del piloto** quedó integrado en `main` mediante PR #51 y Quality Gate post-merge #338 verde. Este commit registra su cierre formal. El sistema queda **técnicamente elegible para aprobación institucional**, pero la aprobación institucional permanece `PENDING` y producción no está autorizada ni desplegada.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -37,7 +37,7 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | **P9.3 Procedimiento operativo de administración** | ✅ **Completo** | PR #44; Gate #304; merge `1ec716b8...`; Gate post-merge #305; staging validado |
 | **P9.4 Indicadores reales del piloto** | ✅ **Completo** | PR #47; merge `d1aa207e...`; Gate #313/#314; captura real + staging `b6de2f78...` / `d95d1768...` SUCCESS |
 | **P9.5 Backup/restore periódico del piloto** | ✅ **Completo** | PR #49; merge `41cb640b...`; Gate #332/#333; backup real + bucket cifrado + restore PASS + cron diario |
-| **P9.6 Criterios de salida a producción institucional** | 🟠 **Cierre pre-merge** | Gate #336 verde; evaluación real 34/34 PASS; técnicamente elegible; aprobación institucional PENDING |
+| **P9.6 Criterios de salida a producción institucional** | ✅ **Completo** | PR #51; merge `24089be4...`; Gate #337/#338; 34/34 PASS; técnicamente elegible; aprobación institucional PENDING |
 
 ---
 
@@ -617,7 +617,7 @@ Cierre formal:
 
 **P9.5 queda formalmente cerrado. P9.6 pasa a ser elegible, no abierto.** Antes de abrir P9.6 se debe releer este `ROADMAP.md` desde `main`.
 
-### P9.6 — Criterios de salida del piloto 🟠 CIERRE PRE-MERGE
+### P9.6 — Criterios de salida del piloto ✅ CERRADO
 
 Objetivo:
 - consolidar evidencia P8/P9 en un gate técnico reproducible;
@@ -672,13 +672,17 @@ Evidencia real al 20/09/2026:
 - aprobación institucional: `PENDING`;
 - producción no desplegada.
 
-Pendiente exclusivamente para cierre formal:
-- Quality Gate del commit documental final;
-- merge PR #51;
-- Quality Gate post-merge;
-- registrar cierre desde `main`.
+Cierre formal:
+- Quality Gate final pre-merge #337 ✅;
+- PR #51 mergeado por squash ✅;
+- merge `24089be4b7f019288f00f450d1952522080cbc0a` ✅;
+- Quality Gate post-merge #338 sobre ese SHA ✅;
+- evaluación real P9.6: 34/34 criterios técnicos PASS ✅;
+- decisión técnica: `ELIGIBLE_FOR_INSTITUTIONAL_APPROVAL`;
+- aprobación institucional: `PENDING`;
+- producción: **no autorizada y no desplegada**.
 
-Una aprobación institucional posterior debe incluir rol aprobador y referencia de decisión. Sin ella no se abre despliegue a producción.
+**P9.6 queda formalmente cerrado.** No se abre automáticamente un bloque de producción. El próximo paso depende de una aprobación institucional explícita con rol aprobador y referencia de decisión. Sólo después de esa aprobación corresponde definir, en una rama/bloque separado, la planificación protegida de producción.
 
 ---
 

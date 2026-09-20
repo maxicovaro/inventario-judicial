@@ -2,7 +2,7 @@
 
 ## Estado y propósito
 
-P9.6 está en **cierre técnico pre-merge**. Se abrió desde main@4a0dcc1de6941e3cd4507a107a00a93e34920983 después del cierre formal de P9.5 y de releer ROADMAP.md y AGENTS.md. La implementación, Quality Gate y evaluación real ya están completas; resta integrar el PR y obtener el Gate post-merge.
+P9.6 está **formalmente cerrado**. Se abrió desde main@4a0dcc1de6941e3cd4507a107a00a93e34920983 después del cierre formal de P9.5 y de releer ROADMAP.md y AGENTS.md. La implementación, evaluación real, merge y Quality Gate post-merge quedaron completos.
 
 El objetivo es convertir la evidencia acumulada de P8 y P9 en un gate de salida explícito, reproducible y auditable antes de considerar producción institucional.
 
@@ -353,3 +353,28 @@ No existe en este bloque una aprobación institucional formal con rol + referenc
 
 Esta evaluación aplica los mismos criterios versionados por scripts/pilot-exit-gate.js. El comportamiento ejecutable del evaluador y sus casos negativos quedaron validados por Quality Gate #336.
 
+
+
+---
+
+## 12. Cierre formal P9.6
+
+Cierre registrado el 20/09/2026.
+
+Evidencia definitiva:
+- PR #51 integrado;
+- merge squash `24089be4b7f019288f00f450d1952522080cbc0a`;
+- Quality Gate final pre-merge #337 verde;
+- Quality Gate post-merge #338 verde;
+- evaluación real: 34/34 criterios técnicos PASS;
+- estabilidad 6/6;
+- seguridad 4/4;
+- integridad 8/8;
+- adopción 4/4;
+- capacidad operativa 7/7;
+- rendimiento 5/5;
+- decisión técnica: `ELIGIBLE_FOR_INSTITUTIONAL_APPROVAL`;
+- aprobación institucional: `PENDING`;
+- producción no autorizada, no migrada y no desplegada por P9.6.
+
+La finalización técnica del piloto no reemplaza la decisión institucional. Una aprobación posterior debe aportar rol aprobador y referencia de decisión. Sólo entonces puede abrirse un bloque separado de planificación protegida de producción, con su propio preflight, backup, rollback, pruebas y Gate.
