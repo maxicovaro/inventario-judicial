@@ -80,7 +80,8 @@
     "test:p9-exit-gate-contracts": "node scripts/test-p9-exit-gate-contracts.js",
     "staging:free:budget": "node scripts/staging-free-budget.js",
     "test:h1-zero-cost-staging-contracts": "node scripts/test-h1-zero-cost-staging-contracts.js",
-    "staging:upload-storage:smoke": "node scripts/staging-upload-storage-smoke.js"
+    "staging:upload-storage:smoke": "node scripts/staging-upload-storage-smoke.js",
+    "staging:external-free:start": "node scripts/staging-external-free-start.js"
   },
   "keywords": [],
   "author": "",
