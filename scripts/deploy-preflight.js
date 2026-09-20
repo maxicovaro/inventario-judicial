@@ -67,8 +67,12 @@ const validateDeployment = (input = process.env) => {
     errors.push("NODE_ENV debe ser production en staging y production");
   }
 
-  if (!text(input.DEPLOY_REVISION)) {
-    errors.push("Falta DEPLOY_REVISION con el commit o versión a desplegar");
+  const deployRevision =
+    text(input.DEPLOY_REVISION) || text(input.RENDER_GIT_COMMIT);
+  if (!deployRevision) {
+    errors.push(
+      "Falta DEPLOY_REVISION o RENDER_GIT_COMMIT con el commit o versión a desplegar",
+    );
   }
 
   if (text(input.AUTH_TOKEN_TRANSPORT).toLowerCase() !== "cookie") {
@@ -87,7 +91,14 @@ const validateDeployment = (input = process.env) => {
     errors.push("MFA_ENCRYPTION_KEY debe ser Base64 de exactamente 32 bytes");
   }
 
-  parseHttpsOrigin("CORS_ORIGIN", input.CORS_ORIGIN, errors);
+  const serveFrontendStatic = parseBoolean(input.SERVE_FRONTEND_STATIC) === true;
+  const renderHostname = text(input.RENDER_EXTERNAL_HOSTNAME);
+  const corsOrigin =
+    text(input.CORS_ORIGIN) ||
+    (deployEnv === "staging" && serveFrontendStatic && renderHostname
+      ? `https://${renderHostname}`
+      : "");
+  parseHttpsOrigin("CORS_ORIGIN", corsOrigin, errors);
 
   const trustProxyHops = parseNonNegativeInteger(input.TRUST_PROXY_HOPS);
   if (trustProxyHops === null) {
@@ -148,7 +159,7 @@ const validateDeployment = (input = process.env) => {
     summary: {
       deploy_env: deployEnv || null,
       node_env: text(input.NODE_ENV) || null,
-      revision: text(input.DEPLOY_REVISION) || null,
+      revision: deployRevision || null,
       auth_transport: text(input.AUTH_TOKEN_TRANSPORT) || null,
       admin_mfa: parseBoolean(input.REQUIRE_ADMIN_MFA),
       trust_proxy_hops: trustProxyHops,
