@@ -152,6 +152,8 @@ H1 debe poder restaurar un backup verificado aunque la estación local no tenga 
 
 El fallback no envía el dump completo como una consulta multi-statement. Parsea el formato real de `mysqldump`, elimina comentarios de control y locks, conserva correctamente comillas/escapes y ejecuta sólo sentencias permitidas (`DROP TABLE`, `CREATE TABLE`, `INSERT`) una por una. Cualquier sentencia inesperada bloquea el restore antes de continuar. El Quality Gate fuerza además el escenario `mysql` ausente contra una base MySQL descartable para evitar regresiones.
 
+Evidencia de causa raíz H1: el Quality Gate #393 reprodujo contra MySQL 8.4 el mismo error observado al restaurar en TiDB (`;` vacíos antes de `DROP TABLE IF EXISTS`). El fallo correspondía al primer fallback mysql2 y no a TiDB. El parser corregido queda sujeto al mismo test de restore descartable antes de repetir la validación real.
+
 ### DB TLS
 
 En `STAGING_TOPOLOGY=external-free`, preflight exige:
