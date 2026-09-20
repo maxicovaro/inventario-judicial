@@ -33,6 +33,55 @@ const encryptionKeyFromBase64 = (value) => {
   return key;
 };
 
+const configFromEnvironment = () => {
+  const endpoint = new URL(required("PILOT_BACKUP_S3_ENDPOINT"));
+  if (!["https:", "http:"].includes(endpoint.protocol)) {
+    throw new Error("PILOT_BACKUP_S3_ENDPOINT debe usar http/https");
+  }
+  if (endpoint.pathname && endpoint.pathname !== "/") {
+    throw new Error(
+      "PILOT_BACKUP_S3_ENDPOINT no debe incluir un path; usar sólo el endpoint base",
+    );
+  }
+
+  return {
+    endpoint,
+    bucket: required("PILOT_BACKUP_S3_BUCKET"),
+    region: required("PILOT_BACKUP_S3_REGION"),
+    accessKeyId: required("PILOT_BACKUP_S3_ACCESS_KEY_ID"),
+    secretAccessKey: required("PILOT_BACKUP_S3_SECRET_ACCESS_KEY"),
+    forcePathStyle: boolEnv("PILOT_BACKUP_S3_FORCE_PATH_STYLE"),
+    prefix: String(process.env.PILOT_BACKUP_S3_PREFIX || "p9-5/staging")
+      .trim()
+      .replace(/^\/+|\/+$/g, ""),
+    keep: Number(process.env.PILOT_BACKUP_S3_KEEP || 7),
+    encryptionKey: encryptionKeyFromBase64(
+      required("PILOT_BACKUP_ENCRYPTION_KEY"),
+    ),
+  };
+};
+
+const s3Configured = () => {
+  const names = [
+    "PILOT_BACKUP_S3_ENDPOINT",
+    "PILOT_BACKUP_S3_BUCKET",
+    "PILOT_BACKUP_S3_REGION",
+    "PILOT_BACKUP_S3_ACCESS_KEY_ID",
+    "PILOT_BACKUP_S3_SECRET_ACCESS_KEY",
+    "PILOT_BACKUP_ENCRYPTION_KEY",
+  ];
+  const present = names.filter(
+    (name) => String(process.env[name] || "").trim() !== "",
+  );
+  if (present.length > 0 && present.length !== names.length) {
+    const missing = names.filter((name) => !present.includes(name));
+    throw new Error(
+      `Configuración S3 P9.5 incompleta; faltan: ${missing.join(", ")}`,
+    );
+  }
+  return present.length === names.length;
+};
+
 const encryptBuffer = (plaintext, key) => {
   if (!Buffer.isBuffer(plaintext)) {
     throw new TypeError("encryptBuffer requiere un Buffer");
