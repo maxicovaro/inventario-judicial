@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 20/09/2026. **P9.6 — Criterios de salida del piloto** quedó integrado en `main` mediante PR #51 y Quality Gate post-merge #338 verde. Este commit registra su cierre formal. El sistema queda **técnicamente elegible para aprobación institucional**, pero la aprobación institucional permanece `PENDING` y producción no está autorizada ni desplegada.
+> Actualizada al 20/09/2026. P9.6 está formalmente cerrado. La aprobación institucional y cualquier planificación de producción se difieren para el final. **H1 — Continuidad de staging a costo $0** está activo en rama `ops/h1-zero-cost-staging`, abierto desde `main@892e21f142dc6af41898f39390ccfb248c132fe2` después de releer `ROADMAP.md` y `AGENTS.md`.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -38,6 +38,7 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | **P9.4 Indicadores reales del piloto** | ✅ **Completo** | PR #47; merge `d1aa207e...`; Gate #313/#314; captura real + staging `b6de2f78...` / `d95d1768...` SUCCESS |
 | **P9.5 Backup/restore periódico del piloto** | ✅ **Completo** | PR #49; merge `41cb640b...`; Gate #332/#333; backup real + bucket cifrado + restore PASS + cron diario |
 | **P9.6 Criterios de salida a producción institucional** | ✅ **Completo** | PR #51; merge `24089be4...`; Gate #337/#338; 34/34 PASS; técnicamente elegible; aprobación institucional PENDING |
+| **H1 Continuidad de staging a costo $0** | 🟡 **Activo** | Railway Free + Serverless; presupuesto <= USD 1/mes; sin tocar producción |
 
 ---
 
@@ -683,6 +684,49 @@ Cierre formal:
 - producción: **no autorizada y no desplegada**.
 
 **P9.6 queda formalmente cerrado.** No se abre automáticamente un bloque de producción. El próximo paso depende de una aprobación institucional explícita con rol aprobador y referencia de decisión. Sólo después de esa aprobación corresponde definir, en una rama/bloque separado, la planificación protegida de producción.
+
+---
+
+## H — Hardening post-piloto sin producción
+
+### H1 — Continuidad de staging a costo $0 🟡 ACTIVO
+
+Objetivo:
+- conservar un staging funcional después del Trial de Railway sin suscripción paga;
+- mantener costo de bolsillo en **USD 0**;
+- usar el crédito Free de USD 1/mes como techo operativo, no como autorización de gasto;
+- preservar MySQL, volúmenes, backup cifrado y controles P7–P9;
+- no tocar producción ni convertir H1 en planificación productiva.
+
+Baseline real de 7 días:
+- backend: ~0,0997 GB RAM media;
+- frontend: ~0,0381 GB RAM media;
+- MySQL: ~0,4619 GB RAM media;
+- costo continuo estimado: ~USD 6,1/mes;
+- Railway Free: USD 1/mes de crédito;
+- conclusión: **24/7 no es sostenible en Free**.
+
+Estrategia H1:
+- Serverless en frontend, backend y MySQL;
+- cron de backup como ejecución puntual;
+- private networking conservado;
+- bucket cifrado P9.5 conservado;
+- presupuesto reproducible mediante script versionado;
+- prueba real sleep/wake + health + persistencia;
+- plan de contingencia documentado si Railway Free no mantiene continuidad suficiente.
+
+Criterios de cierre:
+- presupuesto continuo y proyectado documentados;
+- Quality Gate cubre el modelo H1;
+- Serverless aplicado a los tres servicios permanentes;
+- servicios entran en estado de sueño por inactividad;
+- wake real de frontend/backend/MySQL validado;
+- login/health/smoke posteriores al wake sin pérdida de datos;
+- backup/cron siguen operativos;
+- costo proyectado <= USD 1/mes bajo el patrón de uso definido;
+- documentación, PR, merge y Gate post-merge verdes.
+
+Producción y aprobación institucional quedan fuera de H1.
 
 ---
 
