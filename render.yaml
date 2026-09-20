@@ -4,10 +4,9 @@ services:
     runtime: node
     plan: free
     region: oregon
-    branch: main
+    branch: ops/h1-zero-cost-staging
     buildCommand: npm ci && npm --prefix inventario-frontend ci && VITE_API_URL=/api npm --prefix inventario-frontend run build
-    preDeployCommand: npm run deploy:preflight
-    startCommand: npm start
+    startCommand: npm run staging:external-free:start
     healthCheckPath: /health/ready
     autoDeployTrigger: checksPass
     envVars:
