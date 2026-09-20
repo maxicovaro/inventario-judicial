@@ -175,7 +175,7 @@ const main = async () => {
   const startedAt = new Date();
   const defaultOutput =
     environment === "staging"
-      ? "/data/backups/pilot-daily"
+      ? "/tmp/pilot-backups/daily"
       : "pilot-backup-results/daily";
 
   const outputDirectory = path.resolve(
