@@ -116,6 +116,23 @@ const validateDeployment = (input = process.env) => {
   }
 
   if (deployEnv === "staging") {
+    const stagingTopology = text(input.STAGING_TOPOLOGY).toLowerCase();
+    if (stagingTopology === "external-free") {
+      if (parseBoolean(input.DB_SSL) !== true) {
+        errors.push("DB_SSL debe ser true en staging external-free");
+      }
+      if (parseBoolean(input.DB_SSL_REJECT_UNAUTHORIZED) !== true) {
+        errors.push(
+          "DB_SSL_REJECT_UNAUTHORIZED debe ser true en staging external-free",
+        );
+      }
+      if (serveFrontendStatic !== true) {
+        errors.push(
+          "SERVE_FRONTEND_STATIC debe ser true en staging external-free para mantener same-origin",
+        );
+      }
+    }
+
     if (text(input.UPLOAD_STORAGE_MODE).toLowerCase() !== "s3") {
       errors.push(
         "UPLOAD_STORAGE_MODE debe ser s3 en staging H1 para no depender de un segundo Volume",
@@ -165,6 +182,9 @@ const validateDeployment = (input = process.env) => {
       trust_proxy_hops: trustProxyHops,
       db_name: text(input.DB_NAME) || null,
       upload_storage_mode: text(input.UPLOAD_STORAGE_MODE).toLowerCase() || null,
+      staging_topology: text(input.STAGING_TOPOLOGY).toLowerCase() || null,
+      db_ssl: parseBoolean(input.DB_SSL),
+      serve_frontend_static: serveFrontendStatic,
     },
   };
 };
