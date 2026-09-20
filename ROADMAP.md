@@ -37,7 +37,7 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | **P9.3 Procedimiento operativo de administración** | ✅ **Completo** | PR #44; Gate #304; merge `1ec716b8...`; Gate post-merge #305; staging validado |
 | **P9.4 Indicadores reales del piloto** | ✅ **Completo** | PR #47; merge `d1aa207e...`; Gate #313/#314; captura real + staging `b6de2f78...` / `d95d1768...` SUCCESS |
 | **P9.5 Backup/restore periódico del piloto** | ✅ **Completo** | PR #49; merge `41cb640b...`; Gate #332/#333; backup real + bucket cifrado + restore PASS + cron diario |
-| **P9.6 Criterios de salida a producción institucional** | 🟡 **Activo** | gate técnico reproducible + evaluación real de staging + decisión institucional separada |
+| **P9.6 Criterios de salida a producción institucional** | 🟠 **Cierre pre-merge** | Gate #336 verde; evaluación real 34/34 PASS; técnicamente elegible; aprobación institucional PENDING |
 
 ---
 
@@ -617,7 +617,7 @@ Cierre formal:
 
 **P9.5 queda formalmente cerrado. P9.6 pasa a ser elegible, no abierto.** Antes de abrir P9.6 se debe releer este `ROADMAP.md` desde `main`.
 
-### P9.6 — Criterios de salida del piloto 🟡 ACTIVO
+### P9.6 — Criterios de salida del piloto 🟠 CIERRE PRE-MERGE
 
 Objetivo:
 - consolidar evidencia P8/P9 en un gate técnico reproducible;
@@ -654,13 +654,31 @@ Guardas:
 - producción no se toca dentro de P9.6;
 - P9.1 prevalece ante cualquier stop condition.
 
-Pendiente para cierre:
-- Quality Gate de implementación;
-- evaluación real actualizada de staging;
-- documentar resultado técnico por dimensión;
-- registrar estado de aprobación institucional;
-- PR/merge/Gate post-merge;
-- cierre formal.
+Evidencia real al 20/09/2026:
+- Quality Gate #336 ✅;
+- 34/34 criterios técnicos PASS;
+- estabilidad 6/6;
+- seguridad 4/4;
+- integridad 8/8;
+- adopción 4/4;
+- capacidad operativa 7/7;
+- rendimiento 5/5;
+- backup al corte con edad 0,9543 h;
+- segunda copia verificada;
+- restore PASS, RPO 0,2203 h y RTO 0,0373 min;
+- 0 SEV-1/SEV-2 abiertos;
+- 562 requests de muestra representativa, 0 5xx, p95 65,31 ms;
+- decisión técnica: `ELIGIBLE_FOR_INSTITUTIONAL_APPROVAL`;
+- aprobación institucional: `PENDING`;
+- producción no desplegada.
+
+Pendiente exclusivamente para cierre formal:
+- Quality Gate del commit documental final;
+- merge PR #51;
+- Quality Gate post-merge;
+- registrar cierre desde `main`.
+
+Una aprobación institucional posterior debe incluir rol aprobador y referencia de decisión. Sin ella no se abre despliegue a producción.
 
 ---
 
