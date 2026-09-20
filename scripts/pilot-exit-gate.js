@@ -218,6 +218,22 @@ const main = () => {
     throw new Error("institutional.approval_status debe ser PENDING, APPROVED o REJECTED");
   }
 
+  const approvedByRole = String(
+    data.institutional?.approved_by_role || "",
+  ).trim();
+  const decisionReference = String(
+    data.institutional?.decision_reference || "",
+  ).trim();
+
+  if (
+    approval === "APPROVED" &&
+    (!approvedByRole || !decisionReference)
+  ) {
+    throw new Error(
+      "Una aprobación institucional requiere approved_by_role y decision_reference",
+    );
+  }
+
   let decision = "BLOCKED";
   if (technicalStatus === "PASS" && approval === "PENDING") {
     decision = "ELIGIBLE_FOR_INSTITUTIONAL_APPROVAL";
@@ -234,6 +250,10 @@ const main = () => {
     thresholds: THRESHOLDS,
     technical_status: technicalStatus,
     institutional_status: approval,
+    institutional_approval: {
+      approved_by_role: approvedByRole || null,
+      decision_reference: decisionReference || null,
+    },
     decision,
     dimensions: byDimension,
     criteria,
