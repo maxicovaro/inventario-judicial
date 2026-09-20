@@ -68,7 +68,7 @@ const resolveBackup = async () => {
     argValue("--manifest") ||
     process.env.PILOT_BACKUP_MANIFEST ||
     (runtimeEnvironment() === "staging"
-      ? "/tmp/pilot-backups/latest.json"
+      ? "/tmp/pilot-backups/daily/latest.json"
       : "pilot-backup-results/latest.json");
 
   const manifestPath = path.resolve(manifestArg);
