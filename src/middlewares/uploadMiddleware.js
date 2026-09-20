@@ -1,29 +1,6 @@
 const multer = require("multer");
-const path = require("path");
-const { ensureUploadsDir, uploadsDir } = require("../utils/uploadStorage");
 
-ensureUploadsDir();
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-
-  filename: (req, file, cb) => {
-    const extension = path.extname(file.originalname);
-
-    const nombreBase = path
-      .basename(file.originalname, extension)
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9-_]/g, "_")
-      .toLowerCase();
-
-    const uniqueName = `${Date.now()}-${nombreBase}${extension}`;
-
-    cb(null, uniqueName);
-  },
-});
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   const allowedTypes = [
@@ -48,7 +25,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10 MB
+    fileSize: 10 * 1024 * 1024,
   },
 });
 
