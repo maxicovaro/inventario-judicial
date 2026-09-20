@@ -44,39 +44,156 @@ const restoreDriver = () => {
   return driver;
 };
 
-const sanitizeDumpForMysql2 = (source) => {
+const parseMysqlDumpStatements = (source) => {
   const sql = String(source || "");
+  const statements = [];
+  let buffer = "";
+  let quote = null;
+  let index = 0;
 
-  if (/^\s*DELIMITER\b/im.test(sql)) {
-    throw new Error(
-      "El fallback mysql2 no admite dumps con DELIMITER; usar el cliente mysql nativo",
-    );
+  const pushStatement = () => {
+    const statement = buffer.trim();
+    buffer = "";
+    if (statement) statements.push(statement);
+  };
+
+  while (index < sql.length) {
+    const char = sql[index];
+    const next = sql[index + 1] || "";
+
+    if (quote) {
+      buffer += char;
+
+      if ((quote === "'" || quote === '"') && char === "\" && index + 1 < sql.length) {
+        buffer += sql[index + 1];
+        index += 2;
+        continue;
+      }
+
+      if (char === quote) {
+        if (sql[index + 1] === quote) {
+          buffer += sql[index + 1];
+          index += 2;
+          continue;
+        }
+        quote = null;
+      }
+
+      index += 1;
+      continue;
+    }
+
+    if (char === "'" || char === '"' || char === TICK) {
+      quote = char;
+      buffer += char;
+      index += 1;
+      continue;
+    }
+
+    if (char === "-" && next === "-" && /\s/.test(sql[index + 2] || "")) {
+      const end = sql.indexOf("\n", index + 2);
+      if (end === -1) break;
+      buffer += "\n";
+      index = end + 1;
+      continue;
+    }
+
+    if (char === "#") {
+      const end = sql.indexOf("\n", index + 1);
+      if (end === -1) break;
+      buffer += "\n";
+      index = end + 1;
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      const end = sql.indexOf("*/", index + 2);
+      if (end === -1) {
+        throw new Error("El dump contiene un comentario SQL sin cierre");
+      }
+      index = end + 2;
+      continue;
+    }
+
+    if (char === ";") {
+      pushStatement();
+      index += 1;
+      continue;
+    }
+
+    buffer += char;
+    index += 1;
   }
 
-  if (
-    /\bCREATE\s+(?:DEFINER\s*=\s*[^\s]+\s+)?(?:PROCEDURE|FUNCTION|TRIGGER|EVENT)\b/i.test(
-      sql,
-    )
-  ) {
-    throw new Error(
-      "El fallback mysql2 no admite rutinas/triggers/eventos; usar el cliente mysql nativo",
-    );
+  if (quote) {
+    throw new Error("El dump contiene una cadena o identificador sin cierre");
   }
 
-  if (
-    /^\s*(?:CREATE|DROP)\s+DATABASE\b/im.test(sql) ||
-    /^\s*USE\s+/im.test(sql)
-  ) {
-    throw new Error(
-      "El dump intenta seleccionar/crear/eliminar bases; restore mysql2 sólo admite la base destino validada",
-    );
+  pushStatement();
+  return statements;
+};
+
+const statementKind = (statement) => {
+  const normalized = String(statement || "").trim();
+  const patterns = [
+    ["DROP_TABLE", /^DROP\s+TABLE\b/i],
+    ["CREATE_TABLE", /^CREATE\s+TABLE\b/i],
+    ["INSERT", /^INSERT\s+INTO\b/i],
+    ["LOCK_TABLES", /^LOCK\s+TABLES\b/i],
+    ["UNLOCK_TABLES", /^UNLOCK\s+TABLES\b/i],
+  ];
+
+  for (const [kind, pattern] of patterns) {
+    if (pattern.test(normalized)) return kind;
   }
 
-  return sql
-    .replace(/\/\*!\d{5}\s+[\s\S]*?\*\//g, "")
-    .replace(/^\s*LOCK TABLES\b.*?;\s*$/gim, "")
-    .replace(/^\s*UNLOCK TABLES\s*;\s*$/gim, "")
-    .trim();
+  if (/^SET\b/i.test(normalized)) return "SET";
+  return "UNSUPPORTED";
+};
+
+const statementTable = (statement, kind) => {
+  const normalized = String(statement || "").trim();
+  const match =
+    kind === "DROP_TABLE"
+      ? normalized.match(/^DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+`?([^`\s,;]+)`?/i)
+      : kind === "CREATE_TABLE"
+        ? normalized.match(/^CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+`?([^`\s(;]+)`?/i)
+        : kind === "INSERT"
+          ? normalized.match(/^INSERT\s+INTO\s+`?([^`\s(;]+)`?/i)
+          : null;
+  return match?.[1] || null;
+};
+
+const prepareMysql2Statements = (source) => {
+  const parsed = parseMysqlDumpStatements(source);
+  const executable = [];
+
+  for (const statement of parsed) {
+    const kind = statementKind(statement);
+
+    if (["LOCK_TABLES", "UNLOCK_TABLES", "SET"].includes(kind)) {
+      continue;
+    }
+
+    if (kind === "UNSUPPORTED") {
+      const preview = statement.replace(/\s+/g, " ").slice(0, 80);
+      throw new Error(
+        `El fallback mysql2 encontró una sentencia no permitida: ${preview}`,
+      );
+    }
+
+    executable.push({
+      sql: statement,
+      kind,
+      table: statementTable(statement, kind),
+    });
+  }
+
+  if (executable.length === 0) {
+    throw new Error("El dump no contiene sentencias restaurables");
+  }
+
+  return executable;
 };
 
 const mysql2ConnectionOptions = (config, extra = {}) => ({
@@ -111,15 +228,12 @@ const restoreWithMysql2 = async ({ backup, restoreConfig, target, recreate }) =>
   await prepareTargetWithMysql2(restoreConfig, target, recreate);
 
   const rawDump = fs.readFileSync(path.resolve(backup.backupPath), "utf8");
-  const dump = sanitizeDumpForMysql2(rawDump);
-  if (!dump) {
-    throw new Error("El dump quedó vacío después de aplicar las guardas mysql2");
-  }
+  const statements = prepareMysql2Statements(rawDump);
 
   const connection = await mysql.createConnection(
     mysql2ConnectionOptions(restoreConfig, {
       database: target,
-      multipleStatements: true,
+      multipleStatements: false,
     }),
   );
 
@@ -127,7 +241,20 @@ const restoreWithMysql2 = async ({ backup, restoreConfig, target, recreate }) =>
   try {
     await connection.query("SET FOREIGN_KEY_CHECKS=0");
     foreignKeyChecksDisabled = true;
-    await connection.query(dump);
+
+    for (let index = 0; index < statements.length; index += 1) {
+      const statement = statements[index];
+      try {
+        await connection.query(statement.sql);
+      } catch (error) {
+        const label = statement.table
+          ? `${statement.kind} ${statement.table}`
+          : statement.kind;
+        throw new Error(
+          `mysql2 falló en sentencia ${index + 1}/${statements.length} (${label}): ${error.message}`,
+        );
+      }
+    }
   } finally {
     if (foreignKeyChecksDisabled) {
       try {
@@ -136,6 +263,8 @@ const restoreWithMysql2 = async ({ backup, restoreConfig, target, recreate }) =>
     }
     await connection.end();
   }
+
+  return statements.length;
 };
 
 const restoreWithCli = ({
@@ -243,6 +372,7 @@ const main = async () => {
     run(mysqlCommand, ["--version"]);
   }
 
+  let restoredStatements = null;
   if (useCli) {
     restoreWithCli({
       backup,
@@ -252,7 +382,7 @@ const main = async () => {
       mysqlCommand,
     });
   } else {
-    await restoreWithMysql2({
+    restoredStatements = await restoreWithMysql2({
       backup,
       restoreConfig,
       target,
@@ -262,6 +392,9 @@ const main = async () => {
 
   console.log("✓ Backup restaurado en la base destino: " + target);
   console.log("✓ Driver de restore: " + (useCli ? "mysql-cli" : "mysql2"));
+  if (restoredStatements !== null) {
+    console.log("✓ Sentencias restauradas por mysql2: " + restoredStatements);
+  }
   console.log("✓ Backup verificado previamente con SHA-256: " + backup.sha256);
 };
 
@@ -274,6 +407,9 @@ if (require.main === module) {
 
 module.exports = {
   commandMissing,
+  parseMysqlDumpStatements,
+  prepareMysql2Statements,
   restoreDriver,
-  sanitizeDumpForMysql2,
+  statementKind,
+  statementTable,
 };
