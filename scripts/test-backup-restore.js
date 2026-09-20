@@ -7,6 +7,8 @@ const mysql = require("mysql2/promise");
 const sequelize = require("../src/config/database");
 const { sanitizeDumpForMysql2 } = require("./db-restore");
 
+const TICK = String.fromCharCode(96);
+
 const runNode = (args, extraEnv = {}) => {
   const result = spawnSync(process.execPath, args, {
     cwd: path.resolve(__dirname, ".."),
@@ -18,7 +20,7 @@ const runNode = (args, extraEnv = {}) => {
   if (result.status !== 0) {
     throw new Error(
       [result.stdout, result.stderr].filter(Boolean).join("\n").trim() ||
-        `Comando falló con código ${result.status}`,
+        "Comando falló con código " + result.status,
     );
   }
 
@@ -46,7 +48,9 @@ const verifyToken = async ({
     );
     if (rows.length !== 1 || rows[0].token !== token) {
       throw new Error(
-        `La restauración ${database} no preservó el dato de control esperado`,
+        "La restauración " +
+          database +
+          " no preservó el dato de control esperado",
       );
     }
   } finally {
@@ -55,11 +59,13 @@ const verifyToken = async ({
 };
 
 const main = async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "inventario-backup-test-"));
+  const tempDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "inventario-backup-test-"),
+  );
   const backupPath = path.join(tempDir, "backup.sql");
-  const targetCli = `inventario_restore_cli_ci_${process.pid}`;
-  const targetFallback = `inventario_restore_mysql2_ci_${process.pid}`;
-  const token = `probe-${Date.now()}`;
+  const targetCli = "inventario_restore_cli_ci_" + process.pid;
+  const targetFallback = "inventario_restore_mysql2_ci_" + process.pid;
+  const token = "probe-" + Date.now();
 
   const restoreHost = process.env.RESTORE_DB_HOST || process.env.DB_HOST;
   const restorePort = Number(
@@ -84,10 +90,10 @@ const main = async () => {
   try {
     await sequelize.authenticate();
     await sequelize.query(
-      `CREATE TABLE IF NOT EXISTS p3_backup_probe (
-        id INT PRIMARY KEY,
-        token VARCHAR(120) NOT NULL
-      ) ENGINE=InnoDB`,
+      "CREATE TABLE IF NOT EXISTS p3_backup_probe (" +
+        "id INT PRIMARY KEY, " +
+        "token VARCHAR(120) NOT NULL" +
+        ") ENGINE=InnoDB",
     );
     await sequelize.query("DELETE FROM p3_backup_probe");
     await sequelize.query(
@@ -164,7 +170,9 @@ const main = async () => {
         password: restorePassword,
       });
       for (const target of [targetCli, targetFallback]) {
-        await admin.query(`DROP DATABASE IF EXISTS \\`${target}\\``);
+        await admin.query(
+          "DROP DATABASE IF EXISTS " + TICK + target + TICK,
+        );
       }
       await admin.end();
     } catch {}
@@ -179,6 +187,6 @@ const main = async () => {
 };
 
 main().catch((error) => {
-  console.error(`✗ Prueba de backup/restore falló: ${error.message}`);
+  console.error("✗ Prueba de backup/restore falló: " + error.message);
   process.exitCode = 1;
 });
