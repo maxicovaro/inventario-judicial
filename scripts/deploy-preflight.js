@@ -105,6 +105,35 @@ const validateDeployment = (input = process.env) => {
   }
 
   if (deployEnv === "staging") {
+    if (text(input.UPLOAD_STORAGE_MODE).toLowerCase() !== "s3") {
+      errors.push(
+        "UPLOAD_STORAGE_MODE debe ser s3 en staging H1 para no depender de un segundo Volume",
+      );
+    }
+
+    const requiredUploadS3 = [
+      "UPLOAD_S3_ENDPOINT",
+      "UPLOAD_S3_BUCKET",
+      "UPLOAD_S3_REGION",
+      "UPLOAD_S3_ACCESS_KEY_ID",
+      "UPLOAD_S3_SECRET_ACCESS_KEY",
+    ];
+    for (const name of requiredUploadS3) {
+      if (!text(input[name])) errors.push(`Falta ${name} para storage S3 de staging`);
+    }
+
+    const uploadEndpoint = text(input.UPLOAD_S3_ENDPOINT);
+    if (uploadEndpoint) {
+      try {
+        const url = new URL(uploadEndpoint);
+        if (url.protocol !== "https:" || url.pathname !== "/" || url.search || url.hash) {
+          errors.push("UPLOAD_S3_ENDPOINT debe ser un endpoint HTTPS sin path/query");
+        }
+      } catch {
+        errors.push("UPLOAD_S3_ENDPOINT debe ser una URL HTTPS válida");
+      }
+    }
+
     const productionDbName = text(input.PRODUCTION_DB_NAME);
     if (!productionDbName) {
       errors.push("PRODUCTION_DB_NAME es obligatorio en staging como guarda de separación");
@@ -124,6 +153,7 @@ const validateDeployment = (input = process.env) => {
       admin_mfa: parseBoolean(input.REQUIRE_ADMIN_MFA),
       trust_proxy_hops: trustProxyHops,
       db_name: text(input.DB_NAME) || null,
+      upload_storage_mode: text(input.UPLOAD_STORAGE_MODE).toLowerCase() || null,
     },
   };
 };
