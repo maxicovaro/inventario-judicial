@@ -180,6 +180,9 @@ const uploadEncryptedBackup = async (verified) => {
     encryption: "AES-256-GCM",
     backup_file: path.basename(verified.backupPath),
     backup_created_at: verified.metadata.created_at,
+    database: verified.metadata.database,
+    dump_tool: verified.metadata.dump_tool || null,
+    source_snapshot: verified.metadata.source_snapshot || null,
     plaintext_bytes: verified.bytes,
     plaintext_sha256: verified.sha256,
     encrypted_bytes: encrypted.length,
@@ -228,6 +231,8 @@ const uploadEncryptedBackup = async (verified) => {
         schema_version: 1,
         object_key: encryptedKey,
         metadata_key: metadataKey,
+        backup_file: path.basename(verified.backupPath),
+        backup_created_at: verified.metadata.created_at,
         plaintext_bytes: verified.bytes,
         plaintext_sha256: verified.sha256,
         encryption: "AES-256-GCM",
@@ -266,9 +271,100 @@ const uploadEncryptedBackup = async (verified) => {
   };
 };
 
+const downloadLatestEncryptedBackup = async (options = {}) => {
+  const config = configFromEnvironment();
+  const prefixValue = config.prefix ? `${config.prefix}/` : "";
+  const latestKey = `${prefixValue}latest.json`;
+
+  const latestResponse = await s3Request({
+    config,
+    method: "GET",
+    key: latestKey,
+  });
+  const latest = JSON.parse(latestResponse.body.toString("utf8"));
+
+  if (!latest.object_key || !latest.metadata_key) {
+    throw new Error("El índice latest del bucket no contiene objetos verificables");
+  }
+
+  const metadataResponse = await s3Request({
+    config,
+    method: "GET",
+    key: latest.metadata_key,
+  });
+  const metadata = JSON.parse(metadataResponse.body.toString("utf8"));
+
+  if (
+    !metadata.database ||
+    !metadata.backup_created_at ||
+    !metadata.source_snapshot ||
+    !metadata.plaintext_sha256 ||
+    !Number(metadata.plaintext_bytes)
+  ) {
+    throw new Error(
+      "La metadata cifrada del bucket no contiene snapshot/checksum suficientes para restore",
+    );
+  }
+
+  const encryptedResponse = await s3Request({
+    config,
+    method: "GET",
+    key: latest.object_key,
+  });
+  const recovered = decryptBuffer(
+    encryptedResponse.body,
+    config.encryptionKey,
+  );
+  const recoveredSha256 = sha256Buffer(recovered);
+
+  if (
+    recoveredSha256 !== metadata.plaintext_sha256 ||
+    recovered.length !== Number(metadata.plaintext_bytes)
+  ) {
+    throw new Error(
+      "El backup recuperado desde bucket no coincide con su metadata",
+    );
+  }
+
+  const outputDirectory = path.resolve(
+    options.outputDirectory || "pilot-backup-results/recovered",
+  );
+  fs.mkdirSync(outputDirectory, { recursive: true });
+
+  const backupName = path.basename(
+    metadata.backup_file || "inventario-recovered.sql",
+  );
+  const backupPath = path.join(outputDirectory, backupName);
+  const checksumMetadata = {
+    format: "mysql-sql",
+    database: metadata.database,
+    created_at: metadata.backup_created_at,
+    bytes: Number(metadata.plaintext_bytes),
+    sha256: metadata.plaintext_sha256,
+    dump_tool: metadata.dump_tool || "recovered-from-s3",
+    source_snapshot: metadata.source_snapshot,
+  };
+
+  fs.writeFileSync(backupPath, recovered);
+  fs.writeFileSync(
+    `${backupPath}.sha256.json`,
+    `${JSON.stringify(checksumMetadata, null, 2)}\n`,
+    "utf8",
+  );
+
+  return {
+    backupPath,
+    metadata: checksumMetadata,
+    latest,
+    bucketMetadata: metadata,
+    outputDirectory,
+  };
+};
+
 module.exports = {
   configFromEnvironment,
   decryptBuffer,
+  downloadLatestEncryptedBackup,
   encryptBuffer,
   s3Configured,
   signedRequest,
