@@ -19,6 +19,7 @@ const SYSTEM_DATABASES = new Set([
 ]);
 
 const RESTORE_DRIVERS = new Set(["auto", "cli", "mysql2"]);
+const TICK = String.fromCharCode(96);
 
 const argValue = (name) => {
   const index = process.argv.indexOf(name);
@@ -28,10 +29,10 @@ const argValue = (name) => {
 const hasArg = (name) => process.argv.includes(name);
 
 const quoteIdentifier = (value) =>
-  `\\`${String(value).replace(/\\`/g, "\\`\\`")}\\``;
+  TICK + String(value).replace(new RegExp(TICK, "g"), TICK + TICK) + TICK;
 
 const commandMissing = (error) =>
-  /(?:\\bENOENT\\b|not found|no such file)/i.test(String(error?.message || error));
+  /(?:\bENOENT\b|not found|no such file)/i.test(String(error?.message || error));
 
 const restoreDriver = () => {
   const driver = String(process.env.DB_RESTORE_DRIVER || "auto")
@@ -46,14 +47,14 @@ const restoreDriver = () => {
 const sanitizeDumpForMysql2 = (source) => {
   const sql = String(source || "");
 
-  if (/^\\s*DELIMITER\\b/im.test(sql)) {
+  if (/^\s*DELIMITER\b/im.test(sql)) {
     throw new Error(
       "El fallback mysql2 no admite dumps con DELIMITER; usar el cliente mysql nativo",
     );
   }
 
   if (
-    /\\bCREATE\\s+(?:DEFINER\\s*=\\s*[^\\s]+\\s+)?(?:PROCEDURE|FUNCTION|TRIGGER|EVENT)\\b/i.test(
+    /\bCREATE\s+(?:DEFINER\s*=\s*[^\s]+\s+)?(?:PROCEDURE|FUNCTION|TRIGGER|EVENT)\b/i.test(
       sql,
     )
   ) {
@@ -62,16 +63,19 @@ const sanitizeDumpForMysql2 = (source) => {
     );
   }
 
-  if (/^\\s*(?:CREATE|DROP)\\s+DATABASE\\b/im.test(sql) || /^\\s*USE\\s+/im.test(sql)) {
+  if (
+    /^\s*(?:CREATE|DROP)\s+DATABASE\b/im.test(sql) ||
+    /^\s*USE\s+/im.test(sql)
+  ) {
     throw new Error(
       "El dump intenta seleccionar/crear/eliminar bases; restore mysql2 sólo admite la base destino validada",
     );
   }
 
   return sql
-    .replace(/\\/\\*!\\d{5}\\s+[\\s\\S]*?\\*\\//g, "")
-    .replace(/^\\s*LOCK TABLES\\b.*?;\\s*$/gim, "")
-    .replace(/^\\s*UNLOCK TABLES\\s*;\\s*$/gim, "")
+    .replace(/\/\*!\d{5}\s+[\s\S]*?\*\//g, "")
+    .replace(/^\s*LOCK TABLES\b.*?;\s*$/gim, "")
+    .replace(/^\s*UNLOCK TABLES\s*;\s*$/gim, "")
     .trim();
 };
 
@@ -91,10 +95,12 @@ const prepareTargetWithMysql2 = async (config, target, recreate) => {
   );
   try {
     if (recreate) {
-      await admin.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(target)}`);
+      await admin.query("DROP DATABASE IF EXISTS " + quoteIdentifier(target));
     }
     await admin.query(
-      `CREATE DATABASE IF NOT EXISTS ${quoteIdentifier(target)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+      "CREATE DATABASE IF NOT EXISTS " +
+        quoteIdentifier(target) +
+        " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci",
     );
   } finally {
     await admin.end();
@@ -140,17 +146,23 @@ const restoreWithCli = ({
   mysqlCommand,
 }) => {
   const connectionArgs = [
-    `--host=${restoreConfig.host}`,
-    `--port=${restoreConfig.port}`,
-    `--user=${restoreConfig.user}`,
+    "--host=" + restoreConfig.host,
+    "--port=" + restoreConfig.port,
+    "--user=" + restoreConfig.user,
     ...mysqlCliTlsArgs(restoreConfig),
     "--default-character-set=utf8mb4",
   ];
 
   const quotedTarget = quoteIdentifier(target);
   const prepareSql = recreate
-    ? `DROP DATABASE IF EXISTS ${quotedTarget}; CREATE DATABASE ${quotedTarget} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
-    : `CREATE DATABASE IF NOT EXISTS ${quotedTarget} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`;
+    ? "DROP DATABASE IF EXISTS " +
+      quotedTarget +
+      "; CREATE DATABASE " +
+      quotedTarget +
+      " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    : "CREATE DATABASE IF NOT EXISTS " +
+      quotedTarget +
+      " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;";
 
   run(mysqlCommand, [...connectionArgs, "--execute", prepareSql], {
     env: mysqlEnvironment(restoreConfig.password),
@@ -248,14 +260,14 @@ const main = async () => {
     });
   }
 
-  console.log(`✓ Backup restaurado en la base destino: ${target}`);
-  console.log(`✓ Driver de restore: ${useCli ? "mysql-cli" : "mysql2"}`);
-  console.log(`✓ Backup verificado previamente con SHA-256: ${backup.sha256}`);
+  console.log("✓ Backup restaurado en la base destino: " + target);
+  console.log("✓ Driver de restore: " + (useCli ? "mysql-cli" : "mysql2"));
+  console.log("✓ Backup verificado previamente con SHA-256: " + backup.sha256);
 };
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error(`✗ Restauración falló: ${error.message}`);
+    console.error("✗ Restauración falló: " + error.message);
     process.exitCode = 1;
   });
 }
