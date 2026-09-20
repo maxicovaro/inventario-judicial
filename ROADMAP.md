@@ -38,7 +38,7 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | **P9.4 Indicadores reales del piloto** | ✅ **Completo** | PR #47; merge `d1aa207e...`; Gate #313/#314; captura real + staging `b6de2f78...` / `d95d1768...` SUCCESS |
 | **P9.5 Backup/restore periódico del piloto** | ✅ **Completo** | PR #49; merge `41cb640b...`; Gate #332/#333; backup real + bucket cifrado + restore PASS + cron diario |
 | **P9.6 Criterios de salida a producción institucional** | ✅ **Completo** | PR #51; merge `24089be4...`; Gate #337/#338; 34/34 PASS; técnicamente elegible; aprobación institucional PENDING |
-| **H1 Continuidad de staging a costo $0** | 🟡 **Activo** | Railway Free + Serverless; presupuesto <= USD 1/mes; sin tocar producción |
+| **H1 Continuidad de staging a costo $0** | 🟡 **Activo — pivot external-free** | Railway Serverless no durmió MySQL; preparar Render Free + TiDB Starter + bucket/cron residual Railway |
 
 ---
 
@@ -692,39 +692,47 @@ Cierre formal:
 ### H1 — Continuidad de staging a costo $0 🟡 ACTIVO
 
 Objetivo:
-- conservar un staging funcional después del Trial de Railway sin suscripción paga;
-- mantener costo de bolsillo en **USD 0**;
-- usar el crédito Free de USD 1/mes como techo operativo, no como autorización de gasto;
-- preservar MySQL, volúmenes, backup cifrado y controles P7–P9;
-- no tocar producción ni convertir H1 en planificación productiva.
+- conservar staging después del Trial sin suscripción paga ni tarjeta obligatoria;
+- costo de bolsillo **USD 0**;
+- preservar seguridad, integridad, backup/restore y evidencia P7–P9;
+- no tocar producción.
 
-Baseline real de 7 días:
-- backend: ~0,0997 GB RAM media;
-- frontend: ~0,0381 GB RAM media;
-- MySQL: ~0,4619 GB RAM media;
-- costo continuo estimado: ~USD 6,1/mes;
-- Railway Free: USD 1/mes de crédito;
-- conclusión: **24/7 no es sostenible en Free**.
+Hallazgo real:
+- Railway 24x7 equivale a ~USD 6,1/mes frente a USD 1 de crédito Free;
+- Serverless fue aplicado a backend/frontend/MySQL;
+- tras >1 h no se observó ningún deployment SLEEPING;
+- MySQL continuó consumiendo ~0,387 GB de RAM;
+- la hipótesis Railway-only queda descartada como cierre H1;
+- Railway Free admite 1 Volume/proyecto y el Trial actual conserva 3.
 
-Estrategia H1:
-- Serverless en frontend, backend y MySQL;
-- cron de backup como ejecución puntual;
-- private networking conservado;
-- bucket cifrado P9.5 conservado;
-- presupuesto reproducible mediante script versionado;
-- prueba real sleep/wake + health + persistencia;
-- plan de contingencia documentado si Railway Free no mantiene continuidad suficiente.
+Topología objetivo:
+- **Render Free**: un único web service full-stack que sirve React + Express same-origin;
+- **TiDB Cloud Starter**: base MySQL-compatible gratuita con TLS verificable;
+- **Railway Storage Bucket**: adjuntos privados + backups cifrados;
+- **Railway cron residual**: backup diario corto, sin Volume, contra TiDB vía TLS;
+- Railway antiguo permanece intacto hasta que el reemplazo complete smoke, persistencia y recovery.
 
-Criterios de cierre:
-- presupuesto continuo y proyectado documentados;
-- Quality Gate cubre el modelo H1;
-- Serverless aplicado a los tres servicios permanentes;
-- servicios entran en estado de sueño por inactividad;
-- wake real de frontend/backend/MySQL validado;
-- login/health/smoke posteriores al wake sin pérdida de datos;
-- backup/cron siguen operativos;
-- costo proyectado <= USD 1/mes bajo el patrón de uso definido;
-- documentación, PR, merge y Gate post-merge verdes.
+Implementación versionada:
+- storage S3 abstracto para adjuntos;
+- backup/restore recuperable desde bucket cifrado;
+- TLS opcional para Sequelize, mysql2 y CLI;
+- SPA same-origin opt-in;
+- `render.yaml` plan Free y deploy tras CI verde;
+- preflight específico `STAGING_TOPOLOGY=external-free`;
+- modelo económico con baseline `OVER_BUDGET` y target residual `PASS`;
+- documento `docs/H1_ZERO_COST_STAGING.md`.
+
+Pendiente para cierre:
+- Gate de implementación verde;
+- crear TiDB Starter y Render Free reales;
+- backup/restauración/migraciones/conteos sobre TiDB;
+- deploy SHA aprobado en Render;
+- health, auth/MFA/permisos y adjuntos verdes;
+- backup cron sin Volume y restore desde bucket PASS;
+- sleep/wake de Render y persistencia demostrados;
+- retirar compute/Volumes Railway antiguos sólo después de todo lo anterior;
+- confirmar costo de bolsillo USD 0;
+- PR/merge/Gate post-merge.
 
 Producción y aprobación institucional quedan fuera de H1.
 
