@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 20/09/2026. **P9.5 — Backup y recuperación durante el piloto** quedó integrado en `main` mediante PR #49 y Quality Gate post-merge #333 verde. Este commit registra su cierre formal. **P9.6 queda elegible como próximo bloque**, pero no debe abrirse sin releer primero este `ROADMAP.md` desde `main`.
+> Actualizada al 20/09/2026. **P9.5 — Backup y recuperación durante el piloto** está formalmente cerrado. **P9.6 — Criterios de salida del piloto** está activo en rama `ops/p9-6-pilot-exit-gate`, abierto después de releer `ROADMAP.md` y `AGENTS.md` desde `main@4a0dcc1de6941e3cd4507a107a00a93e34920983`.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -37,7 +37,7 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | **P9.3 Procedimiento operativo de administración** | ✅ **Completo** | PR #44; Gate #304; merge `1ec716b8...`; Gate post-merge #305; staging validado |
 | **P9.4 Indicadores reales del piloto** | ✅ **Completo** | PR #47; merge `d1aa207e...`; Gate #313/#314; captura real + staging `b6de2f78...` / `d95d1768...` SUCCESS |
 | **P9.5 Backup/restore periódico del piloto** | ✅ **Completo** | PR #49; merge `41cb640b...`; Gate #332/#333; backup real + bucket cifrado + restore PASS + cron diario |
-| P9.6 Criterios de salida a producción institucional | 🟢 **Elegible** | Próximo bloque; releer `ROADMAP.md` desde `main` antes de abrir |
+| **P9.6 Criterios de salida a producción institucional** | 🟡 **Activo** | gate técnico reproducible + evaluación real de staging + decisión institucional separada |
 
 ---
 
@@ -617,16 +617,50 @@ Cierre formal:
 
 **P9.5 queda formalmente cerrado. P9.6 pasa a ser elegible, no abierto.** Antes de abrir P9.6 se debe releer este `ROADMAP.md` desde `main`.
 
-### P9.6 — Criterios de salida del piloto ⏳
+### P9.6 — Criterios de salida del piloto 🟡 ACTIVO
 
-Previsto:
-- estabilidad;
-- seguridad;
-- integridad;
-- adopción;
-- capacidad operativa;
-- rendimiento;
-- decisión documentada de paso a producción institucional.
+Objetivo:
+- consolidar evidencia P8/P9 en un gate técnico reproducible;
+- evaluar estabilidad, seguridad, integridad, adopción, capacidad operativa y rendimiento;
+- bloquear la salida ante cualquier stop condition o criterio crítico incumplido;
+- separar elegibilidad técnica de aprobación institucional;
+- impedir que P9.6 despliegue producción o modifique datos.
+
+Implementación en curso:
+- `scripts/pilot-exit-gate.js`;
+- `pilot/exit-gate.example.json`;
+- `npm run pilot:exit:gate`;
+- contrato `test:p9-exit-gate-contracts`;
+- ejecución sintética en Quality Gate;
+- documento `docs/P9_6_EXIT_CRITERIA.md`;
+- resultados reales excluidos mediante `pilot-exit-results/`.
+
+Criterios mínimos definidos:
+- health/deployment verdes;
+- muestra HTTP representativa y 0 respuestas 5xx;
+- 0 SEV-1/SEV-2 abiertos;
+- MFA en 100 % de ADMIN activos y 0 ADMIN fuera de Dirección;
+- 0 stop conditions, corrupción, bypass, stock negativo, duplicación física e idempotencia incompleta;
+- primera ola 12/12 y 4/4 usuarios verificados;
+- actividad real en al menos 2 oficinas piloto;
+- backup <= 24 h, segunda copia verificada y restore PASS;
+- RPO <= 24 h y RTO <= 4 h;
+- carga controlada >= c20 con 0 % errores;
+- p95 runtime P9.6 <= 500 ms y sin presión relevante de recursos.
+
+Guardas:
+- el resultado automático máximo sin aprobación humana es `ELIGIBLE_FOR_INSTITUTIONAL_APPROVAL`;
+- `APPROVED_FOR_PRODUCTION_PLANNING` exige rol institucional y referencia de decisión;
+- producción no se toca dentro de P9.6;
+- P9.1 prevalece ante cualquier stop condition.
+
+Pendiente para cierre:
+- Quality Gate de implementación;
+- evaluación real actualizada de staging;
+- documentar resultado técnico por dimensión;
+- registrar estado de aprobación institucional;
+- PR/merge/Gate post-merge;
+- cierre formal.
 
 ---
 
