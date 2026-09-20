@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const env = require("./config/env");
@@ -52,9 +54,11 @@ app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 app.use(safeErrorResponses);
 
-app.get("/", (req, res) => {
-  res.json({ mensaje: "Servidor del sistema de inventario funcionando ✓" });
-});
+if (!env.SERVE_FRONTEND_STATIC) {
+  app.get("/", (req, res) => {
+    res.json({ mensaje: "Servidor del sistema de inventario funcionando ✓" });
+  });
+}
 
 app.use("/health", healthRoutes);
 app.use("/api/auth", authRoutes);
@@ -78,6 +82,31 @@ app.use("/api/pedidos", pedidoInsumoRoutes);
 app.use("/api/pedidos-insumos", pedidoInsumoRoutes);
 app.use("/api/reportes", reporteConsumoOficinaRoutes);
 app.use("/api/reportes-pedidos", reportePedidoRoutes);
+
+if (env.SERVE_FRONTEND_STATIC) {
+  const frontendDir = path.resolve(env.FRONTEND_DIST_DIR);
+  const frontendIndex = path.join(frontendDir, "index.html");
+
+  if (!fs.existsSync(frontendIndex)) {
+    throw new Error(
+      `SERVE_FRONTEND_STATIC=true pero no existe ${frontendIndex}`,
+    );
+  }
+
+  app.use(express.static(frontendDir, { index: false }));
+
+  app.use((req, res, next) => {
+    if (
+      req.method !== "GET" ||
+      req.path.startsWith("/api/") ||
+      req.path.startsWith("/health/")
+    ) {
+      return next();
+    }
+
+    return res.sendFile(frontendIndex);
+  });
+}
 
 app.use((req, res) => {
   return res.status(404).json({
