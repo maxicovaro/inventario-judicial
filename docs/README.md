@@ -220,6 +220,19 @@ Contiene:
 - programación prevista en Railway;
 - stop conditions y criterios de cierre P9.5.
 
+### 14. P9.6 — Criterios de salida del piloto
+
+`P9_6_EXIT_CRITERIA.md`
+
+Contiene:
+- gate técnico de salida reproducible;
+- estabilidad, seguridad, integridad, adopción, capacidad operativa y rendimiento;
+- umbrales bloqueantes;
+- separación entre elegibilidad técnica y aprobación institucional;
+- evidencia real requerida;
+- guardas que impiden desplegar producción desde el gate;
+- criterios de cierre P9.6.
+
 ## Evidencia técnica
 
 La documentación anterior define el estado consolidado. La evidencia detallada de que un cambio fue implementado/validado vive en:
@@ -247,7 +260,8 @@ Para retomar el proyecto después de una pausa:
 10. Para P9.3/operación administrativa, leer `P9_3_ADMIN_PROCEDURE.md` y `OPERATIONS.md`.
 11. Para P9.4/indicadores del piloto, leer `P9_4_PILOT_INDICATORS.md`, `PERFORMANCE.md` y `P9_1_INCIDENT_RESPONSE.md`.
 12. Para P9.5/backup periódico y recovery, leer `P9_5_PILOT_BACKUP_RECOVERY.md`, `OPERATIONS.md` y `RAILWAY_STAGING.md`.
-13. Verificar el último Quality Gate antes de modificar/integrar.
+13. Para P9.6/gate de salida, leer `P9_6_EXIT_CRITERIA.md`, P9.1, P9.4, P9.5 y P8.
+14. Verificar el último Quality Gate antes de modificar/integrar.
 
 ## Regla de actualización
 
