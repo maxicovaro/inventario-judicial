@@ -20,6 +20,7 @@ const assertIncludes = (source, fragments, label) => {
 
 const backup = read("scripts/pilot-backup-run.js");
 const backupS3 = read("scripts/pilot-backup-s3.js");
+const s3Client = read("src/utils/s3ObjectClient.js");
 const restore = read("scripts/pilot-restore-drill.js");
 const documentation = read("docs/P9_5_PILOT_BACKUP_RECOVERY.md");
 const operations = read("docs/OPERATIONS.md");
@@ -58,12 +59,25 @@ assertIncludes(
     "PILOT_BACKUP_S3_ACCESS_KEY_ID",
     "PILOT_BACKUP_S3_SECRET_ACCESS_KEY",
     "PILOT_BACKUP_ENCRYPTION_KEY",
-    "AWS4-HMAC-SHA256",
     "uploadEncryptedBackup",
+    "downloadLatestEncryptedBackup",
     "plaintext_sha256",
+    "source_snapshot",
     "pruneEncryptedBackups",
   ],
   "scripts/pilot-backup-s3.js",
+);
+
+assertIncludes(
+  s3Client,
+  [
+    "AWS4-HMAC-SHA256",
+    "X-Amz-Content-Sha256",
+    "putObject",
+    "getObject",
+    "deleteObject",
+  ],
+  "src/utils/s3ObjectClient.js",
 );
 
 assertIncludes(
@@ -77,6 +91,9 @@ assertIncludes(
     "source_snapshot",
     "snapshot del backup",
     "DROP DATABASE IF EXISTS",
+    "downloadLatestEncryptedBackup",
+    "encrypted-bucket",
+    "source_cleanup_ok",
     "PILOT_RPO_TARGET_HOURS",
     "PILOT_RTO_TARGET_MINUTES",
     "pilot_restore_drill_completed",
