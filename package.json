@@ -79,7 +79,8 @@
     "pilot:exit:gate": "node scripts/pilot-exit-gate.js",
     "test:p9-exit-gate-contracts": "node scripts/test-p9-exit-gate-contracts.js",
     "staging:free:budget": "node scripts/staging-free-budget.js",
-    "test:h1-zero-cost-staging-contracts": "node scripts/test-h1-zero-cost-staging-contracts.js"
+    "test:h1-zero-cost-staging-contracts": "node scripts/test-h1-zero-cost-staging-contracts.js",
+    "staging:upload-storage:smoke": "node scripts/staging-upload-storage-smoke.js"
   },
   "keywords": [],
   "author": "",
