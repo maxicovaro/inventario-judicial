@@ -231,6 +231,39 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      - name: Run H1 zero-cost staging budget
+        run: |
+          rm -rf staging-free-results
+          npm run staging:free:budget -- \
+            --evidence pilot/staging-free-budget.example.json \
+            --output staging-free-results/budget.json
+          node - <<'NODE'
+          const fs = require("fs");
+          const report = JSON.parse(
+            fs.readFileSync("staging-free-results/budget.json", "utf8"),
+          );
+          if (
+            report.schema_version !== 1 ||
+            report.environment !== "staging" ||
+            report.status !== "PASS" ||
+            !(report.totals.continuous_monthly_usd > 5) ||
+            !(report.totals.projected_monthly_usd < 1) ||
+            !(report.totals.max_uniform_active_hours_per_day > 3)
+          ) {
+            throw new Error("Presupuesto H1 no cumplió el contrato esperado");
+          }
+          console.log("✓ H1 confirma que 24/7 excede Free y Serverless proyectado cabe en USD 1.");
+          NODE
+
+      - name: Upload H1 zero-cost budget artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h1-zero-cost-staging-budget
+          path: staging-free-results/
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Run P8.0 API baseline
         run: |
           npm run perf:fixtures
