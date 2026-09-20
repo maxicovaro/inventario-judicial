@@ -2,7 +2,9 @@
 
 ## Estado y objetivo
 
-P9.5 está **activo**. Su objetivo es convertir los mecanismos de backup/restore ya existentes en una rutina periódica, verificable y medible para el piloto, sin ampliar privilegios de la aplicación ni introducir restauraciones destructivas sobre la base activa.
+P9.5 está en **cierre técnico pre-merge**. La implementación, Quality Gate y validación real de staging ya están completas; el cierre formal requiere integrar el PR #49 y obtener el Quality Gate post-merge verde.
+
+Su objetivo es convertir los mecanismos de backup/restore ya existentes en una rutina periódica, verificable y medible para el piloto, sin ampliar privilegios de la aplicación ni introducir restauraciones destructivas sobre la base activa.
 
 P9.5 no reemplaza P3, P7 ni P9.1. Los reutiliza:
 - P3 aporta `db:backup`, checksum SHA-256, `db:restore` y restore drill de CI;
@@ -192,10 +194,10 @@ Los resultados de CI pueden publicarse como artifact sintético. Los resultados 
 
 ## 7. Programación prevista en staging
 
-Frecuencia objetivo:
-- backup lógico: **diario**;
+Frecuencia aplicada en staging:
+- backup lógico: **diario a las 06:00 UTC / 03:00 Argentina** mediante Railway Cron `0 6 * * *`;
 - segunda copia cifrada al bucket: **en la misma ejecución diaria**;
-- restore drill real: **mensual** y antes de ampliar el piloto;
+- restore drill real: **mensual** y antes de ampliar el piloto, ejecutado manualmente de forma controlada;
 - backup adicional: antes de toda migración/cambio destructivo.
 
 Los backups/PITR nativos del volumen MySQL quedan como mejora opcional de un plan pago y no forman parte del criterio de cierre del piloto de costo cero.
@@ -246,18 +248,88 @@ Detener el flujo y aplicar P9.1 si:
 
 ## 10. Criterios de cierre P9.5
 
-P9.5 puede cerrarse cuando:
-- runners de backup y restore drill están versionados;
-- contrato P9.5 forma parte de `npm test`;
-- Quality Gate ejecuta backup+restore real sobre MySQL descartable;
-- documentación y `ROADMAP.md` están alineados;
-- existe al menos un backup lógico real de staging verificado;
-- la retención primaria está validada;
-- existe una segunda capa de backup real fuera del runtime primario;
-- existe un restore drill real de staging sobre base alternativa;
-- RPO/RTO reales quedan medidos y dentro de objetivo, o cualquier incumplimiento está tratado;
-- la programación periódica real queda configurada y evidenciada;
-- PR del bloque queda verde y mergeado;
-- Quality Gate post-merge queda verde.
+Estado al 20/09/2026:
 
-**P9.6 permanece bloqueado mientras P9.5 esté activo.**
+- ✅ runners de backup y restore drill versionados;
+- ✅ contrato P9.5 forma parte de `npm test`;
+- ✅ Quality Gate ejecuta backup+restore real sobre MySQL descartable;
+- ✅ documentación y `ROADMAP.md` alineados para cierre pre-merge;
+- ✅ backup lógico real de staging verificado;
+- ✅ retención primaria configurada en 7;
+- ✅ segunda capa real fuera del volumen primario mediante Storage Bucket privado;
+- ✅ copia secundaria cifrada con AES-256-GCM y reverificada por SHA-256;
+- ✅ restore drill real de staging sobre base alternativa;
+- ✅ RPO/RTO reales dentro de objetivo;
+- ✅ base temporal eliminada al finalizar el drill;
+- ✅ cron diario real configurado;
+- ⏳ PR #49 pendiente de merge;
+- ⏳ Quality Gate post-merge pendiente.
+
+**P9.6 permanece bloqueado hasta completar esos dos últimos puntos y registrar el cierre formal desde `main`.**
+
+---
+
+## 11. Evidencia real de staging — 20/09/2026
+
+### Quality Gate
+
+- PR: **#49**;
+- HEAD validado: `7bdeeec815be4d4e78320063891fb73e1bcb92ee`;
+- Quality Gate **#330**: verde;
+- incluye contratos, sintaxis, integración MySQL, backup/restore P9.5, concurrencia, rendimiento, E2E y frontend.
+
+### Backup lógico real + segunda copia
+
+Deployment Railway:
+- servicio: `pilot-backup-cron`;
+- deployment: `66bd32ef-5f88-4b6b-82ba-7e428a7150db`;
+- SHA: `7bdeeec815be4d4e78320063891fb73e1bcb92ee`;
+- estado: `SUCCESS`.
+
+Resultado estructurado:
+- entorno: `staging`;
+- dump: **44.533 bytes**;
+- SHA-256: `1887757832441ad96f46ddec8f7b057c3313e9a700c98196a2fe64df11682e92`;
+- retención primaria observada: 1 de 7;
+- `bucket_copy_verified=true`;
+- `secondary_copy_verified=true`;
+- duración: **970 ms**.
+
+Segunda capa:
+- bucket privado: `pilot-backup-bucket`;
+- región: US West;
+- objeto SQL cifrado del lado cliente con AES-256-GCM antes de salir del contenedor;
+- descarga posterior, descifrado en memoria y comparación de SHA-256 antes de declarar éxito;
+- backups/PITR nativos del volumen MySQL no se usan porque Railway los reserva para plan Pro y el piloto mantiene objetivo de costo de bolsillo **$0**.
+
+### Restore drill real
+
+Deployment Railway:
+- deployment: `3f4d5547-7284-478d-b4d5-00c42f399047`;
+- SHA: `7bdeeec815be4d4e78320063891fb73e1bcb92ee`;
+- estado del deployment: `SUCCESS`;
+- evento: `pilot_restore_drill_completed`;
+- resultado: **PASS**.
+
+Validación:
+- tablas restauradas/comparadas: **19**;
+- filas comparadas: **168**;
+- RPO real: **0,2203 h** (~13,2 min), objetivo <= 24 h;
+- RTO real: **0,0373 min** (~2,24 s), objetivo <= 240 min;
+- `target_cleanup_ok=true`;
+- la base activa no fue usada como destino;
+- la identidad administrativa de restore fue temporal y separada del usuario normal de aplicación;
+- las variables administrativas de restore se vaciaron después del drill.
+
+### Programación final
+
+Configuración efectiva del servicio:
+- rama: `ops/p9-5-pilot-backup-recovery`;
+- Dockerfile del repositorio;
+- comando: `npm run pilot:backup:run`;
+- política de restart: `NEVER`;
+- volumen dedicado: `/data`, 500 MB;
+- cron: `0 6 * * *` UTC = **03:00 Argentina**;
+- deployment final de configuración: `cf9ef12f-fe83-4d00-9eb7-10d7d0781cd3`, `SUCCESS`.
+
+Con esta evidencia, los criterios técnicos/operativos de P9.5 están satisfechos. Restan únicamente merge del PR #49 y Quality Gate post-merge para declarar el bloque formalmente cerrado.
