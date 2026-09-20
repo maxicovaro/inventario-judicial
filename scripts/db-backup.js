@@ -4,6 +4,7 @@ const {
   databaseConfig,
   metadataPathFor,
   mysqlEnvironment,
+  mysqlCliTlsArgs,
   run,
   sha256File,
 } = require("./db-cli-utils");
@@ -34,6 +35,7 @@ const main = () => {
     `--host=${config.host}`,
     `--port=${config.port}`,
     `--user=${config.user}`,
+    ...mysqlCliTlsArgs(config),
     "--single-transaction",
     "--quick",
     "--triggers",
