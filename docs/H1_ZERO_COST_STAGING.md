@@ -46,6 +46,12 @@ Resultado:
 
 Conclusión: mantener frontend + backend + MySQL despiertos 24/7 no es compatible con Railway Free.
 
+Restricción adicional descubierta en la documentación actual de Railway:
+- Trial: hasta 3 Volumes por proyecto;
+- Free: **máximo 1 Volume por proyecto**.
+
+El staging original tiene 3 Volumes, por lo que H1 debe reducirlos a uno antes de depender del plan Free.
+
 ## 2. Estrategia
 
 H1 usa **Railway Serverless** en los tres servicios permanentes:
@@ -53,6 +59,12 @@ H1 usa **Railway Serverless** en los tres servicios permanentes:
 - frontend;
 - backend;
 - mysql.
+
+La topología persistente objetivo es:
+- `mysql-data`: único Volume del proyecto, montado en `/var/lib/mysql`;
+- adjuntos: bucket privado S3 compatible, prefijo `uploads/staging/`, siempre servidos por backend después de autorización;
+- backup diario: dump/checksum en `/tmp`, copia durable cifrada AES-256-GCM en bucket y restore capaz de recuperar directamente desde esa copia;
+- `backend-data` y `pilot-backup-cron-volume`: se retiran sólo después de validar los reemplazos.
 
 Railway considera inactivo un servicio sin tráfico saliente y normalmente lo duerme después de aproximadamente 5–10 minutos. Un request posterior vuelve a despertarlo.
 
@@ -113,10 +125,10 @@ Esto hace razonable Serverless, pero la prueba real sleep/wake es obligatoria po
 
 H1 preserva P9.5:
 
-- volumen MySQL `/var/lib/mysql`;
-- volumen backend `/data`;
-- volumen backup `/data`;
-- bucket privado cifrado AES-256-GCM;
+- volumen MySQL `/var/lib/mysql`, único Volume permanente;
+- bucket privado para adjuntos;
+- bucket privado con copia de backup cifrada AES-256-GCM;
+- runner de backup sin Volume, usando `/tmp`;
 - backup lógico diario;
 - SHA-256;
 - segunda copia verificada;
@@ -133,6 +145,9 @@ H1 se cierra sólo cuando:
 - modelo de presupuesto versionado y cubierto por tests;
 - Quality Gate verde;
 - Serverless aplicado realmente a frontend/backend/MySQL;
+- proyecto reducido a **un único Volume** (`mysql-data`);
+- adjuntos reales probados en bucket privado: alta, descarga y borrado con autorización preservada;
+- backup cron probado sin Volume y restore recuperado desde bucket cifrado;
 - los tres servicios alcanzan estado de sueño por inactividad;
 - un acceso real despierta el flujo frontend -> backend -> MySQL;
 - health/smoke posteriores al wake son verdes;
