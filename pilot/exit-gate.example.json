@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-20T00:00:00.000Z",
+  "environment": "test",
+  "stability": {
+    "health_ready_200": true,
+    "deployment_success": true,
+    "http_requests": 562,
+    "http_5xx": 0,
+    "open_sev1": 0,
+    "open_sev2": 0
+  },
+  "security": {
+    "active_admins": 1,
+    "admins_with_mfa": 1,
+    "admins_outside_direction": 0,
+    "open_auth_permission_incidents": 0,
+    "security_regression_gate_green": true
+  },
+  "integrity": {
+    "open_stop_conditions": 0,
+    "data_loss_events": 0,
+    "auth_bypass_events": 0,
+    "stock_negative_events": 0,
+    "duplicate_physical_operations": 0,
+    "incomplete_idempotent_operations": 0,
+    "first_wave_scenarios_passed": 12,
+    "first_wave_users_verified": 4
+  },
+  "adoption": {
+    "pilot_users_active": 4,
+    "pilot_users_verified": 4,
+    "pilot_offices_with_functional_activity": 2,
+    "critical_flows_exercised": true
+  },
+  "operations": {
+    "backup_age_hours": 1,
+    "secondary_backup_verified": true,
+    "restore_drill_pass": true,
+    "rpo_hours": 0.2203,
+    "rto_minutes": 0.0373,
+    "backup_cron_enabled": true,
+    "runbooks_ready": true
+  },
+  "performance": {
+    "runtime_p95_ms": 65.31,
+    "runtime_resource_pressure": false,
+    "controlled_load_max_concurrency": 20,
+    "controlled_load_error_rate_pct": 0,
+    "p8_regression_gate_green": true
+  },
+  "institutional": {
+    "approval_status": "PENDING"
+  }
+}

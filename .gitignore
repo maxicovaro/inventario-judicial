@@ -11,3 +11,4 @@ pilot/*.private.json
 pilot/*.local.json
 pilot-metrics-results/
 pilot-backup-results/
+pilot-exit-results/
