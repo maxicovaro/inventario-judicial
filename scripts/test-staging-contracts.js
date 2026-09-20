@@ -30,6 +30,12 @@ const validStagingEnv = () => ({
   TRUST_PROXY_HOPS: "1",
   REQUIRE_ADMIN_MFA: "true",
   MFA_ENCRYPTION_KEY: VALID_MFA_KEY,
+  UPLOAD_STORAGE_MODE: "s3",
+  UPLOAD_S3_ENDPOINT: "https://storage-staging.example.invalid",
+  UPLOAD_S3_BUCKET: "inventario-staging-bucket",
+  UPLOAD_S3_REGION: "auto",
+  UPLOAD_S3_ACCESS_KEY_ID: "test-access-key",
+  UPLOAD_S3_SECRET_ACCESS_KEY: "test-secret-key",
 });
 
 const assertRejected = (mutate, expected) => {
@@ -72,6 +78,14 @@ assertRejected((env) => {
 assertRejected((env) => {
   env.DEPLOY_REVISION = "";
 }, /DEPLOY_REVISION/);
+
+assertRejected((env) => {
+  env.UPLOAD_STORAGE_MODE = "local";
+}, /UPLOAD_STORAGE_MODE debe ser s3/);
+
+assertRejected((env) => {
+  env.UPLOAD_S3_ENDPOINT = "";
+}, /UPLOAD_S3_ENDPOINT/);
 
 assert.strictEqual(isValidBase64Key32(VALID_MFA_KEY), true);
 assert.strictEqual(isValidBase64Key32("not-a-key"), false);
@@ -144,6 +158,9 @@ assert.match(stagingExample, /DEPLOY_ENV=staging/);
 assert.match(stagingExample, /AUTH_TOKEN_TRANSPORT=cookie/);
 assert.match(stagingExample, /REQUIRE_ADMIN_MFA=true/);
 assert.match(stagingExample, /PRODUCTION_DB_NAME=/);
+assert.match(stagingExample, /UPLOAD_STORAGE_MODE=s3/);
+assert.match(stagingExample, /UPLOAD_S3_ENDPOINT=/);
+assert.match(stagingExample, /UPLOAD_S3_BUCKET=/);
 assert.match(frontendStagingExample, /VITE_API_URL=\/api/);
 
 assert.match(backendDockerfile, /FROM node:22-bookworm-slim/);
@@ -167,13 +184,16 @@ assert.match(caddyfile, /try_files \{path\} \/index\.html/);
 assert.match(caddyfile, /trusted_proxies static private_ranges 100\.0\.0\.0\/8/);
 
 assert.match(envConfig, /UPLOAD_DIR:/);
-assert.match(uploadStorage, /env\.UPLOAD_DIR/);
-assert.match(uploadStorage, /\.\.\/\.\.\/storage\/uploads/);
-assert.match(uploadStorage, /ensureUploadsDir/);
-assert.match(uploadStorage, /resolveUploadPath/);
-assert.match(uploadMiddleware, /ensureUploadsDir/);
-assert.match(uploadMiddleware, /uploadsDir/);
-assert.match(adjuntoController, /resolveUploadPath/);
+assert.match(uploadStorage, /UPLOAD_STORAGE_MODE/);
+assert.match(uploadStorage, /UPLOAD_S3_ENDPOINT/);
+assert.match(uploadStorage, /UPLOAD_S3_BUCKET/);
+assert.match(uploadStorage, /saveUpload/);
+assert.match(uploadStorage, /readUpload/);
+assert.match(uploadStorage, /deleteUpload/);
+assert.match(uploadMiddleware, /multer\.memoryStorage/);
+assert.match(adjuntoController, /saveUpload/);
+assert.match(adjuntoController, /readUpload/);
+assert.match(adjuntoController, /deleteUpload/);
 
 assert.match(migrateScript, /verifyBackupFile/);
 assert.match(migrateScript, /backupDatabase !== currentDatabase/);
@@ -186,7 +206,8 @@ assert.match(stagingDoc, /npm run deploy:preflight/);
 assert.match(stagingDoc, /npm run deploy:migrate/);
 assert.match(stagingDoc, /npm run deploy:smoke/);
 assert.match(railwayDoc, /railway ssh --service backend/);
-assert.match(railwayDoc, /\/data\/uploads/);
+assert.match(railwayDoc, /Serverless/);
+assert.match(railwayDoc, /bucket privado/);
 assert.match(railwayDoc, /BACKEND_INTERNAL_URL/);
 
 console.log("✓ Contratos P7.1/P7.2 de staging y Railway validados.");
