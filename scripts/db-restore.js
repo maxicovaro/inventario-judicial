@@ -64,7 +64,7 @@ const parseMysqlDumpStatements = (source) => {
     if (quote) {
       buffer += char;
 
-      if ((quote === "'" || quote === '"') && char === "\" && index + 1 < sql.length) {
+      if ((quote === "'" || quote === '"') && char.charCodeAt(0) === 92 && index + 1 < sql.length) {
         buffer += sql[index + 1];
         index += 2;
         continue;
