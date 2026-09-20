@@ -2,7 +2,7 @@
 
 > **Fuente principal de continuidad del proyecto.**
 >
-> Actualizada al 20/09/2026. **P9.5 — Backup y recuperación durante el piloto** completó implementación, Quality Gate y validación real de staging en rama `ops/p9-5-pilot-backup-recovery`; está en cierre técnico pre-merge del PR #49. P9.6 permanece bloqueado hasta merge + Quality Gate post-merge y cierre formal desde `main`.
+> Actualizada al 20/09/2026. **P9.5 — Backup y recuperación durante el piloto** quedó integrado en `main` mediante PR #49 y Quality Gate post-merge #333 verde. Este commit registra su cierre formal. **P9.6 queda elegible como próximo bloque**, pero no debe abrirse sin releer primero este `ROADMAP.md` desde `main`.
 
 Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality Gate, evidencia técnica y actualización documental antes de considerarse cerrado.
 
@@ -36,8 +36,8 @@ Cada bloque se trabaja en rama propia, con commits identificables, PR, Quality G
 | **P9.2B Primera ola Contable + Informática** | ✅ **Completo** | 12 escenarios + rollback + verify final 4/4; staging `e8256927...` |
 | **P9.3 Procedimiento operativo de administración** | ✅ **Completo** | PR #44; Gate #304; merge `1ec716b8...`; Gate post-merge #305; staging validado |
 | **P9.4 Indicadores reales del piloto** | ✅ **Completo** | PR #47; merge `d1aa207e...`; Gate #313/#314; captura real + staging `b6de2f78...` / `d95d1768...` SUCCESS |
-| **P9.5 Backup/restore periódico del piloto** | 🟠 **Cierre pre-merge** | Gate #330 verde; backup real + bucket cifrado + restore PASS + cron diario; PR #49 pendiente de merge/post-merge |
-| P9.6 Criterios de salida a producción institucional | ⏳ **Bloqueado** | Se habilita sólo tras cierre formal de P9.5 desde `main` |
+| **P9.5 Backup/restore periódico del piloto** | ✅ **Completo** | PR #49; merge `41cb640b...`; Gate #332/#333; backup real + bucket cifrado + restore PASS + cron diario |
+| P9.6 Criterios de salida a producción institucional | 🟢 **Elegible** | Próximo bloque; releer `ROADMAP.md` desde `main` antes de abrir |
 
 ---
 
@@ -561,7 +561,7 @@ Documento: `docs/P9_4_PILOT_INDICATORS.md`.
 
 Regla de transición aplicada: **P9.5 permanece bloqueado** hasta el cierre formal de P9.4. P9.5 sólo se abre después de integrar este cierre documental, confirmar su Gate post-merge verde y releer `ROADMAP.md` desde `main`.
 
-### P9.5 — Backup y recuperación durante el piloto 🟠 CIERRE PRE-MERGE
+### P9.5 — Backup y recuperación durante el piloto ✅ CERRADO
 
 Regla de transición cumplida: P9.4 fue cerrado formalmente antes de abrir P9.5.
 
@@ -607,13 +607,15 @@ Guardas preservadas:
 - dumps/resultados reales fuera de Git;
 - P9.1 prevalece ante checksum inválido, restore inconsistente o incumplimiento material de RPO/RTO.
 
-Pendiente exclusivamente para cierre formal:
-- Gate del commit documental final;
-- merge PR #49;
-- Quality Gate post-merge;
-- registrar desde `main` el cierre formal y habilitar P9.6.
+Cierre formal:
+- Quality Gate final pre-merge #332 ✅;
+- PR #49 mergeado por squash ✅;
+- merge `41cb640bc299a5faf9af6c3ed67beb258063bfc5` ✅;
+- Quality Gate post-merge #333 sobre ese SHA ✅;
+- staging conserva backup diario a las 03:00 Argentina, segunda copia cifrada y restore drill validado ✅;
+- no quedaron stop conditions P9.1 abiertas.
 
-P9.6 permanece bloqueado hasta completar esos puntos.
+**P9.5 queda formalmente cerrado. P9.6 pasa a ser elegible, no abierto.** Antes de abrir P9.6 se debe releer este `ROADMAP.md` desde `main`.
 
 ### P9.6 — Criterios de salida del piloto ⏳
 
