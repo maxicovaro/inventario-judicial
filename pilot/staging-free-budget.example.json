@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-20T15:35:00.000Z",
+  "environment": "staging",
+  "free_credit_usd": 1,
+  "services": [
+    {
+      "name": "backend",
+      "average_memory_gb": 0.099678,
+      "average_cpu_vcpu": 0.0001192,
+      "projected_active_hours_per_day": 1.5
+    },
+    {
+      "name": "frontend",
+      "average_memory_gb": 0.038065,
+      "average_cpu_vcpu": 0.00004153,
+      "projected_active_hours_per_day": 1.5
+    },
+    {
+      "name": "mysql",
+      "average_memory_gb": 0.461872,
+      "average_cpu_vcpu": 0.0039689,
+      "projected_active_hours_per_day": 1.5
+    }
+  ],
+  "storage": {
+    "volume_used_gb": 0.227279,
+    "bucket_used_gb": 0.001
+  }
+}
