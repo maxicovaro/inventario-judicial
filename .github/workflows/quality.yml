@@ -199,6 +199,38 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      - name: Run P9.6 pilot exit gate
+        run: |
+          rm -rf pilot-exit-results
+          npm run pilot:exit:gate -- \
+            --evidence pilot/exit-gate.example.json \
+            --output pilot-exit-results/ci.json
+          node - <<'NODE'
+          const fs = require("fs");
+          const report = JSON.parse(
+            fs.readFileSync("pilot-exit-results/ci.json", "utf8"),
+          );
+          if (
+            report.schema_version !== 1 ||
+            report.technical_status !== "PASS" ||
+            report.institutional_status !== "PENDING" ||
+            report.decision !== "ELIGIBLE_FOR_INSTITUTIONAL_APPROVAL" ||
+            report.failures?.length !== 0
+          ) {
+            throw new Error("Gate P9.6 CI no cumplió el contrato esperado");
+          }
+          console.log("✓ Gate P9.6 CI finalizó con PASS técnico y aprobación institucional pendiente.");
+          NODE
+
+      - name: Upload P9.6 exit gate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p9-6-exit-gate
+          path: pilot-exit-results/
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Run P8.0 API baseline
         run: |
           npm run perf:fixtures
