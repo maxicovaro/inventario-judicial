@@ -2,7 +2,7 @@
 
 ## Estado y objetivo
 
-P9.5 está en **cierre técnico pre-merge**. La implementación, Quality Gate y validación real de staging ya están completas; el cierre formal requiere integrar el PR #49 y obtener el Quality Gate post-merge verde.
+P9.5 está **formalmente cerrado**. La implementación, Quality Gate, validación real de staging, merge y Quality Gate post-merge quedaron completos.
 
 Su objetivo es convertir los mecanismos de backup/restore ya existentes en una rutina periódica, verificable y medible para el piloto, sin ampliar privilegios de la aplicación ni introducir restauraciones destructivas sobre la base activa.
 
@@ -262,10 +262,11 @@ Estado al 20/09/2026:
 - ✅ RPO/RTO reales dentro de objetivo;
 - ✅ base temporal eliminada al finalizar el drill;
 - ✅ cron diario real configurado;
-- ⏳ PR #49 pendiente de merge;
-- ⏳ Quality Gate post-merge pendiente.
+- ✅ PR #49 mergeado por squash en `41cb640bc299a5faf9af6c3ed67beb258063bfc5`;
+- ✅ Quality Gate final pre-merge #332 verde;
+- ✅ Quality Gate post-merge #333 verde.
 
-**P9.6 permanece bloqueado hasta completar esos dos últimos puntos y registrar el cierre formal desde `main`.**
+**P9.5 queda formalmente cerrado. P9.6 pasa a ser elegible como próximo bloque, pero no se abre hasta releer `ROADMAP.md` desde `main`.**
 
 ---
 
@@ -333,3 +334,26 @@ Configuración efectiva del servicio:
 - deployment final de configuración: `cf9ef12f-fe83-4d00-9eb7-10d7d0781cd3`, `SUCCESS`.
 
 Con esta evidencia, los criterios técnicos/operativos de P9.5 están satisfechos. Restan únicamente merge del PR #49 y Quality Gate post-merge para declarar el bloque formalmente cerrado.
+
+
+---
+
+## 12. Cierre formal
+
+Cierre registrado el 20/09/2026.
+
+Evidencia definitiva:
+- PR #49 integrado;
+- merge squash `41cb640bc299a5faf9af6c3ed67beb258063bfc5`;
+- Quality Gate final pre-merge #332 verde;
+- Quality Gate post-merge #333 verde;
+- backup real de staging verificado;
+- segunda copia cifrada en bucket verificada;
+- restore drill real PASS;
+- RPO/RTO dentro de objetivo;
+- cleanup de base temporal confirmado;
+- cron diario de backup activo a las 06:00 UTC / 03:00 Argentina;
+- objetivo de costo de bolsillo $0 preservado;
+- sin stop conditions P9.1 abiertas.
+
+La continuidad pasa a P9.6 únicamente después de releer `ROADMAP.md` desde `main`.
