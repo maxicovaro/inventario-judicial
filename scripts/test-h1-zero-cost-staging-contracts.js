@@ -1,3 +1,4 @@
+const assert = require("assert");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -5,7 +6,12 @@ const { spawnSync } = require("child_process");
 
 const root = path.resolve(__dirname, "..");
 const script = path.join(root, "scripts", "staging-free-budget.js");
-const example = path.join(root, "pilot", "staging-free-budget.example.json");
+const current = path.join(root, "pilot", "staging-free-budget.example.json");
+const target = path.join(
+  root,
+  "pilot",
+  "staging-free-budget-target.example.json",
+);
 
 const run = (args) =>
   spawnSync(process.execPath, [script, ...args], {
@@ -13,50 +19,31 @@ const run = (args) =>
     encoding: "utf8",
   });
 
-const pass = run(["--evidence", example]);
-if (pass.status !== 0) {
+const currentRun = run(["--evidence", current]);
+if (currentRun.status !== 2) {
   throw new Error(
-    `H1 ejemplo esperado PASS falló: ${pass.stderr || pass.stdout}`,
+    `H1 debe demostrar que Railway continuo queda OVER_BUDGET; status=${currentRun.status}: ${currentRun.stderr || currentRun.stdout}`,
   );
 }
-const report = JSON.parse(pass.stdout);
-if (report.status !== "PASS") {
-  throw new Error("H1 ejemplo no terminó en PASS");
+const currentReport = JSON.parse(currentRun.stdout);
+assert.strictEqual(currentReport.status, "OVER_BUDGET");
+assert.ok(currentReport.totals.continuous_monthly_usd > 5);
+
+const targetRun = run(["--evidence", target]);
+if (targetRun.status !== 0) {
+  throw new Error(
+    `H1 target residual esperado PASS falló: ${targetRun.stderr || targetRun.stdout}`,
+  );
 }
-if (!(report.totals.continuous_monthly_usd > 5)) {
-  throw new Error("H1 debe demostrar que 24/7 supera ampliamente Free");
-}
-if (!(report.totals.projected_monthly_usd < 1)) {
-  throw new Error("H1 debe demostrar que el patrón Serverless cabe en Free");
-}
-if (!(report.totals.max_uniform_active_hours_per_day > 3)) {
-  throw new Error("H1 debe calcular margen operativo diario");
-}
+const targetReport = JSON.parse(targetRun.stdout);
+assert.strictEqual(targetReport.status, "PASS");
+assert.ok(targetReport.totals.projected_monthly_usd < 1);
+assert.ok(targetReport.totals.projected_headroom_usd > 0.9);
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "inventario-h1-"));
 try {
-  const overBudget = JSON.parse(fs.readFileSync(example, "utf8"));
-  for (const service of overBudget.services) {
-    service.projected_active_hours_per_day = 24;
-  }
-  const overFile = path.join(tmp, "over-budget.json");
-  fs.writeFileSync(overFile, JSON.stringify(overBudget), "utf8");
-
-  const blocked = run(["--evidence", overFile]);
-  if (blocked.status !== 2) {
-    throw new Error(
-      `H1 debe devolver exit 2 cuando supera presupuesto; status=${blocked.status}`,
-    );
-  }
-  const blockedReport = JSON.parse(blocked.stdout);
-  if (blockedReport.status !== "OVER_BUDGET") {
-    throw new Error("H1 no clasificó correctamente OVER_BUDGET");
-  }
-
-  const wrongEnv = {
-    ...overBudget,
-    environment: "production",
-  };
+  const wrongEnv = JSON.parse(fs.readFileSync(target, "utf8"));
+  wrongEnv.environment = "production";
   const wrongEnvFile = path.join(tmp, "production.json");
   fs.writeFileSync(wrongEnvFile, JSON.stringify(wrongEnv), "utf8");
 
@@ -73,11 +60,61 @@ const requiredFiles = [
   "ROADMAP.md",
   ".github/workflows/quality.yml",
   "package.json",
+  "render.yaml",
+  "pilot/staging-free-budget-target.example.json",
+  "src/utils/s3ObjectClient.js",
 ];
 for (const file of requiredFiles) {
   if (!fs.existsSync(path.join(root, file))) {
     throw new Error(`Falta archivo contractual H1: ${file}`);
   }
 }
+
+const render = fs.readFileSync(path.join(root, "render.yaml"), "utf8");
+const envConfig = fs.readFileSync(
+  path.join(root, "src/config/env.js"),
+  "utf8",
+);
+const database = fs.readFileSync(
+  path.join(root, "src/config/database.js"),
+  "utf8",
+);
+const app = fs.readFileSync(path.join(root, "src/app.js"), "utf8");
+const headers = fs.readFileSync(
+  path.join(root, "src/middlewares/securityHeaders.js"),
+  "utf8",
+);
+const preflight = fs.readFileSync(
+  path.join(root, "scripts/deploy-preflight.js"),
+  "utf8",
+);
+const dbCli = fs.readFileSync(
+  path.join(root, "scripts/db-cli-utils.js"),
+  "utf8",
+);
+
+assert.match(render, /plan:\s*free/);
+assert.match(render, /autoDeployTrigger:\s*checksPass/);
+assert.match(render, /VITE_API_URL=\/api/);
+assert.match(render, /SERVE_FRONTEND_STATIC/);
+assert.match(render, /STAGING_TOPOLOGY/);
+assert.match(render, /DB_SSL/);
+assert.match(render, /UPLOAD_STORAGE_MODE/);
+assert.match(render, /healthCheckPath:\s*\/health\/ready/);
+
+assert.match(envConfig, /DB_SSL_REJECT_UNAUTHORIZED/);
+assert.match(envConfig, /SERVE_FRONTEND_STATIC/);
+assert.match(envConfig, /RENDER_EXTERNAL_HOSTNAME/);
+assert.match(envConfig, /RENDER_GIT_COMMIT/);
+assert.match(database, /dialectOptions:\s*\{ ssl \}/);
+assert.match(database, /TLSv1\.2/);
+assert.match(app, /express\.static/);
+assert.match(app, /res\.sendFile\(frontendIndex\)/);
+assert.match(headers, /FRONTEND_CSP/);
+assert.match(headers, /connect-src 'self'/);
+assert.match(preflight, /external-free/);
+assert.match(preflight, /DB_SSL debe ser true/);
+assert.match(dbCli, /--ssl-mode=VERIFY_IDENTITY/);
+assert.match(dbCli, /mysql2SslOptions/);
 
 console.log("✓ Contratos H1 de staging gratuito verificados.");
