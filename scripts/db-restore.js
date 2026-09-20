@@ -3,6 +3,7 @@ const path = require("path");
 const {
   databaseConfig,
   mysqlEnvironment,
+  mysqlCliTlsArgs,
   run,
   validateDatabaseName,
   verifyBackupFile,
@@ -38,6 +39,9 @@ const main = () => {
     name: argValue("--target") || process.env.RESTORE_DB_NAME,
     user: source.user,
     password: source.password,
+    ssl: source.ssl,
+    sslRejectUnauthorized: source.sslRejectUnauthorized,
+    sslCaPath: source.sslCaPath,
   });
 
   const target = validateDatabaseName(argValue("--target") || restoreConfig.name);
@@ -70,6 +74,7 @@ const main = () => {
     `--host=${restoreConfig.host}`,
     `--port=${restoreConfig.port}`,
     `--user=${restoreConfig.user}`,
+    ...mysqlCliTlsArgs(restoreConfig),
     "--default-character-set=utf8mb4",
   ];
 
